@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WARDAR — Global Situational Awareness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050507;
+  --panel:#0a0a0e;
+  --panel2:#0f0f14;
+  --border:#1a1a24;
+  --amber:#f59e0b;
+  --amber-dim:rgba(245,158,11,.15);
+  --green:#22c55e;
+  --cyan:#06b6d4;
+  --red:#ef4444;
+  --purple:#a855f7;
+  --yellow:#eab308;
+  --blue:#3b82f6;
+  --text:#c8ccd4;
+  --dim:#4a4d58;
+  --font:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
+#map{position:absolute;inset:0;z-index:1}
+
+/* ── BOOT OVERLAY ── */
+#boot{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+  padding:4rem;font-family:var(--font);
+  transition:opacity .6s ease;
+}
+#boot.fade{opacity:0;pointer-events:none}
+.boot-line{
+  font-size:.8rem;letter-spacing:.08em;color:var(--dim);
+  opacity:0;transform:translateX(-8px);
+  transition:opacity .2s,transform .2s;
+  margin-bottom:.35rem;
+  white-space:nowrap;
+}
+.boot-line.show{opacity:1;transform:none}
+.boot-line.ok::after{content:" ■";color:var(--green)}
+.boot-line.warn::after{content:" ▲";color:var(--amber)}
+.boot-line b{color:var(--amber)}
+.boot-logo{
+  font-size:2.8rem;font-weight:700;letter-spacing:.2em;
+  color:var(--amber);margin-bottom:2rem;
+  text-shadow:0 0 40px rgba(245,158,11,.3);
+}
+.boot-sub{font-size:.65rem;letter-spacing:.25em;color:var(--dim);margin-top:-.5rem;margin-bottom:2.5rem}
+.boot-cursor{
+  display:inline-block;width:8px;height:1em;background:var(--amber);
+  vertical-align:text-bottom;margin-left:4px;
+  animation:blink .7s step-end infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── CONTROL PANEL ── */
+#panel{
+  position:absolute;top:16px;left:16px;z-index:500;
+  background:rgba(10,10,14,.92);border:1px solid var(--border);
+  width:220px;font-size:.72rem;letter-spacing:.05em;
+  backdrop-filter:blur(8px);
+}
+.panel-header{
+  padding:.75rem 1rem;border-bottom:1px solid var(--border);
+}
+.panel-title{
+  font-size:1.05rem;font-weight:700;letter-spacing:.18em;color:var(--amber);
+  text-shadow:0 0 20px rgba(245,158,11,.25);
+}
+.panel-sub{
+  font-size:.55rem;letter-spacing:.18em;color:var(--dim);margin-top:2px;
+}
+.layer-list{padding:.5rem 0}
+.layer-item{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.35rem 1rem;cursor:pointer;
+  transition:background .15s;
+}
+.layer-item:hover{background:rgba(255,255,255,.03)}
+.layer-cb{
+  appearance:none;width:12px;height:12px;flex-shrink:0;
+  border:1px solid var(--dim);cursor:pointer;
+  position:relative;transition:border-color .15s;
+}
+.layer-cb:checked{border-color:currentColor;background:currentColor}
+.layer-cb:checked::after{
+  content:'';position:absolute;inset:2px;
+  background:var(--bg);clip-path:polygon(14% 44%,0 65%,50% 100%,100% 16%,80% 0%,43% 62%);
+}
+.layer-icon{font-size:.85rem;line-height:1;flex-shrink:0;width:16px;text-align:center}
+.layer-name{flex:1;color:var(--text)}
+.layer-count{
+  font-size:.62rem;padding:.1rem .35rem;
+  border-radius:2px;color:#000;font-weight:700;min-width:20px;text-align:center;
+}
+.panel-footer{
+  border-top:1px solid var(--border);padding:.6rem 1rem;
+  font-size:.58rem;color:var(--dim);line-height:1.6;
+}
+
+/* ── STATUS BAR ── */
+#statusbar{
+  position:absolute;bottom:0;left:0;right:0;z-index:500;
+  background:rgba(10,10,14,.95);border-top:1px solid var(--border);
+  height:32px;display:flex;align-items:center;gap:1.5rem;
+  padding:0 1rem;font-size:.62rem;letter-spacing:.06em;
+  backdrop-filter:blur(8px);
+}
+.sb-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--dim);
+  display:inline-block;margin-right:.35rem;flex-shrink:0;
+}
+.sb-dot.live{background:var(--green);box-shadow:0 0 6px var(--green)}
+.sb-dot.dead{background:var(--red)}
+.sb-sep{color:var(--border);user-select:none}
+.sb-delay{
+  margin-left:auto;font-size:.58rem;letter-spacing:.08em;
+  color:var(--amber);border:1px solid rgba(245,158,11,.25);
+  padding:.2rem .6rem;background:rgba(245,158,11,.05);flex-shrink:0;
+}
+.sb-count{color:var(--text)}
+.sb-count span{color:var(--amber);font-weight:500}
+
+/* ── POPUP ── */
+.leaflet-popup-content-wrapper{
+  background:var(--panel2)!important;border:1px solid var(--border)!important;
+  border-radius:0!important;box-shadow:0 4px 24px rgba(0,0,0,.6)!important;
+  color:var(--text)!important;font-family:var(--font)!important;
+  font-size:.72rem!important;letter-spacing:.04em!important;
+  padding:0!important;
+}
+.leaflet-popup-tip{background:var(--panel2)!important}
+.leaflet-popup-content{margin:0!important;padding:0!important}
+.popup-inner{padding:.75rem 1rem}
+.popup-call{font-size:.88rem;font-weight:700;letter-spacing:.1em;color:var(--amber);margin-bottom:.5rem}
+.popup-row{display:flex;gap:.5rem;margin-bottom:.2rem}
+.popup-label{color:var(--dim);width:70px;flex-shrink:0}
+.popup-val{color:var(--text)}
+.delay-badge{
+  display:inline-block;margin-top:.5rem;font-size:.6rem;font-weight:700;
+  letter-spacing:.08em;padding:.2rem .5rem;
+  color:#000;background:var(--amber);
+}
+.delay-badge.conflict{background:var(--red);color:#fff}
+
+/* ── MARKER CLUSTER OVERRIDE ── */
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{
+  background:rgba(10,10,14,.8)!important;border:1px solid var(--border)!important;
+}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{
+  background:rgba(245,158,11,.12)!important;color:var(--amber)!important;
+  font-family:var(--font)!important;font-size:.65rem!important;letter-spacing:.05em!important;
+}
+
+/* Leaflet attribution override */
+.leaflet-control-attribution{
+  background:rgba(10,10,14,.7)!important;color:var(--dim)!important;
+  font-family:var(--font)!important;font-size:.55rem!important;
+}
+.leaflet-control-attribution a{color:var(--dim)!important}
+.leaflet-control-zoom a{
+  background:var(--panel)!important;border-color:var(--border)!important;
+  color:var(--text)!important;font-family:var(--font)!important;
+}
+.leaflet-control-zoom a:hover{background:var(--panel2)!important;color:var(--amber)!important}
+</style>
+</head>
+<body>
+
+<!-- BOOT SEQUENCE -->
+<div id="boot">
+  <div class="boot-logo">WARDAR</div>
+  <div class="boot-sub">GLOBAL SITUATIONAL AWARENESS PLATFORM</div>
+  <div id="boot-lines"></div>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- CONTROL PANEL -->
+<div id="panel">
+  <div class="panel-header">
+    <div class="panel-title">WARDAR</div>
+    <div class="panel-sub">GLOBAL SITUATIONAL AWARENESS</div>
+  </div>
+  <div class="layer-list">
+    <label class="layer-item" onclick="toggleLayer('adsb')">
+      <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)">
+      <span class="layer-icon">✈</span>
+      <span class="layer-name">AIRCRAFT</span>
+      <span class="layer-count" id="cnt-adsb" style="background:var(--amber)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('ais')">
+      <input type="checkbox" class="layer-cb" id="cb-ais" checked style="color:var(--cyan)">
+      <span class="layer-icon" style="color:var(--cyan)">⛵</span>
+      <span class="layer-name">MARITIME</span>
+      <span class="layer-count" id="cnt-ais" style="background:var(--cyan)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('tle')">
+      <input type="checkbox" class="layer-cb" id="cb-tle" checked style="color:var(--purple)">
+      <span class="layer-icon" style="color:var(--purple)">◎</span>
+      <span class="layer-name">SATELLITE</span>
+      <span class="layer-count" id="cnt-tle" style="background:var(--purple)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('acled')">
+      <input type="checkbox" class="layer-cb" id="cb-acled" checked style="color:var(--red)">
+      <span class="layer-icon" style="color:var(--red)">💥</span>
+      <span class="layer-name">CONFLICT</span>
+      <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('notam')">
+      <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)">
+      <span class="layer-icon" style="color:var(--yellow)">⚠</span>
+      <span class="layer-name">NOTAM</span>
+      <span class="layer-count" id="cnt-notam" style="background:var(--yellow)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('osint')">
+      <input type="checkbox" class="layer-cb" id="cb-osint" checked style="color:var(--blue)">
+      <span class="layer-icon" style="color:var(--blue)">📡</span>
+      <span class="layer-name">OSINT</span>
+      <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
+    </label>
+  </div>
+  <div class="panel-footer">
+    DATA DELAYED PER POLICY<br>
+    CIVILIAN +30s · MILITARY +24H
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <span id="sb-conn"><span class="sb-dot" id="sb-dot"></span><span id="sb-conntext">CONNECTING</span></span>
+  <span class="sb-sep">│</span>
+  <span class="sb-count">✈ <span id="sb-ac">0</span></span>
+  <span class="sb-count">⛵ <span id="sb-sh">0</span></span>
+  <span class="sb-count">◎ <span id="sb-sat">0</span></span>
+  <span class="sb-count">⚑ <span id="sb-ev">0</span></span>
+  <span class="sb-sep">│</span>
+  <span id="sb-ts" style="color:var(--dim)">--:--:-- UTC</span>
+  <span class="sb-delay">DELAYED — CIVILIAN 30s / MILITARY 24H</span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+// ── XSS helper ──────────────────────────────────────────────────────────────
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Boot sequence ───────────────────────────────────────────────────────────
+const BOOT_LINES = [
+  {t:"WARDAR v0.1 INITIALIZING...", cls:""},
+  {t:"LOADING CARTOGRAPHIC DATABASE...", cls:"ok"},
+  {t:"ADS-B EXCHANGE FEED............", cls:"ok"},
+  {t:"AIS STREAM WEBSOCKET............", cls:"ok"},
+  {t:"CELESTRAK TLE CATALOG...........", cls:"ok"},
+  {t:"ACLED CONFLICT DATABASE.........", cls:"ok"},
+  {t:"GDELT OSINT MONITOR.............", cls:"ok"},
+  {t:"FAA NOTAM FEED..................", cls:"ok"},
+  {t:"DELAY POLICY ENFORCED...........", cls:"ok"},
+  {t:"ALL SYSTEMS NOMINAL ▸ WARDAR ACTIVE", cls:""},
+];
+
+function runBoot(){
+  const container = document.getElementById('boot-lines');
+  let i = 0;
+  function step(){
+    if(i >= BOOT_LINES.length){
+      setTimeout(()=>{
+        document.getElementById('boot').classList.add('fade');
+        setTimeout(()=>{
+          document.getElementById('boot').remove();
+          initMap();
+        }, 700);
+      }, 400);
+      return;
+    }
+    const d = document.createElement('div');
+    d.className = 'boot-line' + (BOOT_LINES[i].cls ? ' ' + BOOT_LINES[i].cls : '');
+    d.innerHTML = '<b>›</b> ' + esc(BOOT_LINES[i].t) + (i === BOOT_LINES.length-1 ? '' : '<span class="boot-cursor"></span>');
+    container.appendChild(d);
+    requestAnimationFrame(()=>{ setTimeout(()=>d.classList.add('show'), 20); });
+    i++;
+    setTimeout(step, i === 1 ? 300 : 220);
+  }
+  step();
+}
+runBoot();
+
+// ── State ────────────────────────────────────────────────────────────────────
+let map;
+const CLUSTER_THRESHOLD = 500;
+
+// Marker storage: key = callsign+source, value = marker
+const markers = { adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{} };
+
+// Layer groups
+let layers = {};
+
+// Visibility
+const visible = { adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true };
+
+// ── SVG DivIcons ─────────────────────────────────────────────────────────────
+function makeIcon(emoji, color, size=22){
+  return L.divIcon({
+    html: `<div style="font-size:${size}px;line-height:1;color:${color};text-shadow:0 0 8px ${color}88;filter:drop-shadow(0 0 3px ${color}66)">${emoji}</div>`,
+    className:'',
+    iconSize:[size,size],
+    iconAnchor:[size/2,size/2],
+    popupAnchor:[0,-size/2],
+  });
+}
+
+const ICONS = {
+  adsb:  { fn: (mil) => makeIcon('✈', mil ? '#ef4444' : '#f59e0b') },
+  opensky: { fn: (mil) => makeIcon('✈', mil ? '#ef4444' : '#f59e0b') },
+  ais:   { fn: () => makeIcon('⛵','#06b6d4',18) },
+  tle:   { fn: () => makeIcon('◎','#a855f7',16) },
+  acled: { fn: () => makeIcon('💥','#ef4444',18) },
+  notam: { fn: () => makeIcon('⚠','#eab308',20) },
+  gdelt: { fn: () => makeIcon('📡','#3b82f6',18) },
+  osint_news: { fn: () => makeIcon('📡','#3b82f6',18) },
+};
+
+function iconFor(source, mil){
+  const s = source.toLowerCase();
+  if(ICONS[s]) return ICONS[s].fn(mil);
+  return makeIcon('●','#6b7280',14);
+}
+
+// ── Popup builder ────────────────────────────────────────────────────────────
+function fmtTs(ts){
+  if(!ts) return '—';
+  try{
+    const d = new Date(ts);
+    return d.toISOString().replace('T',' ').substring(0,19)+' UTC';
+  }catch{return ts;}
+}
+
+function buildPopup(p){
+  const isEvent = !!(p.title);
+  const isMil   = parseInt(p.military_flag||0) === 1;
+  const isConflict = ['acled','gdelt','osint_news'].includes((p.source||'').toLowerCase());
+
+  let badge = '';
+  if(isMil) badge = '<div class="delay-badge">[DELAYED 24H — MILITARY]</div>';
+  else if(isConflict) badge = '<div class="delay-badge conflict">[DELAYED 1H — CONFLICT]</div>';
+
+  if(isEvent){
+    return `<div class="popup-inner">
+      <div class="popup-call">${esc(p.title||'EVENT')}</div>
+      <div class="popup-row"><span class="popup-label">SOURCE</span><span class="popup-val">${esc(p.source||'').toUpperCase()}</span></div>
+      <div class="popup-row"><span class="popup-label">CATEGORY</span><span class="popup-val">${esc(p.category||'').toUpperCase()}</span></div>
+      <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(p.country||'—')}</span></div>
+      <div class="popup-row"><span class="popup-label">TIME</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
+      ${p.description ? `<div class="popup-row" style="flex-direction:column"><span class="popup-label">DESC</span><span class="popup-val" style="color:var(--dim);font-size:.65rem;margin-top:.2rem">${esc(p.description.substring(0,200))}</span></div>`:''}
+      ${p.url ? `<div class="popup-row"><span class="popup-label">URL</span><a href="${esc(p.url)}" target="_blank" style="color:var(--blue);font-size:.65rem">OPEN ↗</a></div>`:''}
+      ${badge}
+    </div>`;
+  }
+
+  const alt  = p.altitude_ft != null ? Math.round(p.altitude_ft).toLocaleString() + ' ft' : '—';
+  const spd  = p.speed_kts   != null ? Math.round(p.speed_kts)   + ' kts'          : '—';
+  const hdg  = p.heading_deg != null ? Math.round(p.heading_deg) + '°'             : '—';
+
+  return `<div class="popup-inner">
+    <div class="popup-call">${esc(p.callsign||'UNKNOWN')}${isMil?' <span style="color:var(--red);font-size:.65rem">◈ MIL</span>':''}</div>
+    <div class="popup-row"><span class="popup-label">SOURCE</span><span class="popup-val">${esc(p.source||'').toUpperCase()}</span></div>
+    <div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val">${esc(p.type||'').toUpperCase()}</span></div>
+    <div class="popup-row"><span class="popup-label">ALTITUDE</span><span class="popup-val">${alt}</span></div>
+    <div class="popup-row"><span class="popup-label">SPEED</span><span class="popup-val">${spd}</span></div>
+    <div class="popup-row"><span class="popup-label">HEADING</span><span class="popup-val">${hdg}</span></div>
+    <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(p.country||'—')}</span></div>
+    <div class="popup-row"><span class="popup-label">SEEN</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
+    ${badge}
+  </div>`;
+}
+
+// ── Layer helpers ────────────────────────────────────────────────────────────
+function sourceToLayerKey(source){
+  const s = (source||'').toLowerCase();
+  if(['adsb','opensky'].includes(s))  return 'adsb';
+  if(s === 'ais')                      return 'ais';
+  if(s === 'tle')                      return 'tle';
+  if(s === 'acled')                    return 'acled';
+  if(s === 'notam')                    return 'notam';
+  if(['gdelt','osint_news'].includes(s)) return 'osint';
+  return 'osint';
+}
+
+function markerKey(p){
+  return (p.callsign||p.title||'') + '_' + (p.source||'') + '_' + (p.lat||0).toFixed(2) + '_' + (p.lon||0).toFixed(2);
+}
+
+function updatePosition(p){
+  if(p.lat == null || p.lon == null) return;
+  const lk  = sourceToLayerKey(p.source);
+  const key  = markerKey(p);
+  const icon = iconFor(p.source, parseInt(p.military_flag||0));
+  const popup = buildPopup(p);
+
+  if(markers[lk] && markers[lk][key]){
+    markers[lk][key].setLatLng([p.lat, p.lon]);
+    markers[lk][key].setPopupContent(popup);
+  } else {
+    if(!markers[lk]) markers[lk] = {};
+    const m = L.marker([p.lat, p.lon], {icon}).bindPopup(popup, {maxWidth:320,minWidth:240});
+    markers[lk][key] = m;
+    if(layers[lk]) layers[lk].addLayer(m);
+  }
+}
+
+function updateEvent(e){
+  if(e.lat == null || e.lon == null) return;
+  updatePosition(e);
+}
+
+function refreshCounts(){
+  const ac  = Object.keys(markers.adsb||{}).length;
+  const sh  = Object.keys(markers.ais||{}).length;
+  const sat = Object.keys(markers.tle||{}).length;
+  const ev  = (Object.keys(markers.acled||{}).length +
+               Object.keys(markers.notam||{}).length +
+               Object.keys(markers.osint||{}).length);
+
+  document.getElementById('cnt-adsb').textContent  = ac;
+  document.getElementById('cnt-ais').textContent   = sh;
+  document.getElementById('cnt-tle').textContent   = sat;
+  document.getElementById('cnt-acled').textContent = Object.keys(markers.acled||{}).length;
+  document.getElementById('cnt-notam').textContent = Object.keys(markers.notam||{}).length;
+  document.getElementById('cnt-osint').textContent = Object.keys(markers.osint||{}).length;
+
+  document.getElementById('sb-ac').textContent  = ac;
+  document.getElementById('sb-sh').textContent  = sh;
+  document.getElementById('sb-sat').textContent = sat;
+  document.getElementById('sb-ev').textContent  = ev;
+
+  const now = new Date();
+  document.getElementById('sb-ts').textContent =
+    now.toISOString().replace('T',' ').substring(0,19) + ' UTC';
+}
+
+// ── Layer toggle ─────────────────────────────────────────────────────────────
+function toggleLayer(key){
+  visible[key] = !visible[key];
+  document.getElementById('cb-'+key).checked = visible[key];
+  if(layers[key]){
+    if(visible[key]) map.addLayer(layers[key]);
+    else             map.removeLayer(layers[key]);
+  }
+}
+
+// ── Map init ─────────────────────────────────────────────────────────────────
+function initMap(){
+  map = L.map('map', {
+    center:[20,0], zoom:3,
+    zoomControl:true,
+    attributionControl:true,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; OpenStreetMap contributors &copy; CARTO',
+    subdomains:'abcd', maxZoom:19,
+  }).addTo(map);
+
+  // Create cluster groups for each layer
+  ['adsb','ais','tle','acled','notam','osint'].forEach(k => {
+    layers[k] = L.markerClusterGroup({
+      disableClusteringAtZoom: 7,
+      maxClusterRadius: 60,
+      iconCreateFunction: function(cluster){
+        const n = cluster.getChildCount();
+        const colors = {adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',notam:'#eab308',osint:'#3b82f6'};
+        const c = colors[k]||'#6b7280';
+        return L.divIcon({
+          html:`<div style="background:rgba(10,10,14,.85);border:1px solid ${c}44;color:${c};font-family:'JetBrains Mono',monospace;font-size:.62rem;width:32px;height:32px;display:flex;align-items:center;justify-content:center;letter-spacing:.04em">${n}</div>`,
+          className:'', iconSize:[32,32],
+        });
+      },
+    });
+    if(visible[k]) layers[k].addTo(map);
+  });
+
+  // Load initial data via REST then connect WS
+  loadInitialData();
+  connectWS();
+}
+
+// ── REST initial load ─────────────────────────────────────────────────────────
+async function loadInitialData(){
+  try{
+    const [posRes, evtRes] = await Promise.all([
+      fetch('/api/positions?limit=3000').then(r=>r.json()),
+      fetch('/api/events?limit=500').then(r=>r.json()),
+    ]);
+    (posRes.data||[]).forEach(updatePosition);
+    (evtRes.data||[]).forEach(updateEvent);
+    refreshCounts();
+  }catch(e){
+    console.warn('Initial load failed:', e);
+  }
+}
+
+// ── WebSocket ────────────────────────────────────────────────────────────────
+let ws, wsRetry = 1000, wsTimer;
+
+function setConnStatus(connected){
+  const dot  = document.getElementById('sb-dot');
+  const text = document.getElementById('sb-conntext');
+  if(connected){
+    dot.className = 'sb-dot live';
+    text.textContent = 'LIVE';
+    text.style.color = 'var(--green)';
+  } else {
+    dot.className = 'sb-dot dead';
+    text.textContent = 'RECONNECTING';
+    text.style.color = 'var(--red)';
+  }
+}
+
+function connectWS(){
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url   = `${proto}://${location.host}/ws`;
+  try{ ws = new WebSocket(url); } catch(e){ scheduleReconnect(); return; }
+
+  ws.onopen = () => {
+    setConnStatus(true);
+    wsRetry = 1000;
+    ws.send(JSON.stringify({
+      type:'subscribe',
+      domains:['adsb','opensky','ais','tle','acled','gdelt','osint_news','notam'],
+    }));
+  };
+
+  ws.onmessage = (e) => {
+    try{
+      const msg = JSON.parse(e.data);
+      if(msg.type === 'snapshot'){
+        (msg.positions||[]).forEach(updatePosition);
+        (msg.events||[]).forEach(updateEvent);
+      } else if(msg.type === 'positions'){
+        (msg.data||[]).forEach(updatePosition);
+      } else if(msg.type === 'events'){
+        (msg.data||[]).forEach(updateEvent);
+      }
+      refreshCounts();
+    }catch(err){console.warn('WS parse error:',err);}
+  };
+
+  ws.onclose = () => { setConnStatus(false); scheduleReconnect(); };
+  ws.onerror = () => { setConnStatus(false); };
+}
+
+function scheduleReconnect(){
+  clearTimeout(wsTimer);
+  wsTimer = setTimeout(()=>{ connectWS(); }, wsRetry);
+  wsRetry = Math.min(wsRetry * 1.5, 30000);
+}
+
+// Ping every 30s to keep connection alive
+setInterval(()=>{ if(ws && ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 30000);
+
+// Refresh counts / clock every second
+setInterval(refreshCounts, 1000);
+</script>
+</body>
+</html>
