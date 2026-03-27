@@ -245,6 +245,46 @@ async def _tick_purge():
     except Exception as exc:
         log_err(f"tick_purge: {exc}")
 
+async def _tick_static_layers():
+    try:
+        from ingestors import static_layers
+        await static_layers.refresh_all()
+    except Exception as exc:
+        log_err(f"tick_static_layers: {exc}")
+
+async def _tick_osint_geo():
+    try:
+        from ingestors import osint_geo
+        events = await osint_geo.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["osint_geo"], limit=300)
+            await _broadcast({"type": "events", "sources": ["osint_geo"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_osint_geo: {exc}")
+
+async def _tick_unhcr():
+    try:
+        from ingestors import unhcr
+        events = await unhcr.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["unhcr"], limit=100)
+            await _broadcast({"type": "events", "sources": ["unhcr"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_unhcr: {exc}")
+
+async def _tick_views():
+    try:
+        from ingestors import views_forecast
+        events = await views_forecast.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["views_forecast"], limit=100)
+            await _broadcast({"type": "events", "sources": ["views_forecast"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_views: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -286,6 +326,10 @@ async def start():
         asyncio.create_task(_run_every(_tick_usgs,   C.USGS_INTERVAL_SEC,      "usgs")),
         asyncio.create_task(_run_every(_tick_gpsjam, C.GPSJAM_INTERVAL_SEC,    "gpsjam")),
         asyncio.create_task(_run_every(_tick_purge,  3600,                     "purge")),
+        asyncio.create_task(_run_every(_tick_static_layers, C.STATIC_REFRESH_SEC,   "static_layers")),
+        asyncio.create_task(_run_every(_tick_osint_geo,    C.OSINT_GEO_INTERVAL_SEC, "osint_geo")),
+        asyncio.create_task(_run_every(_tick_unhcr,         C.UNHCR_INTERVAL_SEC,    "unhcr")),
+        asyncio.create_task(_run_every(_tick_views,         C.VIEWS_INTERVAL_SEC,    "views")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

@@ -810,6 +810,55 @@ body::after{
           <span class="layer-name">COMMUNITY</span>
           <span class="layer-count" id="cnt-community" style="background:var(--green)">0</span>
         </label>
+        <!-- Nuclear Plants -->
+        <label class="layer-item" id="lr-nuclear">
+          <input type="checkbox" class="layer-cb" id="cb-nuclear" checked style="color:var(--yellow)" onchange="toggleLayer('nuclear')">
+          <span class="layer-icon" style="color:var(--yellow)">☢</span>
+          <span class="layer-name">NUCLEAR PLANTS</span>
+          <span class="layer-count" id="cnt-nuclear" style="background:var(--yellow)">0</span>
+        </label>
+        <!-- Military Bases -->
+        <label class="layer-item" id="lr-milbase">
+          <input type="checkbox" class="layer-cb" id="cb-mil_base" checked style="color:var(--amber)" onchange="toggleLayer('mil_base')">
+          <span class="layer-icon" style="color:var(--amber)">★</span>
+          <span class="layer-name">MILITARY BASES</span>
+          <span class="layer-count" id="cnt-milbase" style="background:var(--amber)">0</span>
+        </label>
+        <!-- Submarine Cables -->
+        <label class="layer-item" id="lr-cables">
+          <input type="checkbox" class="layer-cb" id="chk-cables" checked style="color:var(--cyan)" onchange="toggleCableLayer(this.checked)">
+          <span class="layer-icon" style="color:var(--cyan)">⌇</span>
+          <span class="layer-name">SUBSEA CABLES</span>
+          <span class="layer-count" id="cnt-cables" style="background:var(--cyan)">0</span>
+        </label>
+        <!-- Pipelines -->
+        <label class="layer-item" id="lr-pipelines">
+          <input type="checkbox" class="layer-cb" id="chk-pipelines" checked style="color:var(--orange)" onchange="togglePipelineLayer(this.checked)">
+          <span class="layer-icon" style="color:var(--orange)">⊸</span>
+          <span class="layer-name">OIL/GAS PIPELINES</span>
+          <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
+        </label>
+        <!-- OSINT Verified -->
+        <label class="layer-item" id="lr-osintgeo">
+          <input type="checkbox" class="layer-cb" id="cb-osint_geo" checked style="color:var(--orange)" onchange="toggleLayer('osint_geo')">
+          <span class="layer-icon" style="color:var(--orange)">◈</span>
+          <span class="layer-name">OSINT VERIFIED</span>
+          <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
+        </label>
+        <!-- Displacement -->
+        <label class="layer-item" id="lr-unhcr">
+          <input type="checkbox" class="layer-cb" id="cb-unhcr" checked style="color:var(--purple)" onchange="toggleLayer('unhcr')">
+          <span class="layer-icon" style="color:var(--purple)">⊙</span>
+          <span class="layer-name">DISPLACEMENT</span>
+          <span class="layer-count" id="cnt-unhcr" style="background:var(--purple)">0</span>
+        </label>
+        <!-- Conflict Forecast -->
+        <label class="layer-item" id="lr-views">
+          <input type="checkbox" class="layer-cb" id="cb-views" checked style="color:var(--red)" onchange="toggleLayer('views')">
+          <span class="layer-icon" style="color:var(--red)">◉</span>
+          <span class="layer-name">CONFLICT FORECAST</span>
+          <span class="layer-count" id="cnt-views" style="background:var(--red)">0</span>
+        </label>
       </div>
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
@@ -1260,6 +1309,8 @@ const SRC_COLORS = {
   twz:'var(--red)',usni:'var(--cyan)',bellingcat:'var(--orange)',oryx:'var(--orange)',
   defense_news:'var(--blue)',defense_one:'var(--blue)',ukmod:'var(--cyan)',
   rusi:'var(--purple)',gcaptain:'var(--cyan)',krebs:'var(--fuchsia)',
+  nuclear:'var(--yellow)', mil_base:'var(--amber)', osint_geo:'var(--orange)',
+  unhcr:'var(--purple)', views_forecast:'var(--red)',
 };
 
 function renderFeed(){
@@ -1424,11 +1475,13 @@ let map;
 const markers = {
   adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{},
   fire:{}, seismic:{}, ew:{}, community:{},
+  nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
 };
 let layers = {};
 const visible = {
   adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true,
   fire:true, seismic:true, ew:true, community:true,
+  nuclear:true, mil_base:true, osint_geo:true, unhcr:true, views:true,
 };
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -1452,11 +1505,23 @@ const ICONS = {
   usgs:    {fn:()=>makeIcon('◉','#84cc16',17)},
   gpsjam:  {fn:()=>makeIcon('⚡','#e879f9',19)},
   community:{fn:(v)=>makeIcon('◈', v?'#22c55e':'#16a34a',17)},
+  // New layers: nuclear ☢, military_base ★, osint_geo ◈, unhcr ⊙, views ◉
+  nuclear:       {fn:()=>makeIcon('☢','#eab308',16)},
+  mil_base:      {fn:()=>makeIcon('★','#f59e0b',15)},
+  osint_geo:     {fn:()=>makeIcon('◈','#f97316',17)},
+  unhcr:         {fn:()=>makeIcon('⊙','#a855f7',17)},
+  views:         {fn:()=>makeIcon('◉','#ef4444',17)},
+  views_forecast:{fn:()=>makeIcon('◉','#ef4444',17)},
 };
 
 function iconFor(source, mil, extra){
   const s = (source||'').toLowerCase();
   if(s==='community') return ICONS.community.fn(extra?.verified);
+  if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return ICONS.osint_geo.fn();
+  if(s==='unhcr') return ICONS.unhcr.fn();
+  if(s==='views_forecast') return ICONS.views.fn();
+  if(s==='nuclear') return ICONS.nuclear.fn();
+  if(s==='mil_base') return ICONS.mil_base.fn();
   if(ICONS[s]) return ICONS[s].fn(!!mil);
   return makeIcon('●','#4b5563',12);
 }
@@ -1570,6 +1635,11 @@ function sourceToLayerKey(source){
   if(s==='usgs')  return 'seismic';
   if(s==='gpsjam')return 'ew';
   if(s==='community') return 'community';
+  if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
+  if(s==='unhcr') return 'unhcr';
+  if(s==='views_forecast') return 'views';
+  if(s==='nuclear') return 'nuclear';
+  if(s==='mil_base') return 'mil_base';
   return 'osint';
 }
 
@@ -1592,6 +1662,7 @@ const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
   ew:'#e879f9',community:'#22c55e',
+  nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
 };
 
 function updatePosition(p, isNew){
@@ -1791,6 +1862,12 @@ function refreshCounts(){
   document.getElementById('cnt-ew').textContent      = nEw;
   document.getElementById('cnt-community').textContent = nComm;
 
+  document.getElementById('cnt-nuclear').textContent   = Object.keys(markers.nuclear||{}).length;
+  document.getElementById('cnt-milbase').textContent   = Object.keys(markers.mil_base||{}).length;
+  document.getElementById('cnt-osintgeo').textContent  = Object.keys(markers.osint_geo||{}).length;
+  document.getElementById('cnt-unhcr').textContent     = Object.keys(markers.unhcr||{}).length;
+  document.getElementById('cnt-views').textContent     = Object.keys(markers.views||{}).length;
+
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
   document.getElementById('sb-sat').textContent = sat;
@@ -1858,11 +1935,31 @@ function initMap(){
   });
 
   // Cluster groups
+  const clusterOpts = {disableClusteringAtZoom:7, maxClusterRadius:55};
   const ALL_KEYS=['adsb','ais','tle','acled','notam','osint','fire','seismic','ew','community'];
   ALL_KEYS.forEach(k=>{
     const c=LAYER_COLORS[k]||'#6b7280';
     layers[k]=L.markerClusterGroup({
-      disableClusteringAtZoom:7, maxClusterRadius:55,
+      ...clusterOpts,
+      iconCreateFunction:function(cluster){
+        const n=cluster.getChildCount();
+        return L.divIcon({
+          html:`<div style="background:rgba(8,8,12,.88);border:1px solid ${c}33;color:${c};font-family:'JetBrains Mono',monospace;font-size:.58rem;width:30px;height:30px;display:flex;align-items:center;justify-content:center;letter-spacing:.03em">${n}</div>`,
+          className:'',iconSize:[30,30],
+        });
+      },
+    });
+    if(visible[k]) layers[k].addTo(map);
+  });
+
+  // New static + event layers
+  const NEW_LAYER_COLORS = {
+    nuclear:'#eab308', mil_base:'#f59e0b', osint_geo:'#f97316', unhcr:'#a855f7', views:'#ef4444',
+  };
+  ['nuclear','mil_base','osint_geo','unhcr','views'].forEach(k=>{
+    const c=NEW_LAYER_COLORS[k]||'#6b7280';
+    layers[k]=L.markerClusterGroup({
+      ...clusterOpts,
       iconCreateFunction:function(cluster){
         const n=cluster.getChildCount();
         return L.divIcon({
@@ -1900,6 +1997,139 @@ async function loadInitialData(){
   loadWarNews();
   // Auto-refresh war news every 2 minutes
   setInterval(loadWarNews, 120000);
+  loadStaticLayers();
+}
+
+// ── Static Infrastructure GeoJSON Layers ────────────────────────────────────
+let cableLayer = null;
+let pipelineLayer = null;
+
+async function loadStaticLayers(){
+  await Promise.all([loadNuclear(), loadMilBases(), loadCables(), loadPipelines()]);
+}
+
+async function loadNuclear(){
+  try{
+    const res = await fetch('/api/layers/nuclear').then(r=>r.json());
+    const features = res.features || [];
+    features.forEach(f=>{
+      if(f.geometry?.type !== 'Point') return;
+      const [lon, lat] = f.geometry.coordinates;
+      const props = f.properties || {};
+      const key = 'nuc_' + lat.toFixed(3) + '_' + lon.toFixed(3);
+      if(markers.nuclear[key]) return;
+      const icon = L.divIcon({
+        html:`<div style="font-size:16px;line-height:1;color:var(--yellow);text-shadow:0 0 6px #eab30888">☢</div>`,
+        className:'', iconSize:[16,16], iconAnchor:[8,8], popupAnchor:[0,-8],
+      });
+      const popup = `<div class="popup-inner">
+        <div class="popup-call" style="color:var(--yellow)">☢ ${esc(props.name||'Nuclear Plant')}</div>
+        <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(props.country||'—')}</span></div>
+        <div class="popup-row"><span class="popup-label">STATUS</span><span class="popup-val">${esc(props.status||'—')}</span></div>
+        <div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val">${esc(props.type||props.reactor_type||'—')}</span></div>
+        ${props.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(props.country)}')">⚡ INTEL CHAT: ${esc(props.country.toUpperCase())}</button></div>`:''}
+      </div>`;
+      const m = L.marker([lat, lon], {icon}).bindPopup(popup, {maxWidth:280,minWidth:220});
+      markers.nuclear[key] = m;
+      if(layers.nuclear && visible.nuclear) layers.nuclear.addLayer(m);
+    });
+    document.getElementById('cnt-nuclear').textContent = Object.keys(markers.nuclear).length;
+  }catch(e){ console.warn('nuclear layer:', e); }
+}
+
+async function loadMilBases(){
+  try{
+    const res = await fetch('/api/layers/mil_bases').then(r=>r.json());
+    const features = res.features || [];
+    features.forEach(f=>{
+      if(f.geometry?.type !== 'Point') return;
+      const [lon, lat] = f.geometry.coordinates;
+      const props = f.properties || {};
+      const key = 'mb_' + lat.toFixed(3) + '_' + lon.toFixed(3);
+      if(markers.mil_base[key]) return;
+      const icon = L.divIcon({
+        html:`<div style="font-size:14px;line-height:1;color:var(--amber);text-shadow:0 0 6px #f59e0b88">★</div>`,
+        className:'', iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-7],
+      });
+      const name = props.INSTNAME || props.name || 'Military Installation';
+      const branch = props.BRANCHNAME || props.branch || '';
+      const country = props.COUNTRY || props.STATE_TERR || 'USA';
+      const popup = `<div class="popup-inner">
+        <div class="popup-call" style="color:var(--amber)">★ ${esc(name)}</div>
+        <div class="popup-row"><span class="popup-label">BRANCH</span><span class="popup-val">${esc(branch||'—')}</span></div>
+        <div class="popup-row"><span class="popup-label">LOCATION</span><span class="popup-val">${esc(country)}</span></div>
+        <div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(country)}')">⚡ INTEL CHAT: ${esc(country.toUpperCase())}</button></div>
+      </div>`;
+      const m = L.marker([lat, lon], {icon}).bindPopup(popup, {maxWidth:280,minWidth:220});
+      markers.mil_base[key] = m;
+      if(layers.mil_base && visible.mil_base) layers.mil_base.addLayer(m);
+    });
+    document.getElementById('cnt-milbase').textContent = Object.keys(markers.mil_base).length;
+  }catch(e){ console.warn('mil_base layer:', e); }
+}
+
+async function loadCables(){
+  try{
+    const res = await fetch('/api/layers/cables').then(r=>r.json());
+    if(cableLayer){ cableLayer.remove(); cableLayer=null; }
+    cableLayer = L.geoJSON(res, {
+      style: f => ({
+        color: '#06b6d4', weight: 1.5, opacity: 0.55,
+        dashArray: null,
+      }),
+      onEachFeature: (f, l) => {
+        const p = f.properties || {};
+        const name = p.name || p.cable_name || 'Submarine Cable';
+        const owners = Array.isArray(p.owners) ? p.owners.map(o=>o.name||o).join(', ') : (p.owner||'');
+        l.bindPopup(`<div class="popup-inner">
+          <div class="popup-call" style="color:var(--cyan)">⌇ ${esc(name)}</div>
+          ${owners?`<div class="popup-row"><span class="popup-label">OPERATORS</span><span class="popup-val">${esc(owners.substring(0,120))}</span></div>`:''}
+          ${p.length?`<div class="popup-row"><span class="popup-label">LENGTH</span><span class="popup-val">${esc(String(p.length))}</span></div>`:''}
+        </div>`, {maxWidth:280});
+        l.on('mouseover', function(){ this.setStyle({weight:3, opacity:0.9}); });
+        l.on('mouseout', function(){ cableLayer.resetStyle(this); });
+      }
+    });
+    if(document.getElementById('chk-cables').checked) cableLayer.addTo(map);
+    // Count line features
+    const n = (res.features||[]).filter(f=>f.geometry?.type?.includes('Line')||f.geometry?.type?.includes('Multi')).length;
+    document.getElementById('cnt-cables').textContent = n;
+  }catch(e){ console.warn('cables layer:', e); }
+}
+
+async function loadPipelines(){
+  try{
+    const res = await fetch('/api/layers/pipelines').then(r=>r.json());
+    if(pipelineLayer){ pipelineLayer.remove(); pipelineLayer=null; }
+    pipelineLayer = L.geoJSON(res, {
+      style: f => ({
+        color: '#f97316', weight: 1.5, opacity: 0.5,
+        dashArray: '4 4',
+      }),
+      onEachFeature: (f, l) => {
+        const p = f.properties || {};
+        l.bindPopup(`<div class="popup-inner">
+          <div class="popup-call" style="color:var(--orange)">⊸ ${esc(p.name||'Pipeline')}</div>
+          <div class="popup-row"><span class="popup-label">SUBSTANCE</span><span class="popup-val">${esc((p.substance||'oil/gas').toUpperCase())}</span></div>
+          ${p.operator?`<div class="popup-row"><span class="popup-label">OPERATOR</span><span class="popup-val">${esc(p.operator)}</span></div>`:''}
+        </div>`, {maxWidth:260});
+        l.on('mouseover', function(){ this.setStyle({weight:3, opacity:0.85}); });
+        l.on('mouseout',  function(){ pipelineLayer.resetStyle(this); });
+      }
+    });
+    if(document.getElementById('chk-pipelines').checked) pipelineLayer.addTo(map);
+    const n = (res.features||[]).length;
+    document.getElementById('cnt-pipelines').textContent = n;
+  }catch(e){ console.warn('pipelines layer:', e); }
+}
+
+function toggleCableLayer(on){
+  if(!cableLayer) return;
+  if(on) cableLayer.addTo(map); else cableLayer.remove();
+}
+function togglePipelineLayer(on){
+  if(!pipelineLayer) return;
+  if(on) pipelineLayer.addTo(map); else pipelineLayer.remove();
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -2278,6 +2508,7 @@ function renderCesiumMarkers(){
     adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
     notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
     ew:'#e879f9',community:'#22c55e',
+    nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   };
 
   Object.entries(markers).forEach(([lk, layerMarkers])=>{

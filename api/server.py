@@ -233,6 +233,24 @@ async def upload_image(file: UploadFile = File(...)):
         f.write(data)
     return JSONResponse({"url": f"/static/uploads/{fname}"})
 
+# ── Static Infrastructure Layers ─────────────────────────────────────────────
+
+@app.get("/api/layers/{layer}")
+async def get_static_layer(layer: str):
+    """
+    Serve cached GeoJSON for static infrastructure layers:
+    nuclear, cables, mil_bases, pipelines
+    """
+    valid = {"nuclear", "cables", "mil_bases", "pipelines"}
+    if layer not in valid:
+        raise HTTPException(status_code=404, detail=f"Unknown layer: {layer}")
+    try:
+        from ingestors.static_layers import get_layer
+        data = await get_layer(layer)
+        return JSONResponse(data)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 # ── Country Intel Chat ────────────────────────────────────────────────────────
 
 class ChatMessageIn(BaseModel):

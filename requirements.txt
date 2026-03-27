@@ -5,3 +5,4 @@ websockets==14.1
 sgp4==2.23
 python-multipart==0.0.19
 h3==4.1.0
+osint-geo-extractor==1.2.0

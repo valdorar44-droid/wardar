@@ -93,3 +93,22 @@ GPSJAM_INTERVAL_SEC = _i("GPSJAM_INTERVAL_SEC", 3600)  # hourly
 # ── AI (optional — for OSINT summaries) ──────────────
 ANTHROPIC_API_KEY = _s("ANTHROPIC_API_KEY", "")
 AI_MODEL          = _s("AI_MODEL", "claude-haiku-4-5-20251001")  # fast + cheap for summaries
+
+# ── Static Infrastructure Layers ──────────────────────
+ENABLE_NUCLEAR      = _b("ENABLE_NUCLEAR",      True)
+ENABLE_SUBCABLES    = _b("ENABLE_SUBCABLES",     True)
+ENABLE_MIL_BASES    = _b("ENABLE_MIL_BASES",     True)
+ENABLE_PIPELINES    = _b("ENABLE_PIPELINES",     True)
+STATIC_REFRESH_SEC  = _i("STATIC_REFRESH_SEC",   86400)  # daily
+
+# ── OSINT Geo-Extractor ────────────────────────────────
+ENABLE_OSINT_GEO    = _b("ENABLE_OSINT_GEO",     True)
+OSINT_GEO_INTERVAL_SEC = _i("OSINT_GEO_INTERVAL_SEC", 3600)
+
+# ── UNHCR Refugees ─────────────────────────────────────
+ENABLE_UNHCR        = _b("ENABLE_UNHCR",         True)
+UNHCR_INTERVAL_SEC  = _i("UNHCR_INTERVAL_SEC",   86400)  # daily
+
+# ── VIEWS Conflict Forecast ────────────────────────────
+ENABLE_VIEWS        = _b("ENABLE_VIEWS",         True)
+VIEWS_INTERVAL_SEC  = _i("VIEWS_INTERVAL_SEC",   86400)  # daily
