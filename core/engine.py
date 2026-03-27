@@ -192,14 +192,21 @@ async def _tick_acled():
     except Exception as exc:
         log_err(f"tick_acled: {exc}")
 
+_ALL_OSINT_SOURCES = [
+    "gdelt", "osint_news", "twz", "usni", "bellingcat", "oryx",
+    "defense_news", "defense_one", "ukmod", "rusi", "gcaptain", "krebs",
+    "isw", "aljazeera", "mem", "toi", "ukrinform", "kyiv_ind",
+    "reliefweb", "centcom", "reuters", "bbc",
+]
+
 async def _tick_osint():
     try:
         from ingestors import osint
         events = await osint.fetch()
         n = _save_events(events)
         if n:
-            released = DB.get_released_events(sources=["gdelt", "osint_news"], limit=200)
-            await _broadcast({"type": "events", "sources": ["gdelt", "osint_news"], "data": released})
+            released = DB.get_released_events(sources=_ALL_OSINT_SOURCES, limit=200)
+            await _broadcast({"type": "events", "sources": _ALL_OSINT_SOURCES, "data": released})
     except Exception as exc:
         log_err(f"tick_osint: {exc}")
 

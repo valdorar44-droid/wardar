@@ -167,6 +167,33 @@ def get_released_positions(bbox: tuple[float,float,float,float] | None = None,
     ).fetchall()
     return [dict(r) for r in rows]
 
+
+def get_released_positions_sampled(per_source: int = 600,
+                                    limit: int = 3000) -> list[dict]:
+    """
+    Return a balanced sample across all sources — prevents AIS (7M+ records)
+    from flooding all slots and hiding aircraft/satellites.
+    Used for the initial WS snapshot and the no-filter REST call.
+    """
+    now = _utcnow()
+    conn = get_conn()
+    # Get active sources
+    src_rows = conn.execute(
+        "SELECT DISTINCT source FROM positions WHERE release_ts_utc <= ? LIMIT 20",
+        (now,)
+    ).fetchall()
+    all_rows: list[dict] = []
+    for row in src_rows:
+        src = row[0]
+        rows = conn.execute(
+            "SELECT * FROM positions WHERE source=? AND release_ts_utc<=? "
+            "ORDER BY raw_ts_utc DESC LIMIT ?",
+            (src, now, per_source)
+        ).fetchall()
+        all_rows.extend(dict(r) for r in rows)
+    all_rows.sort(key=lambda x: x.get("raw_ts_utc", ""), reverse=True)
+    return all_rows[:limit]
+
 # ── Playback ─────────────────────────────────────────────────────────────────
 
 def get_playback_summary() -> dict:
@@ -290,7 +317,8 @@ def get_released_events(bbox: tuple[float,float,float,float] | None = None,
         params.extend(sources)
     if bbox:
         w, s, e, n = bbox
-        clauses.append("lon BETWEEN ? AND ? AND lat BETWEEN ? AND ?")
+        # Include events with NULL coords (news/SIGINT) OR within the bbox
+        clauses.append("(lat IS NULL OR (lon BETWEEN ? AND ? AND lat BETWEEN ? AND ?))")
         params.extend([w, e, s, n])
     where = " AND ".join(clauses)
     rows = conn.execute(

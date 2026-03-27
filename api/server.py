@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings as C
 from db import store as DB
-from db.store import insert_chat_message, get_chat_messages
+from db.store import insert_chat_message, get_chat_messages, get_released_positions_sampled
 from core.engine import (
     log, log_warn, log_err,
     register_ws_client, unregister_ws_client,
@@ -81,7 +81,11 @@ async def get_positions(
 ):
     src_list = [x.strip() for x in sources.split(",") if x.strip()] if sources else None
     bbox     = (w, s, e, n)
-    data     = DB.get_released_positions(bbox=bbox, sources=src_list, limit=limit)
+    if src_list:
+        data = DB.get_released_positions(bbox=bbox, sources=src_list, limit=limit)
+    else:
+        # No source filter — use sampled query so AIS doesn't drown aircraft/satellites
+        data = get_released_positions_sampled(per_source=600, limit=limit)
     return JSONResponse({"count": len(data), "data": data})
 
 @app.get("/api/events")
@@ -305,9 +309,9 @@ async def websocket_endpoint(ws: WebSocket):
     register_ws_client(_send)
 
     try:
-        # Send initial snapshot
-        positions = DB.get_released_positions(limit=2000)
-        events    = DB.get_released_events(limit=200)
+        # Send initial snapshot — sampled so AIS doesn't crowd out aircraft/satellites
+        positions = get_released_positions_sampled(per_source=400, limit=2000)
+        events    = DB.get_released_events(limit=500)
         await ws.send_text(json.dumps({"type": "snapshot", "positions": positions, "events": events}))
 
         async for raw in ws.iter_text():
