@@ -3006,7 +3006,7 @@ function connectWS(){
     wsRetry=1000;
     ws.send(JSON.stringify({
       type:'subscribe',
-      domains:['adsb','opensky','ais','tle','acled','gdelt','osint_news','notam','firms','usgs','gpsjam'],
+      domains:[],  // empty = all sources (server skips filter when no domains set)
     }));
   };
 
