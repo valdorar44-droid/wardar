@@ -5,8 +5,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel, Field, field_validator
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -118,6 +119,94 @@ async def playback_frame(
     bbox     = (w, s, e, n)
     data     = DB.get_positions_at(ts=ts, window_sec=window, sources=src_list, bbox=bbox, limit=limit)
     return JSONResponse({"ts": ts, "count": len(data), "data": data})
+
+# ── Community Intel ───────────────────────────────────────────────────────────
+
+_VALID_REPORT_TYPES = {
+    "armor","troops","convoy","aircraft","drone","naval",
+    "airstrike","artillery","explosion","checkpoint",
+    "missile_site","radar","airbase","bunker",
+    "jamming","cyber","damage","displacement","hazmat","other",
+}
+
+class CommunityReportIn(BaseModel):
+    author_token: str = Field(..., min_length=8, max_length=128)
+    title:        str = Field(..., min_length=3, max_length=200)
+    description:  str = Field("", max_length=2000)
+    lat:          float | None = None
+    lon:          float | None = None
+    country:      str = Field("", max_length=100)
+    category:     str = Field("intel", pattern="^(intel|sighting|movement|incident|analysis)$")
+    source_url:   str = Field("", max_length=500)
+    report_type:  str = Field("other", max_length=50)
+    severity:     int = Field(3, ge=1, le=5)
+    confidence:   str = Field("medium", pattern="^(low|medium|high)$")
+    image_url:    str = Field("", max_length=1000)
+
+    @field_validator("report_type")
+    @classmethod
+    def validate_report_type(cls, v: str) -> str:
+        if v not in _VALID_REPORT_TYPES:
+            return "other"
+        return v
+
+class VoteIn(BaseModel):
+    voter_token: str = Field(..., min_length=8, max_length=128)
+    vote:        int = Field(..., ge=-1, le=1)
+
+@app.get("/api/community")
+async def get_community(
+    lat: float | None = None,
+    lon: float | None = None,
+    radius: float = 200,
+    limit: int = 200,
+):
+    if lat is not None and lon is not None:
+        data = DB.get_community_reports_near(lat, lon, radius_km=radius, limit=limit)
+    else:
+        data = DB.get_community_reports_global(limit=limit)
+    return JSONResponse({"count": len(data), "data": data})
+
+@app.post("/api/community", status_code=201)
+async def create_community_report(body: CommunityReportIn):
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "author_token": body.author_token,
+        "title":        body.title,
+        "description":  body.description,
+        "lat":          body.lat,
+        "lon":          body.lon,
+        "country":      body.country,
+        "category":     body.category,
+        "source_url":   body.source_url,
+        "report_type":  body.report_type,
+        "severity":     body.severity,
+        "confidence":   body.confidence,
+        "image_url":    body.image_url,
+        "created_at":   now,
+        "extra":        "{}",
+    }
+    report_id = DB.insert_community_report(row)
+    return JSONResponse({"id": report_id}, status_code=201)
+
+@app.get("/api/community/{report_id}")
+async def get_community_report(report_id: int):
+    report = DB.get_community_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="not found")
+    return JSONResponse(report)
+
+@app.post("/api/community/{report_id}/vote")
+async def vote_community_report(report_id: int, body: VoteIn):
+    if body.vote == 0:
+        raise HTTPException(status_code=400, detail="vote must be +1 or -1")
+    try:
+        updated = DB.vote_community_report(report_id, body.voter_token, body.vote)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if updated is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return JSONResponse(updated)
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 

@@ -55,6 +55,44 @@ _MIGRATIONS: list[str] = [
     # v2 — dedup index for georeferenced events (FIRMS/USGS/GPSJam)
     # NULL lat/lon rows (news articles) are excluded by SQLite NULL semantics.
     """CREATE UNIQUE INDEX IF NOT EXISTS idx_evt_dedup ON events(source, raw_ts_utc, lat, lon)""",
+
+    # v3 — community intelligence reports
+    """CREATE TABLE IF NOT EXISTS community_reports (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        author_token  TEXT NOT NULL,          -- hashed browser UUID, no personal data
+        title         TEXT NOT NULL,
+        description   TEXT,
+        lat           REAL,
+        lon           REAL,
+        country       TEXT DEFAULT '',
+        category      TEXT DEFAULT 'intel',   -- intel|sighting|movement|incident|analysis
+        source_url    TEXT DEFAULT '',
+        upvotes       INTEGER DEFAULT 0,
+        downvotes     INTEGER DEFAULT 0,
+        verified      INTEGER DEFAULT 0,      -- 1 when net_votes >= 3
+        hidden        INTEGER DEFAULT 0,      -- 1 when net_votes <= -3
+        created_at    TEXT NOT NULL,
+        extra         TEXT DEFAULT '{}'
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_cr_location  ON community_reports(lat, lon)""",
+    """CREATE INDEX IF NOT EXISTS idx_cr_created   ON community_reports(created_at)""",
+    """CREATE INDEX IF NOT EXISTS idx_cr_country   ON community_reports(country)""",
+
+    """CREATE TABLE IF NOT EXISTS community_votes (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_id     INTEGER NOT NULL,
+        voter_token   TEXT NOT NULL,
+        vote          INTEGER NOT NULL,       -- +1 or -1
+        created_at    TEXT NOT NULL,
+        UNIQUE(report_id, voter_token)
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_cv_report ON community_votes(report_id)""",
+
+    # v4 — community_reports deep intel fields (ADD COLUMN is idempotent via migration runner)
+    """ALTER TABLE community_reports ADD COLUMN report_type TEXT DEFAULT 'other'""",
+    """ALTER TABLE community_reports ADD COLUMN severity    INTEGER DEFAULT 3""",
+    """ALTER TABLE community_reports ADD COLUMN confidence  TEXT DEFAULT 'medium'""",
+    """ALTER TABLE community_reports ADD COLUMN image_url   TEXT DEFAULT ''""",
 ]
 
 def get_conn() -> sqlite3.Connection:
@@ -71,7 +109,13 @@ def get_conn() -> sqlite3.Connection:
 
 def _run_migrations(conn: sqlite3.Connection):
     for sql in _MIGRATIONS:
-        conn.execute(sql)
+        try:
+            conn.execute(sql)
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" in str(exc).lower():
+                pass  # ADD COLUMN already applied on a prior run
+            else:
+                raise
     conn.commit()
 
 # ── Positions ────────────────────────────────────────────────────────────────
@@ -254,6 +298,95 @@ def purge_old_events() -> int:
         cur = conn.execute("DELETE FROM events WHERE raw_ts_utc < ?", (cutoff,))
         conn.commit()
         return cur.rowcount
+
+# ── Community Intel ──────────────────────────────────────────────────────────
+
+def insert_community_report(r: dict) -> int:
+    """Insert a new community report, return its id."""
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute("""
+            INSERT INTO community_reports
+              (author_token, title, description, lat, lon, country, category,
+               source_url, report_type, severity, confidence, image_url,
+               created_at, extra)
+            VALUES
+              (:author_token,:title,:description,:lat,:lon,:country,:category,
+               :source_url,:report_type,:severity,:confidence,:image_url,
+               :created_at,:extra)
+        """, r)
+        conn.commit()
+        return cur.lastrowid
+
+def get_community_report(report_id: int) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM community_reports WHERE id = ?", (report_id,)
+    ).fetchone()
+    return dict(row) if row else None
+
+def get_community_reports_near(lat: float, lon: float, radius_km: float = 200,
+                                limit: int = 100) -> list[dict]:
+    """Return visible (not hidden) reports within ~radius_km of (lat, lon)."""
+    # Rough degree delta: 1° lat ≈ 111 km
+    delta = radius_km / 111.0
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT * FROM community_reports
+        WHERE hidden = 0
+          AND lat BETWEEN ? AND ?
+          AND lon BETWEEN ? AND ?
+        ORDER BY created_at DESC
+        LIMIT ?
+    """, (lat - delta, lat + delta, lon - delta, lon + delta, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+def get_community_reports_global(limit: int = 500) -> list[dict]:
+    """Return all visible verified + recent community reports for map display."""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT * FROM community_reports
+        WHERE hidden = 0 AND lat IS NOT NULL AND lon IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+def vote_community_report(report_id: int, voter_token: str, vote: int) -> dict:
+    """
+    Cast or flip a vote (+1/-1). Returns updated report dict.
+    Raises ValueError if report not found.
+    """
+    if vote not in (1, -1):
+        raise ValueError("vote must be +1 or -1")
+    now = _utcnow()
+    with _lock:
+        conn = get_conn()
+        # Upsert vote (UNIQUE constraint handles flip)
+        conn.execute("""
+            INSERT INTO community_votes (report_id, voter_token, vote, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(report_id, voter_token) DO UPDATE SET vote=excluded.vote
+        """, (report_id, voter_token, vote, now))
+        # Recount and update report
+        counts = conn.execute("""
+            SELECT
+              SUM(CASE WHEN vote=1  THEN 1 ELSE 0 END) as ups,
+              SUM(CASE WHEN vote=-1 THEN 1 ELSE 0 END) as downs
+            FROM community_votes WHERE report_id=?
+        """, (report_id,)).fetchone()
+        ups   = counts["ups"]   or 0
+        downs = counts["downs"] or 0
+        net   = ups - downs
+        verified = 1 if net >= 3 else 0
+        hidden   = 1 if net <= -3 else 0
+        conn.execute("""
+            UPDATE community_reports
+            SET upvotes=?, downvotes=?, verified=?, hidden=?
+            WHERE id=?
+        """, (ups, downs, verified, hidden, report_id))
+        conn.commit()
+    return get_community_report(report_id)
 
 # ── Stats ────────────────────────────────────────────────────────────────────
 

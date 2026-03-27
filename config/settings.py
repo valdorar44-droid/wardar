@@ -64,6 +64,7 @@ BRAVE_API_KEY   = _s("BRAVE_API_KEY", "")            # reuse from Argus if same 
 ENABLE_ACLED    = _b("ENABLE_ACLED", True)
 ENABLE_GDELT    = _b("ENABLE_GDELT", True)
 ENABLE_OSINT_NEWS = _b("ENABLE_OSINT_NEWS", True)
+ENABLE_DEFENSE_FEEDS = _b("ENABLE_DEFENSE_FEEDS", True)
 
 # ── Scan Intervals ────────────────────────────────────
 ADSB_INTERVAL_SEC   = _i("ADSB_INTERVAL_SEC",   10)   # pull aviation every 10s
