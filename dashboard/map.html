@@ -1387,17 +1387,36 @@ const BOOT_LINES = [
   {t:"ALL SYSTEMS NOMINAL ▸ WARDAR ACTIVE", cls:""},
 ];
 
+function _dismissBoot(){
+  const el = document.getElementById('boot');
+  if(!el) return;
+  el.classList.add('fade');
+  setTimeout(()=>{ el.remove(); }, 600);
+}
+
 function runBoot(){
   const container = document.getElementById('boot-lines');
-  // Start initMap immediately in background — don't wait for animation
-  initMap();
+
+  // Hard failsafe — boot overlay ALWAYS removed after 8s regardless of any error
+  const failsafeTimer = setTimeout(_dismissBoot, 8000);
+
+  // Start initMap — wrapped so any Leaflet/CDN exception doesn't kill the animation
+  try { initMap(); } catch(e) {
+    console.error('initMap failed:', e);
+    // Show error in boot output
+    const errLine = document.createElement('div');
+    errLine.className = 'boot-line warn show';
+    errLine.innerHTML = '<b>›</b> MAP INIT ERROR — RETRYING...';
+    container.appendChild(errLine);
+    // Retry once after 1s (CDN might just be slow)
+    setTimeout(()=>{ try{ initMap(); }catch(e2){ console.error('initMap retry failed:', e2); } }, 1000);
+  }
+
   let i=0;
   function step(){
     if(i >= BOOT_LINES.length){
-      setTimeout(()=>{
-        document.getElementById('boot').classList.add('fade');
-        setTimeout(()=>{ document.getElementById('boot').remove(); }, 600);
-      }, 200);
+      clearTimeout(failsafeTimer);
+      setTimeout(()=>{ _dismissBoot(); }, 200);
       return;
     }
     const d = document.createElement('div');
@@ -1407,7 +1426,7 @@ function runBoot(){
     container.appendChild(d);
     requestAnimationFrame(()=>{ setTimeout(()=>d.classList.add('show'), 10); });
     i++;
-    setTimeout(step, i===1 ? 150 : 80);  // faster — 80ms per line vs 190ms
+    setTimeout(step, i===1 ? 150 : 80);
   }
   step();
 }
