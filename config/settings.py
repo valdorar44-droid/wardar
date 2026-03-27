@@ -151,3 +151,7 @@ ENABLE_OPENSANCTIONS    = _b("ENABLE_OPENSANCTIONS",     False)
 # ── AI Intelligence Brief (SITREP) ──────────────────────────
 ENABLE_INTEL_BRIEF        = _b("ENABLE_INTEL_BRIEF",        True)   # requires ANTHROPIC_API_KEY
 INTEL_BRIEF_INTERVAL_SEC  = _i("INTEL_BRIEF_INTERVAL_SEC",  21600)  # 6h
+
+# ── IODA Internet Blackout Monitoring ────────────────────────────────────────
+ENABLE_IODA         = _b("ENABLE_IODA",        True)   # free, no auth
+IODA_INTERVAL_SEC   = _i("IODA_INTERVAL_SEC",  1800)   # every 30 min

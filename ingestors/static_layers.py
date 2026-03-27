@@ -22,14 +22,44 @@ _TTL = timedelta(hours=24)
 # ── Data source URLs ──────────────────────────────────────────────────────────
 # Nuclear power plants — try multiple sources in order
 _NUCLEAR_URLS = [
-    # GeoNuclearData (data/ path — docs/ was renamed)
-    "https://raw.githubusercontent.com/cristianst85/GeoNuclearData/master/data/world.geojson",
+    # GeoNuclearData — correct v2 path
+    "https://raw.githubusercontent.com/cristianst85/GeoNuclearData/master/docs/GeoNuclearData.geojson",
     # PRIS-derived GeoJSON (community maintained)
     "https://raw.githubusercontent.com/nicholasmr/PRIS-world-nuclear-power-reactors/main/PRIS_reactors.geojson",
-    # Global Energy Monitor nuclear tracker (CSV converted to GeoJSON)
-    "https://raw.githubusercontent.com/GlobalEnergyMonitor/GCPT/main/data/GCPT.geojson",
     # OpenNuclear fallback
     "https://raw.githubusercontent.com/opennuclear/opennuclear/master/data/opennuclear.json",
+]
+
+# Hardcoded conflict-relevant nuclear/radiological sites — guaranteed fallback.
+# Covers Iran program, Ukraine power plants, North Korea Yongbyon, key NATO/Russia facilities.
+_NUCLEAR_FALLBACK: list[dict] = [
+    # Iran nuclear program
+    {"name":"Natanz Enrichment Complex","lat":33.73,"lon":51.73,"country":"Iran","status":"Operational","type":"Enrichment"},
+    {"name":"Fordow Fuel Enrichment Plant","lat":34.88,"lon":51.13,"country":"Iran","status":"Operational","type":"Enrichment"},
+    {"name":"Bushehr Nuclear Power Plant","lat":28.83,"lon":50.88,"country":"Iran","status":"Operational","type":"Power"},
+    {"name":"Isfahan Nuclear Technology Centre","lat":32.63,"lon":51.65,"country":"Iran","status":"Operational","type":"Research"},
+    {"name":"Parchin Military Complex","lat":35.52,"lon":51.77,"country":"Iran","status":"Military","type":"Research"},
+    {"name":"Arak Heavy Water Reactor","lat":34.24,"lon":49.23,"country":"Iran","status":"Operational","type":"Research"},
+    # North Korea
+    {"name":"Yongbyon Nuclear Research Centre","lat":39.79,"lon":125.75,"country":"North Korea","status":"Operational","type":"Research/Weapons"},
+    {"name":"Punggye-ri Test Site","lat":41.27,"lon":129.09,"country":"North Korea","status":"Closed","type":"Test Site"},
+    # Ukraine (conflict zone)
+    {"name":"Zaporizhzhia Nuclear Power Plant","lat":47.51,"lon":34.59,"country":"Ukraine","status":"IAEA Monitoring","type":"Power"},
+    {"name":"Chernobyl Nuclear Power Plant","lat":51.39,"lon":30.10,"country":"Ukraine","status":"Decommissioned","type":"Power"},
+    {"name":"Rivne Nuclear Power Plant","lat":51.33,"lon":25.89,"country":"Ukraine","status":"Operational","type":"Power"},
+    {"name":"Khmelnytskyi Nuclear Power Plant","lat":50.30,"lon":26.65,"country":"Ukraine","status":"Operational","type":"Power"},
+    # Russia (conflict-relevant)
+    {"name":"Leningrad Nuclear Power Plant","lat":59.88,"lon":29.07,"country":"Russia","status":"Operational","type":"Power"},
+    {"name":"Smolensk Nuclear Power Plant","lat":54.17,"lon":32.95,"country":"Russia","status":"Operational","type":"Power"},
+    {"name":"Kursk Nuclear Power Plant","lat":51.67,"lon":35.61,"country":"Russia","status":"Operational","type":"Power"},
+    # Israel
+    {"name":"Negev Nuclear Research Centre (Dimona)","lat":31.00,"lon":35.15,"country":"Israel","status":"Military","type":"Research/Weapons"},
+    # Pakistan
+    {"name":"Khushab Nuclear Complex","lat":32.07,"lon":71.97,"country":"Pakistan","status":"Operational","type":"Plutonium Production"},
+    {"name":"Chasma Nuclear Power Plant","lat":32.38,"lon":71.44,"country":"Pakistan","status":"Operational","type":"Power"},
+    # Key NATO / EU plants near Russia
+    {"name":"Ignalina Nuclear Power Plant (decommissioning)","lat":55.61,"lon":26.56,"country":"Lithuania","status":"Decommissioned","type":"Power"},
+    {"name":"Loviisa Nuclear Power Plant","lat":60.40,"lon":26.37,"country":"Finland","status":"Operational","type":"Power"},
 ]
 
 # Submarine cables — TeleGeography (free public API)
@@ -113,8 +143,22 @@ async def _fetch_nuclear() -> dict:
                         return {"type": "FeatureCollection", "features": features}
             except Exception as exc:
                 log_warn(f"nuclear: {url} failed: {exc}")
-    log_warn("nuclear: all sources failed")
-    return {"type": "FeatureCollection", "features": []}
+    # All network sources failed — return hardcoded conflict-relevant fallback
+    log_warn("nuclear: all sources failed — using conflict-relevant fallback dataset")
+    features = []
+    for p in _NUCLEAR_FALLBACK:
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [p["lon"], p["lat"]]},
+            "properties": {
+                "name":    p["name"],
+                "country": p["country"],
+                "status":  p["status"],
+                "type":    p["type"],
+            },
+        })
+    log(f"nuclear: {len(features)} conflict-relevant facilities (fallback)")
+    return {"type": "FeatureCollection", "features": features}
 
 
 async def _fetch_cables() -> dict:
@@ -310,7 +354,9 @@ async def get_layer(name: str) -> dict:
         return {"type": "FeatureCollection", "features": []}
 
     data = await fn()
-    _cache[name] = {"geojson": data, "fetched_at": datetime.now(timezone.utc)}
+    # Only cache non-empty results so we retry on the next request if failed
+    if data.get("features"):
+        _cache[name] = {"geojson": data, "fetched_at": datetime.now(timezone.utc)}
     return data
 
 

@@ -316,6 +316,94 @@ async def trigger_intel_brief():
     asyncio.create_task(_run())
     return JSONResponse({"status": "generating", "message": "Brief will be ready in ~30s"}, status_code=202)
 
+@app.post("/api/predict")
+async def predict_asset(request: Request):
+    """AI prediction for a tracked asset — identifies what it is, where it's going, threat assessment.
+    Returns text assessment + predicted path waypoints for globe arc rendering.
+    Body: {callsign, type, lat, lon, heading_deg, speed_kts, altitude_ft, country, source, military_flag, trail}
+    """
+    body = await request.json()
+    if not C.ANTHROPIC_API_KEY:
+        return JSONResponse({"error": "no_api_key", "text": "ANTHROPIC_API_KEY not configured."})
+
+    callsign    = str(body.get("callsign") or "UNKNOWN").strip()[:32]
+    asset_type  = str(body.get("type") or "").strip()[:32]
+    lat         = float(body.get("lat") or 0)
+    lon         = float(body.get("lon") or 0)
+    heading     = float(body.get("heading_deg") or 0)
+    speed       = float(body.get("speed_kts") or 0)
+    altitude    = float(body.get("altitude_ft") or 0)
+    country     = str(body.get("country") or "").strip()[:64]
+    source      = str(body.get("source") or "").strip()[:32]
+    military    = bool(int(body.get("military_flag") or 0))
+    trail       = body.get("trail") or []  # [{lat,lon}] recent positions
+
+    # Build prompt
+    trail_desc = ""
+    if trail and len(trail) >= 2:
+        pts = trail[-10:]
+        trail_desc = f"\nRecent trail ({len(pts)} positions): " + " → ".join(
+            f"({p['lat']:.2f},{p['lon']:.2f})" for p in pts
+        )
+
+    prompt = f"""You are a military intelligence analyst. Analyze this tracked asset and provide a brief assessment.
+
+ASSET DATA:
+- Callsign: {callsign}
+- Type: {asset_type or 'unknown'}
+- Position: {lat:.4f}°N, {lon:.4f}°E
+- Heading: {heading:.0f}°
+- Speed: {speed:.0f} kts
+- Altitude: {altitude:.0f} ft
+- Country of registration: {country or 'unknown'}
+- Data source: {source}
+- Military flag: {'YES' if military else 'NO'}
+{trail_desc}
+
+Respond in this exact JSON format (no markdown, just raw JSON):
+{{
+  "assessment": "2-3 sentence plain-English assessment of what this asset likely is, its current activity, and any threat significance",
+  "destination": "Most likely destination or operational area based on heading/speed/position",
+  "threat_level": "LOW|MODERATE|HIGH|CRITICAL",
+  "asset_id": "Best guess at platform type (e.g. P-8 Poseidon, Su-35, cargo vessel, etc.)",
+  "path": [
+    {{"lat": X, "lon": Y}},
+    {{"lat": X, "lon": Y}},
+    {{"lat": X, "lon": Y}},
+    {{"lat": X, "lon": Y}},
+    {{"lat": X, "lon": Y}}
+  ]
+}}
+
+The "path" array must have exactly 5 waypoints projecting the asset's most likely trajectory over the next 2 hours based on heading {heading:.0f}° and speed {speed:.0f} kts. Use great-circle math. Start from current position ({lat:.4f}, {lon:.4f}).
+Keep path realistic — account for known geography (don't fly through mountains, don't route ships over land).
+"""
+
+    try:
+        import anthropic as _ant
+        client = _ant.AsyncAnthropic(api_key=C.ANTHROPIC_API_KEY)
+        msg = await client.messages.create(
+            model=C.AI_MODEL,
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = msg.content[0].text.strip()
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+        result["callsign"] = callsign
+        result["model"] = C.AI_MODEL
+        return JSONResponse(result)
+    except json.JSONDecodeError as exc:
+        return JSONResponse({"error": f"parse_error: {exc}", "text": raw if 'raw' in dir() else ""})
+    except Exception as exc:
+        log_warn(f"predict: {exc}")
+        return JSONResponse({"error": str(exc)}, status_code=503)
+
+
 @app.get("/api/brief/country/{country}")
 async def get_country_brief(country: str):
     """Generate an on-demand AI brief for a specific country."""

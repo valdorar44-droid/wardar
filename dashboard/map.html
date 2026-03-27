@@ -6,9 +6,7 @@
 <title>WARDAR — Global Situational Awareness</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/globe.gl@2/dist/globe.gl.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -104,25 +102,37 @@ body::after{
   height:100vh;
   position:relative;
 }
-#main{
-  display:grid;
-  grid-template-columns:220px 1fr 280px;
-  min-height:0;
-  position:relative;
+#main{display:none} /* remove old grid */
+#panel{
+  position:fixed;left:0;top:52px;bottom:44px;width:260px;
+  z-index:500;background:rgba(8,8,12,.92);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
 }
-#map{
-  position:relative;z-index:1;
-  grid-column:2;grid-row:1;
+#rpanel{
+  position:fixed;right:0;top:52px;bottom:44px;width:280px;
+  z-index:500;background:rgba(8,8,12,.96);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+}
+#timeline{
+  position:fixed;bottom:44px;left:260px;right:280px;
+  z-index:500;background:rgba(8,8,12,.88);
+}
+#statusbar{
+  position:fixed;bottom:0;left:0;right:0;height:44px;
+  z-index:600;
+}
+#globe-container{
+  position:fixed;inset:0;z-index:1;background:#000;
 }
 
 /* ── HEADER BAR ── */
 #header{
-  grid-column:1/-1;
+  position:fixed;top:0;left:0;right:0;height:52px;
   display:flex;align-items:center;gap:1.2rem;
   background:rgba(4,4,6,.97);
   border-bottom:1px solid var(--border2);
   padding:0 1.2rem;
-  position:relative;z-index:600;
+  z-index:700;
 }
 #header::after{
   content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
@@ -171,10 +181,6 @@ body::after{
 
 /* ── LEFT PANEL ── */
 #panel{
-  background:rgba(8,8,12,.96);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  position:relative;z-index:500;
   overflow-y:auto;
   scrollbar-width:none;
 }
@@ -245,12 +251,6 @@ body::after{
 .layer-group.open>.layer-group-body{display:block}
 
 /* ── RIGHT PANEL ── */
-#rpanel{
-  background:rgba(8,8,12,.96);
-  border-left:1px solid var(--border);
-  display:flex;flex-direction:column;
-  position:relative;z-index:500;
-}
 .rp-tabs{
   display:flex;border-bottom:1px solid var(--border);
   flex-shrink:0;
@@ -432,6 +432,34 @@ body::after{
   padding:.2rem .5rem;cursor:pointer;transition:all .12s;
 }
 .sitrep-country-btn:hover{background:rgba(245,158,11,.18)}
+
+/* ── GLOBE POPUP ── */
+#globe-popup{
+  position:fixed;z-index:800;
+  background:rgba(8,8,12,.97);border:1px solid var(--border2);
+  min-width:230px;max-width:320px;max-height:70vh;
+  overflow-y:auto;display:none;
+  box-shadow:0 8px 40px rgba(0,0,0,.8);
+}
+#globe-popup-close{
+  position:absolute;top:4px;right:6px;
+  background:none;border:none;color:var(--dim2);cursor:pointer;
+  font-family:var(--font);font-size:.7rem;
+}
+/* Focus buttons */
+#focus-bar{
+  position:fixed;bottom:48px;
+  left:50%;transform:translateX(-50%);
+  z-index:510;display:flex;gap:.3rem;
+}
+.focus-btn{
+  background:rgba(8,8,12,.88);border:1px solid var(--border2);
+  color:var(--dim2);font-family:var(--font);
+  font-size:.5rem;letter-spacing:.1em;
+  padding:.25rem .55rem;cursor:pointer;transition:all .15s;
+}
+.focus-btn:hover{border-color:var(--amber);color:var(--amber)}
+.focus-btn.hot{border-color:var(--red);color:var(--red)}
 
 /* ── COUNTRY INTEL CHAT PANEL ── */
 #chat-panel{
@@ -823,6 +851,19 @@ body::after{
   <div id="boot-lines"></div>
 </div>
 
+<div id="globe-container"></div>
+<div id="globe-popup">
+  <button id="globe-popup-close" onclick="closeGlobePopup()">✕</button>
+  <div id="globe-popup-content"></div>
+</div>
+<div id="focus-bar">
+  <button class="focus-btn hot" onclick="globeFocusRegion('iran')">🔴 IRAN/ME</button>
+  <button class="focus-btn" onclick="globeFocusRegion('ukraine')">🔵 UKRAINE</button>
+  <button class="focus-btn" onclick="globeFocusRegion('world')">🌍 WORLD</button>
+  <button class="focus-btn" onclick="globeFocusRegion('asia')">⚡ ASIA</button>
+  <button class="focus-btn" id="rotate-btn" onclick="toggleAutoRotate()">⟳ AUTO</button>
+</div>
+
 <!-- ══ SHELL ══════════════════════════════════════════════════════════════════ -->
 <div id="shell">
 
@@ -841,11 +882,8 @@ body::after{
     </div>
   </div>
 
-  <!-- MAIN ROW -->
-  <div id="main">
-
-    <!-- LEFT PANEL: LAYER CONTROLS -->
-    <div id="panel">
+  <!-- LEFT PANEL: LAYER CONTROLS -->
+  <div id="panel">
       <div class="panel-hd">
         <div class="panel-title">SENSOR FEEDS</div>
         <div class="panel-sub">DOMAIN LAYER CONTROL</div>
@@ -1093,16 +1131,6 @@ body::after{
       </div>
     </div>
 
-    <!-- MAP (wrapper for both 2D Leaflet and 3D Cesium) -->
-    <div id="map">
-      <div id="leaflet-map" style="width:100%;height:100%"></div>
-      <div id="cesium-map"  style="width:100%;height:100%;display:none"></div>
-      <div id="cursor-readout"></div>
-      <div id="alert-bar" style="display:none"></div>
-      <button id="globe-toggle" onclick="toggleGlobe()" title="Toggle 3D satellite view">◉ 3D/SAT</button>
-      <button id="fullscreen-toggle" onclick="toggleFullscreen()" title="Toggle fullscreen">⛶ FULLSCREEN</button>
-    </div>
-
     <!-- RIGHT PANEL -->
     <div id="rpanel">
       <div class="rp-tabs">
@@ -1193,8 +1221,6 @@ body::after{
         </div>
       </div>
     </div>
-
-  </div><!-- /main -->
 
   <!-- VIDEO BAR -->
   <div id="videobar">
@@ -1431,8 +1457,6 @@ body::after{
   </div>
 </dialog>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 'use strict';
 
@@ -1741,7 +1765,7 @@ function renderFeed(){
       <div class="feed-ts">${esc(ts)} UTC${item.country ? ' · '+esc(item.country) : ''}</div>
     `;
     if(item.lat != null && item.lon != null){
-      div.onclick = () => map.setView([item.lat, item.lon], Math.max(map.getZoom(), 6));
+      div.onclick = () => flyTo(item.lat, item.lon, 0.8);
     }
     list.appendChild(div);
   });
@@ -1855,7 +1879,7 @@ function renderNews(){
       div.style.cursor='pointer';
     }
     if(n.lat!=null&&n.lon!=null){
-      div.ondblclick=()=>map.setView([n.lat,n.lon],Math.max(map.getZoom(),6));
+      div.ondblclick=()=>flyTo(n.lat,n.lon,0.8);
     }
     list.appendChild(div);
   });
@@ -1884,6 +1908,93 @@ function buildNewsFilters(){
   });
 }
 
+// ── Globe.gl instance ─────────────────────────────────────────────
+let globe;
+const positionStore = {};   // key → position/event data
+const communityStore = {};  // key → community report
+const staticPoints = [];    // nuclear, mil_base static points
+let iswPolygons = [];
+let cableArcs = [];
+let pipelineArcs = [];
+let _gPoints = [], _gRings = [], _gArcs = [];
+const _trails = {};
+let _predictArcs = [];  // AI predicted path arcs — cleared per-prediction
+const _TRAIL_MAX = 5;
+let _autoRotate = false;
+let _rebuildScheduled = false;
+
+function _scheduleRebuild(){
+  if(!_rebuildScheduled){
+    _rebuildScheduled=true;
+    requestAnimationFrame(()=>{ _rebuildScheduled=false; _rebuildGlobe(); });
+  }
+}
+
+function _rebuildGlobe(){
+  if(!globe) return;
+  const pts=[], rings=[];
+  for(const [k,d] of Object.entries(positionStore)){
+    if(d.lat==null||d.lon==null) continue;
+    const lk=sourceToLayerKey(d.source);
+    if(!visible[lk]) continue;
+    const color=LAYER_COLORS[lk]||'#6b7280';
+    const isMil=parseInt(d.military_flag||0);
+    const isAlert=_ALERT_SOURCES.has(d.source)||d.source==='pikud_haoref'||d.source==='adsb_emergency';
+    let alt=0.005;
+    if(d.source==='tle'&&d.altitude_ft) alt=Math.max(0.025, d.altitude_ft/4000000);
+    else if((d.source==='adsb'||d.source==='opensky')&&d.altitude_ft) alt=Math.max(0.003, d.altitude_ft/5000000);
+    let r=isMil?0.45:0.28;
+    if(d.source==='acled') r=0.38;
+    if(d.source==='ioda') r=0.65;
+    pts.push({...d,_k:k,_lk:lk,_color:color,_alt:alt,_r:Math.min(r,0.8)});
+    if(isAlert) rings.push({lat:d.lat,lon:d.lon,_color:color+'bb'});
+  }
+  for(const [k,r] of Object.entries(communityStore)){
+    if(r.lat==null||r.lon==null||r.hidden) continue;
+    if(!visible.community) continue;
+    pts.push({...r,_k:k,_lk:'community',_color:LAYER_COLORS.community||'#22c55e',_alt:0.005,_r:0.32,_isComm:true});
+  }
+  for(const sp of staticPoints){
+    if(!visible[sp._lk]) continue;
+    pts.push(sp);
+  }
+  // Satellite orbital direction arcs
+  const satArcs=[];
+  if(visible.tle){
+    for(const[k,d] of Object.entries(positionStore)){
+      if(d.source!=='tle'||d.lat==null) continue;
+      const h=(d.heading_deg||0)*Math.PI/180;
+      const dist=5600/6371; // ~350km arc
+      const lat1=d.lat*Math.PI/180, lng1=d.lon*Math.PI/180;
+      const lat2=Math.asin(Math.sin(lat1)*Math.cos(dist)+Math.cos(lat1)*Math.sin(dist)*Math.cos(h));
+      const lng2=lng1+Math.atan2(Math.sin(h)*Math.sin(dist)*Math.cos(lat1),Math.cos(dist)-Math.sin(lat1)*Math.sin(lat2));
+      const isMil=parseInt(d.military_flag||0);
+      satArcs.push({sLat:d.lat,sLng:d.lon,eLat:lat2*180/Math.PI,eLng:lng2*180/Math.PI,
+        _color:isMil?['rgba(239,68,68,0)','rgba(239,68,68,0.7)']:['rgba(168,85,247,0)','rgba(168,85,247,0.55)'],
+        _alt:Math.max(0.025,(d.altitude_ft||250000)/4000000)});
+    }
+  }
+  // Aircraft trails
+  const trailArcs=[];
+  if(TL.showTrails){
+    for(const[cs,pts2] of Object.entries(_trails)){
+      for(let i=0;i<pts2.length-1;i++){
+        const alpha=(i+1)/pts2.length;
+        trailArcs.push({sLat:pts2[i].lat,sLng:pts2[i].lon,eLat:pts2[i+1].lat,eLng:pts2[i+1].lon,
+          _color:[`rgba(245,158,11,0)`,`rgba(245,158,11,${alpha*0.35})`],_alt:0});
+      }
+    }
+  }
+  _gPoints=pts; _gRings=rings;
+  _gArcs=[...satArcs,...trailArcs,...cableArcs,...pipelineArcs,..._predictArcs];
+  globe.pointsData(_gPoints).ringsData(_gRings).arcsData(_gArcs).polygonsData([...iswPolygons]);
+}
+
+function hexToRgb(hex){
+  if(!hex||hex[0]!=='#') return '245,158,11';
+  return `${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let map;
 const markers = {
@@ -1902,23 +2013,9 @@ const visible = {
   polymarket:true, shodan:true,
 };
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-function makeIcon(emoji, color, size=20){
-  return L.divIcon({
-    html:`<div style="font-size:${size}px;line-height:1;color:${color};text-shadow:0 0 8px ${color}88;filter:drop-shadow(0 0 3px ${color}55)">${emoji}</div>`,
-    className:'', iconSize:[size,size], iconAnchor:[size/2,size/2], popupAnchor:[0,-size/2],
-  });
-}
-
-function makePulseIcon(emoji, color, label){
-  const html=`<div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center">
-    <div style="position:absolute;inset:0;border-radius:50%;border:2px solid ${color};animation:alertPulse 1.4s ease-out infinite;opacity:.7"></div>
-    <div style="position:absolute;inset:4px;border-radius:50%;border:1px solid ${color}66;animation:alertPulse 1.4s ease-out infinite .4s;opacity:.5"></div>
-    <div style="font-size:16px;line-height:1;color:${color};text-shadow:0 0 10px ${color};z-index:1">${emoji}</div>
-    <div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);font-size:6px;color:${color};white-space:nowrap;letter-spacing:.06em;font-family:'JetBrains Mono',monospace">${label}</div>
-  </div>`;
-  return L.divIcon({html, className:'', iconSize:[36,44], iconAnchor:[18,18], popupAnchor:[0,-18]});
-}
+// ── Icons (stubs — globe.gl uses color/size from data, not DOM icons) ─────────
+function makeIcon(emoji, color, size=20){ return null; }
+function makePulseIcon(emoji, color, label){ return null; }
 
 const ICONS = {
   adsb:    {fn:(mil)=>makeIcon('✈',  mil?'#ef4444':'#f59e0b', 20)},
@@ -2023,10 +2120,11 @@ function buildPopup(p){
     <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(p.country||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">SEEN</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
     ${badge}
-    ${p.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
-      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>
-      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>
-    </div>`:''}
+    <div style="margin-top:.4rem;display:flex;gap:.3rem;flex-wrap:wrap">
+      ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>`:''}
+      ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>`:''}
+      <button class="pvote-btn" style="flex:1;text-align:center;color:#a78bfa" onclick="predictPath(_lastPopupData)">🎯 PREDICT PATH</button>
+    </div>
   </div>`;
 }
 
@@ -2081,6 +2179,94 @@ function buildCommunityPopup(r){
   </div>`;
 }
 
+// ── AI Asset Prediction ───────────────────────────────────────────────────────
+const THREAT_COLORS = {LOW:'#22c55e',MODERATE:'#f59e0b',HIGH:'#f97316',CRITICAL:'#ef4444'};
+
+async function predictPath(d){
+  // d = position object from positionStore
+  const popup = document.getElementById('globe-popup');
+  const inner = popup.querySelector('.popup-inner');
+  if(inner){
+    const el = inner.querySelector('.predict-section');
+    if(el) el.remove();
+    const sec = document.createElement('div');
+    sec.className = 'predict-section';
+    sec.style.cssText = 'margin-top:.5rem;border-top:1px solid #333;padding-top:.4rem';
+    sec.innerHTML = '<div style="color:var(--amber);font-size:.6rem;letter-spacing:.1em">⟳ PREDICTING PATH...</div>';
+    inner.appendChild(sec);
+  }
+
+  const trail = (_trails[d.callsign||d._k] || []).map(p=>({lat:p.lat,lon:p.lon}));
+
+  let result;
+  try {
+    const res = await fetch('/api/predict', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        callsign:   d.callsign || d._k || '',
+        type:       d.type || '',
+        lat:        d.lat,
+        lon:        d.lon,
+        heading_deg: d.heading_deg || 0,
+        speed_kts:  d.speed_kts || 0,
+        altitude_ft: d.altitude_ft || 0,
+        country:    d.country || '',
+        source:     d.source || '',
+        military_flag: d.military_flag || 0,
+        trail,
+      })
+    });
+    result = await res.json();
+  } catch(e) {
+    result = {error: String(e)};
+  }
+
+  // Render predicted path arcs on globe
+  _predictArcs = [];
+  if(result.path && result.path.length >= 2){
+    const pts = result.path;
+    const tColor = THREAT_COLORS[result.threat_level] || '#f59e0b';
+    // Draw arc from current position through predicted waypoints
+    const allPts = [{lat:d.lat,lon:d.lon}, ...pts];
+    for(let i=0;i<allPts.length-1;i++){
+      const alpha = 0.85 - (i * 0.12);
+      _predictArcs.push({
+        sLat:allPts[i].lat, sLng:allPts[i].lon,
+        eLat:allPts[i+1].lat, eLng:allPts[i+1].lon,
+        _color:[`rgba(0,0,0,0)`, `${tColor}${Math.round(Math.max(alpha,0.15)*255).toString(16).padStart(2,'0')}`],
+        _alt: 0.02, _predict:true,
+      });
+    }
+    _scheduleRebuild();
+    // Auto-clear after 5 minutes
+    setTimeout(()=>{ _predictArcs=[]; _scheduleRebuild(); }, 300000);
+  }
+
+  // Update popup with prediction result
+  if(inner){
+    const old = inner.querySelector('.predict-section');
+    if(old) old.remove();
+    const sec = document.createElement('div');
+    sec.className = 'predict-section';
+    sec.style.cssText = 'margin-top:.5rem;border-top:1px solid #333;padding-top:.4rem;font-size:.6rem';
+    if(result.error){
+      sec.innerHTML = `<div style="color:#ef4444">PREDICT ERROR: ${esc(result.error)}</div>`;
+    } else {
+      const tColor = THREAT_COLORS[result.threat_level] || '#f59e0b';
+      sec.innerHTML = `
+        <div style="color:var(--amber);letter-spacing:.1em;margin-bottom:.3rem">◈ AI PREDICTION</div>
+        ${result.asset_id?`<div class="popup-row"><span class="popup-label">PLATFORM</span><span class="popup-val" style="color:var(--cyan)">${esc(result.asset_id)}</span></div>`:''}
+        <div class="popup-row"><span class="popup-label">THREAT</span><span class="popup-val" style="color:${tColor};font-weight:700">${esc(result.threat_level||'—')}</span></div>
+        ${result.destination?`<div class="popup-row"><span class="popup-label">DESTINATION</span><span class="popup-val" style="color:var(--dim2)">${esc(result.destination)}</span></div>`:''}
+        <div style="color:var(--dim2);margin-top:.3rem;line-height:1.4">${esc(result.assessment||'')}</div>
+        ${result.path?`<div style="color:#666;margin-top:.2rem;font-size:.55rem">PATH ARC PROJECTED ON GLOBE — ${result.path.length} WAYPOINTS</div>`:''}
+      `;
+    }
+    inner.appendChild(sec);
+  }
+}
+
 // ── Layer helpers ─────────────────────────────────────────────────────────────
 function sourceToLayerKey(source){
   const s=(source||'').toLowerCase();
@@ -2114,12 +2300,11 @@ function markerKey(p){
 
 // ── Signal pulse ──────────────────────────────────────────────────────────────
 function spawnPulse(lat, lon, color){
-  const pt = map.latLngToLayerPoint([lat,lon]);
-  const el = document.createElement('div');
-  el.className='sig-pulse';
-  el.style.cssText=`left:${pt.x}px;top:${pt.y}px;border-color:${color};position:absolute`;
-  document.querySelector('#map .leaflet-map-pane')?.appendChild(el);
-  el.addEventListener('animationend',()=>el.remove());
+  if(!globe) return;
+  const ring={lat,lon,_color:(color||'#f59e0b')+'99',_temp:true};
+  _gRings=[..._gRings,ring];
+  globe.ringsData(_gRings);
+  setTimeout(()=>{ _gRings=_gRings.filter(r=>r!==ring); globe.ringsData(_gRings); },3000);
 }
 
 // ── Position updater ──────────────────────────────────────────────────────────
@@ -2135,24 +2320,20 @@ const LAYER_COLORS = {
 
 function updatePosition(p, isNew){
   if(p.lat==null||p.lon==null) return;
-  const lk  = sourceToLayerKey(p.source);
-  const key = markerKey(p);
-  const icon = iconFor(p.source, parseInt(p.military_flag||0));
-  const popup = buildPopup(p);
-
-  if(markers[lk]&&markers[lk][key]){
-    markers[lk][key].setLatLng([p.lat,p.lon]);
-    markers[lk][key].setPopupContent(popup);
-  } else {
-    if(!markers[lk]) markers[lk]={};
-    const m=L.marker([p.lat,p.lon],{icon}).bindPopup(popup,{maxWidth:300,minWidth:230});
-    markers[lk][key]=m;
-    if(layers[lk]) layers[lk].addLayer(m);
-    if(isNew && (p.title||p.callsign))
-      pushFeed({...p, source: p.source||lk});
-    if(isNew && Math.random()<0.15) // pulse ~15% of new markers to avoid DOM flood
-      spawnPulse(p.lat,p.lon, LAYER_COLORS[lk]||'#f59e0b');
+  const key=markerKey(p);
+  positionStore[key]=p;
+  if(p.source==='adsb'||p.source==='opensky'||p.source==='ais'){
+    const cs=p.callsign||key;
+    if(!_trails[cs]) _trails[cs]=[];
+    const last=_trails[cs][_trails[cs].length-1];
+    if(!last||last.lat!==p.lat||last.lon!==p.lon){
+      _trails[cs].push({lat:p.lat,lon:p.lon});
+      if(_trails[cs].length>_TRAIL_MAX) _trails[cs].shift();
+    }
   }
+  if(isNew&&(p.title||p.callsign)) pushFeed({...p,source:p.source});
+  if(isNew&&Math.random()<0.12) spawnPulse(p.lat,p.lon,LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b');
+  _scheduleRebuild();
 }
 
 const _ALERT_SOURCES = new Set(['dark_vessel','convergence','nuclear_threat','pipeline_threat']);
@@ -2160,41 +2341,20 @@ const _ALERT_SOURCES = new Set(['dark_vessel','convergence','nuclear_threat','pi
 function updateEvent(e, isNew){
   if(_ALERT_SOURCES.has(e.source)){
     if(isNew) pushAlert(e);
-    if(e.lat!=null && e.lon!=null) updatePosition(e, isNew);
-    return;
   }
   if(e.lat!=null&&e.lon!=null) updatePosition(e,isNew);
-  else if(isNew && e.title) pushFeed(e);
+  else if(isNew&&e.title) pushFeed(e);
   if(e.title) pushNews(e);
 }
 
 // ── Community markers ─────────────────────────────────────────────────────────
-function communityIcon(r){
-  const sev  = parseInt(r.severity)||3;
-  const color = SEV_CSS[sev]||'#22c55e';
-  const rtIcon = RTYPE_ICONS[r.report_type]||'◈';
-  return L.divIcon({
-    html:`<div style="font-size:18px;line-height:1;color:${color};text-shadow:0 0 8px ${color}88;filter:drop-shadow(0 0 3px ${color}55)">${rtIcon}</div>`,
-    className:'', iconSize:[18,18], iconAnchor:[9,9], popupAnchor:[0,-9],
-  });
-}
+function communityIcon(r){ return null; } // unused with globe.gl
 
 function addCommunityMarker(r){
   if(r.lat==null||r.lon==null||r.hidden) return;
-  const key = 'cr_'+r.id;
-  const icon = communityIcon(r);
-  const popup = buildCommunityPopup(r);
-  if(markers.community[key]){
-    markers.community[key].setIcon(icon);
-    markers.community[key].setPopupContent(popup);
-    markers.community[key]._wardData = r;
-  } else {
-    const m=L.marker([r.lat,r.lon],{icon}).bindPopup(popup,{maxWidth:310,minWidth:250});
-    m._wardData = r;
-    markers.community[key]=m;
-    if(layers.community) layers.community.addLayer(m);
-    pushFeed({source:'community', title:r.title, lat:r.lat, lon:r.lon, raw_ts_utc:r.created_at, country:r.country});
-  }
+  const key='cr_'+r.id;
+  communityStore[key]=r;
+  _scheduleRebuild();
 }
 
 function refreshCommunityList(reports){
@@ -2224,7 +2384,7 @@ function refreshCommunityList(reports){
       <div class="comm-ts">${fmtTs(r.created_at)}</div>
     `;
     if(r.lat!=null&&r.lon!=null)
-      div.onclick=e=>{ if(e.target.tagName!=='BUTTON') map.setView([r.lat,r.lon],Math.max(map.getZoom(),6)); };
+      div.onclick=e=>{ if(e.target.tagName!=='BUTTON') { if(globe) globe.pointOfView({lat:r.lat,lng:r.lon,altitude:0.8},800); } };
     list.appendChild(div);
   });
 }
@@ -2313,58 +2473,59 @@ async function submitReport(){
 
 // ── Count + UI refresh ────────────────────────────────────────────────────────
 function refreshCounts(){
-  const ac  = Object.keys(markers.adsb||{}).length;
-  const sh  = Object.keys(markers.ais||{}).length;
-  const sat = Object.keys(markers.tle||{}).length;
-  const nFire    = Object.keys(markers.fire||{}).length;
-  const nSeismic = Object.keys(markers.seismic||{}).length;
-  const nEw      = Object.keys(markers.ew||{}).length;
-  const nComm    = Object.keys(markers.community||{}).length;
-  const ev  = Object.keys(markers.acled||{}).length +
-              Object.keys(markers.notam||{}).length +
-              Object.keys(markers.osint||{}).length +
-              nFire + nSeismic + nEw;
+  const _cnt={};
+  for(const[k,d] of Object.entries(positionStore)){ const lk=sourceToLayerKey(d.source); _cnt[lk]=(_cnt[lk]||0)+1; }
+  for(const[k,r] of Object.entries(communityStore)){ _cnt.community=(_cnt.community||0)+1; }
+  for(const sp of staticPoints){ _cnt[sp._lk]=(_cnt[sp._lk]||0)+1; }
+  const ac=(_cnt.adsb||0);
+  const sh  = (_cnt.ais||0);
+  const sat = (_cnt.tle||0);
+  const nFire    = (_cnt.fire||0);
+  const nSeismic = (_cnt.seismic||0);
+  const nEw      = (_cnt.ew||0);
+  const nComm    = (_cnt.community||0);
+  const ev  = (_cnt.acled||0) + (_cnt.notam||0) + (_cnt.osint||0) + nFire + nSeismic + nEw;
 
   document.getElementById('cnt-adsb').textContent    = ac;
   document.getElementById('cnt-ais').textContent     = sh;
   document.getElementById('cnt-tle').textContent     = sat;
-  document.getElementById('cnt-acled').textContent   = Object.keys(markers.acled||{}).length;
-  document.getElementById('cnt-notam').textContent   = Object.keys(markers.notam||{}).length;
-  document.getElementById('cnt-osint').textContent   = Object.keys(markers.osint||{}).length;
+  document.getElementById('cnt-acled').textContent   = (_cnt.acled||0);
+  document.getElementById('cnt-notam').textContent   = (_cnt.notam||0);
+  document.getElementById('cnt-osint').textContent   = (_cnt.osint||0);
   document.getElementById('cnt-fire').textContent    = nFire;
   document.getElementById('cnt-seismic').textContent = nSeismic;
   document.getElementById('cnt-ew').textContent      = nEw;
   document.getElementById('cnt-community').textContent = nComm;
 
-  document.getElementById('cnt-nuclear').textContent   = Object.keys(markers.nuclear||{}).length;
-  document.getElementById('cnt-milbase').textContent   = Object.keys(markers.mil_base||{}).length;
-  document.getElementById('cnt-osintgeo').textContent  = Object.keys(markers.osint_geo||{}).length;
-  document.getElementById('cnt-unhcr').textContent     = Object.keys(markers.unhcr||{}).length;
-  document.getElementById('cnt-views').textContent     = Object.keys(markers.views||{}).length;
-  const nAlerts = Object.keys(markers.alerts||{}).length;
+  document.getElementById('cnt-nuclear').textContent   = (_cnt.nuclear||0);
+  document.getElementById('cnt-milbase').textContent   = (_cnt.mil_base||0);
+  document.getElementById('cnt-osintgeo').textContent  = (_cnt.osint_geo||0);
+  document.getElementById('cnt-unhcr').textContent     = (_cnt.unhcr||0);
+  document.getElementById('cnt-views').textContent     = (_cnt.views||0);
+  const nAlerts = (_cnt.alerts||0);
   const alertTabCount = document.getElementById('alert-tab-count');
   if(alertTabCount) alertTabCount.textContent = nAlerts;
   const cntAlerts = document.getElementById('cnt-alerts');
   if(cntAlerts) cntAlerts.textContent = nAlerts;
-  const nPikud = Object.keys(markers.pikud||{}).length;
+  const nPikud = (_cnt.pikud||0);
   const cntPikud = document.getElementById('cnt-pikud');
   if(cntPikud) cntPikud.textContent = nPikud;
-  const nWiki = Object.keys(markers.wikipedia||{}).length;
+  const nWiki = (_cnt.wikipedia||0);
   const cntWiki = document.getElementById('cnt-wikipedia');
   if(cntWiki) cntWiki.textContent = nWiki;
-  const nEmergency = Object.keys(markers.adsb_emergency||{}).length;
+  const nEmergency = (_cnt.adsb_emergency||0);
   const cntEmergency = document.getElementById('cnt-adsb-emergency');
   if(cntEmergency) cntEmergency.textContent = nEmergency;
-  const nPoly = Object.keys(markers.polymarket||{}).length;
+  const nPoly = (_cnt.polymarket||0);
   const cntPoly = document.getElementById('cnt-polymarket');
   if(cntPoly) cntPoly.textContent = nPoly;
-  const nShodan = Object.keys(markers.shodan||{}).length;
+  const nShodan = (_cnt.shodan||0);
   const cntShodan = document.getElementById('cnt-shodan');
   if(cntShodan) cntShodan.textContent = nShodan;
 
   // Group badge totals
   const _gb = (id, keys) => {
-    const t = keys.reduce((s,k)=>s+Object.keys(markers[k]||{}).length,0);
+    const t = keys.reduce((s,k)=>s+(_cnt[k]||0),0);
     const el = document.getElementById(id);
     if(el) el.textContent = t||'';
   };
@@ -2373,7 +2534,7 @@ function refreshCounts(){
   _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia']);
   _gb('grp-infra-badge',     ['nuclear','mil_base','ew']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
-  const nAlertTotal = Object.keys(markers.alerts||{}).length + nPikud + nEmergency;
+  const nAlertTotal = nAlerts + nPikud + nEmergency;
   const ab = document.getElementById('grp-alerts-badge');
   if(ab) ab.textContent = nAlertTotal||'';
 
@@ -2394,97 +2555,94 @@ function toggleLayer(key){
   visible[key]=!visible[key];
   const cb=document.getElementById('cb-'+key);
   if(cb) cb.checked=visible[key];
-  if(layers[key]){
-    if(visible[key]) map.addLayer(layers[key]);
-    else             map.removeLayer(layers[key]);
-  }
+  _scheduleRebuild();
 }
 
 // ── Map init ──────────────────────────────────────────────────────────────────
-function initMap(){
+function initMap(){ initGlobe(); }
+
+function initGlobe(){
   buildDomainBars();
-
-  map = L.map('leaflet-map', {
-    center:[20,0], zoom:3,
-    zoomControl:true,
-    attributionControl:true,
-  });
-
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains:'abcd', maxZoom:19,
-  }).addTo(map);
-
-  // Cursor lat/lon readout
-  const readout=document.getElementById('cursor-readout');
-  map.on('mousemove',e=>{
-    const pos=map.latLngToContainerPoint(e.latlng);
-    readout.style.left=pos.x+'px';
-    readout.style.top=pos.y+'px';
-    readout.style.display='block';
-    readout.textContent=
-      (e.latlng.lat>=0?'+':'') + e.latlng.lat.toFixed(4) + ' ' +
-      (e.latlng.lng>=0?'+':'') + e.latlng.lng.toFixed(4);
-  });
-  map.on('mouseout',()=>{ readout.style.display='none'; });
-
-  // Map click → load community reports near click
-  map.on('click', e=>{
-    loadCommunityNear(e.latlng.lat, e.latlng.lng);
-    openSubmitDialog(e.latlng.lat, e.latlng.lng);
-    // only pre-fill — don't force dialog open; user can cancel
-    document.getElementById('dlg-lat').value=e.latlng.lat.toFixed(4);
-    document.getElementById('dlg-lon').value=e.latlng.lng.toFixed(4);
-    // keep dialog closed, just load nearby community
-  });
-  // Re-wire click to only load community, not pop dialog unless button clicked
-  map.off('click');
-  map.on('click', e=>{
-    loadCommunityNear(e.latlng.lat, e.latlng.lng);
-  });
-
-  // Cluster groups
-  const clusterOpts = {disableClusteringAtZoom:7, maxClusterRadius:55};
-  const ALL_KEYS=['adsb','ais','tle','acled','notam','osint','fire','seismic','ew','community'];
-  ALL_KEYS.forEach(k=>{
-    const c=LAYER_COLORS[k]||'#6b7280';
-    layers[k]=L.markerClusterGroup({
-      ...clusterOpts,
-      iconCreateFunction:function(cluster){
-        const n=cluster.getChildCount();
-        return L.divIcon({
-          html:`<div style="background:rgba(8,8,12,.88);border:1px solid ${c}33;color:${c};font-family:'JetBrains Mono',monospace;font-size:.58rem;width:30px;height:30px;display:flex;align-items:center;justify-content:center;letter-spacing:.03em">${n}</div>`,
-          className:'',iconSize:[30,30],
-        });
-      },
+  globe=Globe({animateIn:false})(document.getElementById('globe-container'))
+    .width(window.innerWidth).height(window.innerHeight)
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+    .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+    .atmosphereColor('rgba(34,197,94,0.15)').atmosphereAltitude(0.2)
+    .pointsData([]).pointLat(d=>d.lat).pointLng(d=>d.lon)
+    .pointColor(d=>d._color).pointAltitude(d=>d._alt).pointRadius(d=>d._r)
+    .pointResolution(4)
+    .onPointClick((d,ev)=>{ showGlobePopup(d,ev); loadCommunityNear(d.lat,d.lon); })
+    .onPointHover(d=>{ document.getElementById('globe-container').style.cursor=d?'pointer':'default'; })
+    .ringsData([]).ringLat(d=>d.lat).ringLng(d=>d.lon)
+    .ringMaxRadius(3.5).ringPropagationSpeed(2.5).ringRepeatPeriod(900)
+    .ringColor(d=>t=>`rgba(${hexToRgb(d._color)},${(1-t)*0.8})`)
+    .arcsData([]).arcStartLat(d=>d.sLat).arcStartLng(d=>d.sLng)
+    .arcEndLat(d=>d.eLat).arcEndLng(d=>d.eLng).arcColor(d=>d._color)
+    .arcAltitudeAutoScale(0.35).arcDashLength(0.4).arcDashGap(0.2)
+    .arcDashAnimateTime(4000).arcStroke(0.5)
+    .polygonsData([])
+    .polygonCapColor(d=>d._fill||'rgba(239,68,68,0.12)')
+    .polygonSideColor(()=>'rgba(255,255,255,0.04)')
+    .polygonStrokeColor(d=>d._stroke||'#ef4444')
+    .polygonAltitude(0.001)
+    .onPolygonClick((d,ev)=>{
+      const p=d.properties||{};
+      showGlobePopupRaw(`<div class="popup-inner"><div class="popup-call">🗺 ${esc(p.zone||p.name||'FRONTLINE ZONE')}</div><div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val">${esc(d._type||'—')}</span></div></div>`,ev);
     });
-    if(visible[k]) layers[k].addTo(map);
-  });
 
-  // New static + event layers
-  const NEW_LAYER_COLORS = {
-    nuclear:'#eab308', mil_base:'#f59e0b', osint_geo:'#f97316', unhcr:'#a855f7', views:'#ef4444',
-    alerts:'#ef4444', pikud:'#ef4444', wikipedia:'#f59e0b', adsb_emergency:'#ef4444',
-    polymarket:'#f59e0b', shodan:'#06b6d4',
-  };
-  ['nuclear','mil_base','osint_geo','unhcr','views','alerts','pikud','wikipedia','adsb_emergency','polymarket','shodan'].forEach(k=>{
-    const c=NEW_LAYER_COLORS[k]||'#6b7280';
-    layers[k]=L.markerClusterGroup({
-      ...clusterOpts,
-      iconCreateFunction:function(cluster){
-        const n=cluster.getChildCount();
-        return L.divIcon({
-          html:`<div style="background:rgba(8,8,12,.88);border:1px solid ${c}33;color:${c};font-family:'JetBrains Mono',monospace;font-size:.58rem;width:30px;height:30px;display:flex;align-items:center;justify-content:center;letter-spacing:.03em">${n}</div>`,
-          className:'',iconSize:[30,30],
-        });
-      },
-    });
-    if(visible[k]) layers[k].addTo(map);
+  globe.pointOfView({lat:25,lng:45,altitude:2.2});
+  window.addEventListener('resize',()=>{ globe.width(window.innerWidth).height(window.innerHeight); });
+  document.getElementById('globe-container').addEventListener('click',ev=>{
+    if(ev.target.tagName==='CANVAS') closeGlobePopup();
   });
+  globe.controls().autoRotate=false;
+  globe.controls().autoRotateSpeed=0.25;
+  globe.controls().enableDamping=true;
+  globe.controls().dampingFactor=0.08;
 
   loadInitialData();
   connectWS();
   initTimeline();
+}
+
+let _lastPopupData = null;  // used by predictPath() button
+
+function showGlobePopup(d,ev){
+  _lastPopupData = d;
+  const html=d._isComm?buildCommunityPopup(d):buildPopup(d);
+  showGlobePopupRaw(html,ev);
+}
+
+function showGlobePopupRaw(html,ev){
+  const pop=document.getElementById('globe-popup');
+  document.getElementById('globe-popup-content').innerHTML=html;
+  pop.style.display='block';
+  pop.style.left=Math.max(0,Math.min(ev.clientX+12,window.innerWidth-340))+'px';
+  pop.style.top=Math.max(0,Math.min(ev.clientY-10,window.innerHeight-450))+'px';
+}
+
+function closeGlobePopup(){
+  document.getElementById('globe-popup').style.display='none';
+}
+
+function globeFocusRegion(r){
+  if(!globe) return;
+  const v={world:{lat:20,lng:0,altitude:2.5},iran:{lat:32,lng:50,altitude:1.1},
+    ukraine:{lat:49,lng:32,altitude:1.0},asia:{lat:25,lng:115,altitude:1.8},
+    strait:{lat:26,lng:56,altitude:0.6},gaza:{lat:31,lng:34,altitude:0.7}};
+  globe.pointOfView(v[r]||v.world,1200);
+}
+
+function flyTo(lat,lon,alt){
+  if(globe) globe.pointOfView({lat,lng:lon,altitude:alt||1.2},1000);
+}
+
+function toggleAutoRotate(){
+  _autoRotate=!_autoRotate;
+  globe.controls().autoRotate=_autoRotate;
+  const btn=document.getElementById('rotate-btn');
+  if(btn){ btn.style.color=_autoRotate?'var(--green)':'var(--dim2)';
+    btn.style.borderColor=_autoRotate?'var(--green)':'var(--border2)'; }
 }
 
 // ── REST initial load ─────────────────────────────────────────────────────────
@@ -2523,65 +2681,34 @@ function toggleGroup(hdrEl){
 }
 
 // ── ISW Frontline Layers ──────────────────────────────────────────────────────
-let iswUkraineLayer = null;
-let iswMiddleEastLayer = null;
-
-function toggleIswLayer(key, show){
-  const layer = key==='ukraine' ? iswUkraineLayer : iswMiddleEastLayer;
-  if(!layer) return;
-  if(show) layer.addTo(map);
-  else     map.removeLayer(layer);
+async function loadIswLayers(){
+  try{
+    const res=await fetch('/api/layers/isw_ukraine').then(r=>r.json());
+    if(res.features?.length){
+      res.features.forEach(f=>{ f._fill='rgba(239,68,68,0.12)'; f._stroke='#ef4444'; f._type='Ukraine Frontline'; f._isw='ukraine'; });
+      iswPolygons=[...iswPolygons.filter(p=>p._isw!=='ukraine'),...res.features];
+      const c=document.getElementById('cnt-isw-ukraine'); if(c) c.textContent=res.features.length;
+      _scheduleRebuild();
+    }
+  }catch(e){}
+  try{
+    const res=await fetch('/api/layers/isw_middle_east').then(r=>r.json());
+    if(res.features?.length){
+      res.features.forEach(f=>{ f._fill='rgba(249,115,22,0.1)'; f._stroke='#f97316'; f._type='ME Zone'; f._isw='me'; });
+      iswPolygons=[...iswPolygons.filter(p=>p._isw!=='me'),...res.features];
+      const c=document.getElementById('cnt-isw-me'); if(c) c.textContent=res.features.length;
+      _scheduleRebuild();
+    }
+  }catch(e){}
 }
 
-async function loadIswLayers(){
-  const _styleUkraine = f => ({
-    color:'#ef4444', weight: f.geometry?.type?.includes('Line') ? 2 : 1,
-    opacity:.8, fillColor:'#ef4444', fillOpacity:.1, dashArray:'5 4',
-  });
-  const _styleME = f => ({
-    color:'#f97316', weight:2, opacity:.75,
-    fillColor:'#f97316', fillOpacity:.08, dashArray:'5 4',
-  });
-
-  try{
-    const res = await fetch('/api/layers/isw_ukraine').then(r=>r.json());
-    if(res.features?.length){
-      if(iswUkraineLayer) iswUkraineLayer.remove();
-      iswUkraineLayer = L.geoJSON(res, {
-        style: _styleUkraine,
-        onEachFeature:(f,layer)=>{
-          const p=f.properties||{};
-          layer.bindPopup(`<div class="popup-inner"><div class="popup-call">🗺 UA FRONTLINE</div><div class="popup-row"><span class="popup-label">ZONE</span><span class="popup-val">${esc(p.zone||p.name||p.description||'—')}</span></div></div>`,{maxWidth:260});
-        },
-      });
-      if(document.getElementById('cb-isw-ukraine')?.checked!==false) iswUkraineLayer.addTo(map);
-      const c=document.getElementById('cnt-isw-ukraine');
-      if(c) c.textContent=res.features.length;
-    }
-  }catch(e){}
-
-  try{
-    const res = await fetch('/api/layers/isw_middle_east').then(r=>r.json());
-    if(res.features?.length){
-      if(iswMiddleEastLayer) iswMiddleEastLayer.remove();
-      iswMiddleEastLayer = L.geoJSON(res, {
-        style: _styleME,
-        onEachFeature:(f,layer)=>{
-          const p=f.properties||{};
-          layer.bindPopup(`<div class="popup-inner"><div class="popup-call">🗺 ME ZONE</div><div class="popup-row"><span class="popup-label">NAME</span><span class="popup-val">${esc(p.name||p.zone||'—')}</span></div></div>`,{maxWidth:260});
-        },
-      });
-      if(document.getElementById('cb-isw-me')?.checked!==false) iswMiddleEastLayer.addTo(map);
-      const c=document.getElementById('cnt-isw-me');
-      if(c) c.textContent=res.features.length;
-    }
-  }catch(e){}
+function toggleIswLayer(key,show){
+  const type=key==='ukraine'?'ukraine':'me';
+  if(!show){ iswPolygons=iswPolygons.filter(p=>p._isw!==type); _scheduleRebuild(); }
+  else loadIswLayers();
 }
 
 // ── Static Infrastructure GeoJSON Layers ────────────────────────────────────
-let cableLayer = null;
-let pipelineLayer = null;
-
 async function loadStaticLayers(){
   // Nuclear + mil_bases are small — load immediately
   // Cables + pipelines are large GeoJSON — load in background after a beat
@@ -2592,126 +2719,96 @@ async function loadStaticLayers(){
 
 async function loadNuclear(){
   try{
-    const res = await fetch('/api/layers/nuclear').then(r=>r.json());
-    const features = res.features || [];
-    features.forEach(f=>{
-      if(f.geometry?.type !== 'Point') return;
-      const [lon, lat] = f.geometry.coordinates;
-      const props = f.properties || {};
-      const key = 'nuc_' + lat.toFixed(3) + '_' + lon.toFixed(3);
+    const res=await fetch('/api/layers/nuclear').then(r=>r.json());
+    res.features?.forEach(f=>{
+      if(f.geometry?.type!=='Point') return;
+      const[lon,lat]=f.geometry.coordinates;
+      const props=f.properties||{};
+      const key='nuc_'+lat.toFixed(3)+'_'+lon.toFixed(3);
       if(markers.nuclear[key]) return;
-      const icon = L.divIcon({
-        html:`<div style="font-size:16px;line-height:1;color:var(--yellow);text-shadow:0 0 6px #eab30888">☢</div>`,
-        className:'', iconSize:[16,16], iconAnchor:[8,8], popupAnchor:[0,-8],
-      });
-      const popup = `<div class="popup-inner">
-        <div class="popup-call" style="color:var(--yellow)">☢ ${esc(props.name||'Nuclear Plant')}</div>
-        <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(props.country||'—')}</span></div>
-        <div class="popup-row"><span class="popup-label">STATUS</span><span class="popup-val">${esc(props.status||'—')}</span></div>
-        <div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val">${esc(props.type||props.reactor_type||'—')}</span></div>
-        ${props.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(props.country)}')">⚡ INTEL CHAT: ${esc(props.country.toUpperCase())}</button></div>`:''}
-      </div>`;
-      const m = L.marker([lat, lon], {icon}).bindPopup(popup, {maxWidth:280,minWidth:220});
-      markers.nuclear[key] = m;
-      if(layers.nuclear && visible.nuclear) layers.nuclear.addLayer(m);
+      markers.nuclear[key]=true;
+      staticPoints.push({lat,lon,source:'nuclear',title:props.name||'Nuclear Plant',
+        country:props.country||'',description:`Status: ${props.status||'—'} | Type: ${props.type||'—'}`,
+        _k:key,_lk:'nuclear',_color:'#eab308',_alt:0.005,_r:0.42,...props});
     });
-    document.getElementById('cnt-nuclear').textContent = Object.keys(markers.nuclear).length;
-  }catch(e){ console.warn('nuclear layer:', e); }
+    const cnt=staticPoints.filter(p=>p._lk==='nuclear').length;
+    const el=document.getElementById('cnt-nuclear'); if(el) el.textContent=cnt;
+    _scheduleRebuild();
+  }catch(e){ console.warn('nuclear layer:',e); }
 }
 
 async function loadMilBases(){
   try{
-    const res = await fetch('/api/layers/mil_bases').then(r=>r.json());
-    const features = res.features || [];
-    features.forEach(f=>{
-      if(f.geometry?.type !== 'Point') return;
-      const [lon, lat] = f.geometry.coordinates;
-      const props = f.properties || {};
-      const key = 'mb_' + lat.toFixed(3) + '_' + lon.toFixed(3);
+    const res=await fetch('/api/layers/mil_bases').then(r=>r.json());
+    res.features?.forEach(f=>{
+      if(f.geometry?.type!=='Point') return;
+      const[lon,lat]=f.geometry.coordinates;
+      const props=f.properties||{};
+      const key='mb_'+lat.toFixed(3)+'_'+lon.toFixed(3);
       if(markers.mil_base[key]) return;
-      const icon = L.divIcon({
-        html:`<div style="font-size:14px;line-height:1;color:var(--amber);text-shadow:0 0 6px #f59e0b88">★</div>`,
-        className:'', iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-7],
-      });
-      const name = props.INSTNAME || props.name || 'Military Installation';
-      const branch = props.BRANCHNAME || props.branch || '';
-      const country = props.COUNTRY || props.STATE_TERR || 'USA';
-      const popup = `<div class="popup-inner">
-        <div class="popup-call" style="color:var(--amber)">★ ${esc(name)}</div>
-        <div class="popup-row"><span class="popup-label">BRANCH</span><span class="popup-val">${esc(branch||'—')}</span></div>
-        <div class="popup-row"><span class="popup-label">LOCATION</span><span class="popup-val">${esc(country)}</span></div>
-        <div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(country)}')">⚡ INTEL CHAT: ${esc(country.toUpperCase())}</button></div>
-      </div>`;
-      const m = L.marker([lat, lon], {icon}).bindPopup(popup, {maxWidth:280,minWidth:220});
-      markers.mil_base[key] = m;
-      if(layers.mil_base && visible.mil_base) layers.mil_base.addLayer(m);
+      markers.mil_base[key]=true;
+      const name=props.INSTNAME||props.name||'Military Installation';
+      const country=props.COUNTRY||props.STATE_TERR||'USA';
+      staticPoints.push({lat,lon,source:'mil_base',title:name,country,
+        description:`Branch: ${props.BRANCHNAME||'—'}`,
+        _k:key,_lk:'mil_base',_color:'#f59e0b',_alt:0.005,_r:0.35});
     });
-    document.getElementById('cnt-milbase').textContent = Object.keys(markers.mil_base).length;
-  }catch(e){ console.warn('mil_base layer:', e); }
+    const cnt=staticPoints.filter(p=>p._lk==='mil_base').length;
+    const el=document.getElementById('cnt-milbase'); if(el) el.textContent=cnt;
+    _scheduleRebuild();
+  }catch(e){ console.warn('mil_base layer:',e); }
 }
 
 async function loadCables(){
   try{
-    const res = await fetch('/api/layers/cables').then(r=>r.json());
-    if(cableLayer){ cableLayer.remove(); cableLayer=null; }
-    cableLayer = L.geoJSON(res, {
-      style: f => ({
-        color: '#06b6d4', weight: 1.5, opacity: 0.55,
-        dashArray: null,
-      }),
-      onEachFeature: (f, l) => {
-        const p = f.properties || {};
-        const name = p.name || p.cable_name || 'Submarine Cable';
-        const owners = Array.isArray(p.owners) ? p.owners.map(o=>o.name||o).join(', ') : (p.owner||'');
-        l.bindPopup(`<div class="popup-inner">
-          <div class="popup-call" style="color:var(--cyan)">⌇ ${esc(name)}</div>
-          ${owners?`<div class="popup-row"><span class="popup-label">OPERATORS</span><span class="popup-val">${esc(owners.substring(0,120))}</span></div>`:''}
-          ${p.length?`<div class="popup-row"><span class="popup-label">LENGTH</span><span class="popup-val">${esc(String(p.length))}</span></div>`:''}
-        </div>`, {maxWidth:280});
-        l.on('mouseover', function(){ this.setStyle({weight:3, opacity:0.9}); });
-        l.on('mouseout', function(){ cableLayer.resetStyle(this); });
-      }
+    const res=await fetch('/api/layers/cables').then(r=>r.json());
+    cableArcs=[];
+    res.features?.forEach(f=>{
+      const coords=f.geometry?.coordinates||[];
+      const arr=f.geometry?.type==='LineString'?[coords]:coords;
+      arr.forEach(line=>{
+        for(let i=0;i<line.length-1;i+=4){
+          const[lng1,lat1]=line[i];
+          const[lng2,lat2]=line[Math.min(i+4,line.length-1)];
+          if(!visible.cables) return;
+          cableArcs.push({sLat:lat1,sLng:lng1,eLat:lat2,eLng:lng2,
+            _color:['rgba(6,182,212,0.0)','rgba(6,182,212,0.55)'],_alt:0});
+        }
+      });
     });
-    if(document.getElementById('chk-cables').checked) cableLayer.addTo(map);
-    // Count line features
-    const n = (res.features||[]).filter(f=>f.geometry?.type?.includes('Line')||f.geometry?.type?.includes('Multi')).length;
-    document.getElementById('cnt-cables').textContent = n;
-  }catch(e){ console.warn('cables layer:', e); }
+    const el=document.getElementById('cnt-cables'); if(el) el.textContent=(res.features||[]).length;
+    _scheduleRebuild();
+  }catch(e){ console.warn('cables:',e); }
 }
 
 async function loadPipelines(){
   try{
-    const res = await fetch('/api/layers/pipelines').then(r=>r.json());
-    if(pipelineLayer){ pipelineLayer.remove(); pipelineLayer=null; }
-    pipelineLayer = L.geoJSON(res, {
-      style: f => ({
-        color: '#f97316', weight: 1.5, opacity: 0.5,
-        dashArray: '4 4',
-      }),
-      onEachFeature: (f, l) => {
-        const p = f.properties || {};
-        l.bindPopup(`<div class="popup-inner">
-          <div class="popup-call" style="color:var(--orange)">⊸ ${esc(p.name||'Pipeline')}</div>
-          <div class="popup-row"><span class="popup-label">SUBSTANCE</span><span class="popup-val">${esc((p.substance||'oil/gas').toUpperCase())}</span></div>
-          ${p.operator?`<div class="popup-row"><span class="popup-label">OPERATOR</span><span class="popup-val">${esc(p.operator)}</span></div>`:''}
-        </div>`, {maxWidth:260});
-        l.on('mouseover', function(){ this.setStyle({weight:3, opacity:0.85}); });
-        l.on('mouseout',  function(){ pipelineLayer.resetStyle(this); });
-      }
+    const res=await fetch('/api/layers/pipelines').then(r=>r.json());
+    pipelineArcs=[];
+    res.features?.forEach(f=>{
+      const coords=f.geometry?.coordinates||[];
+      const arr=f.geometry?.type==='LineString'?[coords]:coords;
+      arr.forEach(line=>{
+        for(let i=0;i<line.length-1;i+=4){
+          const[lng1,lat1]=line[i];
+          const[lng2,lat2]=line[Math.min(i+4,line.length-1)];
+          pipelineArcs.push({sLat:lat1,sLng:lng1,eLat:lat2,eLng:lng2,
+            _color:['rgba(249,115,22,0.0)','rgba(249,115,22,0.45)'],_alt:0});
+        }
+      });
     });
-    if(document.getElementById('chk-pipelines').checked) pipelineLayer.addTo(map);
-    const n = (res.features||[]).length;
-    document.getElementById('cnt-pipelines').textContent = n;
-  }catch(e){ console.warn('pipelines layer:', e); }
+    const el=document.getElementById('cnt-pipelines'); if(el) el.textContent=(res.features||[]).length;
+    _scheduleRebuild();
+  }catch(e){ console.warn('pipelines:',e); }
 }
 
 function toggleCableLayer(on){
-  if(!cableLayer) return;
-  if(on) cableLayer.addTo(map); else cableLayer.remove();
+  visible.cables=on;
+  if(on) loadCables(); else { cableArcs=[]; _scheduleRebuild(); }
 }
 function togglePipelineLayer(on){
-  if(!pipelineLayer) return;
-  if(on) pipelineLayer.addTo(map); else pipelineLayer.remove();
+  visible.pipelines=on;
+  if(on) loadPipelines(); else { pipelineArcs=[]; _scheduleRebuild(); }
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -2914,25 +3011,13 @@ function loadFrame(tsIso){
 }
 
 function applyFrame(positions){
-  Object.values(layers).forEach(lg=>lg.clearLayers());
-  Object.values(markers).forEach(m=>{ for(const k in m) delete m[k]; });
+  // Clear positionStore for playback frame
+  for(const k in positionStore) delete positionStore[k];
   positions.forEach(p=>{
     if(p.lat==null||p.lon==null) return;
-    const lk=sourceToLayerKey(p.source), key=markerKey(p);
-    const icon=iconFor(p.source,parseInt(p.military_flag||0));
-    const m=L.marker([p.lat,p.lon],{icon}).bindPopup(buildPopup(p),{maxWidth:300,minWidth:230});
-    if(!markers[lk]) markers[lk]={};
-    markers[lk][key]=m;
-    if(layers[lk]&&visible[lk]) layers[lk].addLayer(m);
-    if(TL.showTrails){
-      const tk=key; if(!TL.trails[tk]) TL.trails[tk]=[];
-      const trail=TL.trails[tk]; const last=trail[trail.length-1];
-      if(!last||last[0]!==p.lat||last[1]!==p.lon){
-        trail.push([p.lat,p.lon]); if(trail.length>25) trail.shift();
-      }
-      drawTrail(tk,trail,lk);
-    }
+    updatePosition(p, false);
   });
+  _scheduleRebuild();
   refreshCounts();
 }
 
@@ -2940,15 +3025,13 @@ function applyFrame(positions){
 const trailColors=Object.assign({opensky:'#f59e0b'},LAYER_COLORS);
 
 function drawTrail(key,points,layerKey){
-  if(points.length<2) return;
-  const color=trailColors[layerKey]||'#6b7280';
-  if(TL.trailPolylines[key]) TL.trailPolylines[key].setLatLngs(points);
-  else TL.trailPolylines[key]=L.polyline(points,{color,weight:1.5,opacity:.45,dashArray:'3 3'}).addTo(map);
+  // Trails are handled via _trails in _rebuildGlobe arc rendering
 }
 
 function clearTrails(){
-  Object.values(TL.trailPolylines).forEach(pl=>{ try{map.removeLayer(pl);}catch{} });
+  for(const k in _trails) delete _trails[k];
   TL.trailPolylines={}; TL.trails={};
+  _scheduleRebuild();
 }
 
 // ── Scrubber ──────────────────────────────────────────────────────────────────
@@ -2987,246 +3070,18 @@ function scrubLeave(){
 window.addEventListener('resize',()=>{ if(TL.summary) renderDensityCanvas(); });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 3D GLOBE (Cesium.js — lazy loaded on first toggle)
-// ══════════════════════════════════════════════════════════════════════════════
-
-let globeMode    = false;
-let cesiumViewer = null;
-let cesiumLoaded = false;
-
-// Severity → Cesium color string
+// ── Severity labels (used in various places) ─────────────────────────────────
 const SEV_CSS = ['','#22c55e','#84cc16','#eab308','#f97316','#ef4444'];
 
-// Zoom ↔ altitude conversion (rough approximation)
-function zoomToAlt(z){ return 20000000 / Math.pow(2, z); }
-function altToZoom(m){ return Math.round(Math.log2(20000000 / Math.max(m, 1))); }
-
-// Lazily inject Cesium CSS + JS bundle
-function loadCesiumBundle(){
-  return new Promise((resolve, reject)=>{
-    if(window.Cesium){ resolve(); return; }
-    // CESIUM_BASE_URL must be set before the script executes
-    window.CESIUM_BASE_URL='https://cesium.com/downloads/cesiumjs/releases/1.112/Build/Cesium/';
-    const link=document.createElement('link');
-    link.rel='stylesheet';
-    link.href=window.CESIUM_BASE_URL+'Widgets/widgets.css';
-    document.head.appendChild(link);
-    const s=document.createElement('script');
-    s.src=window.CESIUM_BASE_URL+'Cesium.js';
-    s.onload=()=>{ cesiumLoaded=true; resolve(); };
-    s.onerror=reject;
-    document.head.appendChild(s);
-  });
+// toggleGlobe stub — globe.gl is always active now
+function toggleGlobe(){
+  globeFocusRegion('world');
 }
 
-function initCesium(){
-  // No Ion token needed — all imagery from Esri ArcGIS (free, no key)
-  // Leave Cesium.Ion.defaultAccessToken at its default; we don't request any Ion assets
-
-  // Esri World Imagery satellite tiles (free, no API key)
-  const imageryProvider = new Cesium.UrlTemplateImageryProvider({
-    url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    maximumLevel:19,
-    credit:'Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, GIS Community',
-  });
-
-  cesiumViewer = new Cesium.Viewer('cesium-map', {
-    imageryProvider,
-    baseLayerPicker:    false,
-    geocoder:           false,
-    homeButton:         false,
-    sceneModePicker:    false,
-    navigationHelpButton: false,
-    animation:          false,
-    timeline:           false,
-    fullscreenButton:   false,
-    selectionIndicator: false,
-    infoBox:            false,  // we use our own popup overlay
-    shadows:            false,
-    // terrain omitted — requires ion token; Esri satellite gives enough depth cues
-  });
-
-  // Dark scene atmosphere to match 2D aesthetic
-  cesiumViewer.scene.skyAtmosphere.show = true;
-  cesiumViewer.scene.globe.enableLighting = false;
-  cesiumViewer.scene.globe.showGroundAtmosphere = false;
-  cesiumViewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#040406');
-
-  // Custom globe popup overlay
-  const overlay = document.createElement('div');
-  overlay.id='globe-popup';
-  overlay.style.cssText=`
-    position:absolute;z-index:900;pointer-events:none;display:none;
-    background:rgba(12,12,18,.95);border:1px solid #1e1e2a;
-    font-family:'JetBrains Mono',monospace;font-size:.65rem;
-    letter-spacing:.04em;color:#b8bcc8;padding:.7rem .9rem;
-    max-width:280px;white-space:pre-wrap;
-  `;
-  document.getElementById('cesium-map').appendChild(overlay);
-
-  // Click handler on Cesium entities → show our popup
-  const handler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
-  handler.setInputAction(click=>{
-    const picked = cesiumViewer.scene.pick(click.position);
-    if(Cesium.defined(picked) && picked.id && picked.id._wardData){
-      const d = picked.id._wardData;
-      const sp = cesiumViewer.scene.cartesianToCanvasCoordinates(picked.id.position.getValue(Cesium.JulianDate.now()));
-      if(sp){
-        overlay.style.left = (sp.x+12)+'px';
-        overlay.style.top  = (sp.y-12)+'px';
-        overlay.style.display='block';
-        overlay.style.pointerEvents='auto';
-        // Build simple text popup
-        const lines = [];
-        if(d.callsign||d.title) lines.push((d.callsign||d.title).toUpperCase());
-        if(d.source) lines.push('SRC: '+(d.source||'').toUpperCase());
-        if(d.report_type) lines.push('TYPE: '+(d.report_type||'').toUpperCase().replace('_',' '));
-        if(d.severity) lines.push('SEV: '+SEVERITY_LABELS[d.severity||3]);
-        if(d.country) lines.push('CTY: '+d.country);
-        if(d.lat!=null) lines.push('POS: '+d.lat.toFixed(4)+', '+d.lon.toFixed(4));
-        overlay.innerHTML = '<div style="color:#f59e0b;font-weight:700;margin-bottom:.4rem">'
-          +esc(lines[0]||'CONTACT')+'</div>'
-          +lines.slice(1).map(l=>'<div style="color:#52566a">'+esc(l)+'</div>').join('');
-      }
-    } else {
-      overlay.style.display='none';
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-}
-
-// Render all current Leaflet markers into Cesium
-function renderCesiumMarkers(){
-  if(!cesiumViewer) return;
-  cesiumViewer.entities.removeAll();
-
-  const CESIUM_COLORS = {
-    adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
-    notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
-    ew:'#e879f9',community:'#22c55e',
-    nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
-  };
-
-  Object.entries(markers).forEach(([lk, layerMarkers])=>{
-    if(!visible[lk]) return;
-    const hex = CESIUM_COLORS[lk]||'#9ca3af';
-    const color = Cesium.Color.fromCssColorString(hex);
-
-    Object.entries(layerMarkers).forEach(([key, m])=>{
-      const ll = m.getLatLng();
-      const popup = m.getPopup();
-      // For community markers, use severity color
-      let mColor = color;
-      if(lk==='community'){
-        // Try to extract severity from popup content (crude but avoids storing extra state)
-        const sevMatch = popup?._content?.match(/SEVERITY_COLORS\[(\d)\]/) ;
-        // Better: use the key to look up the original report — fallback to green
-      }
-
-      const entity = cesiumViewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(ll.lng, ll.lat, 0),
-        point: {
-          pixelSize: lk==='tle'?5:8,
-          color: mColor,
-          outlineColor: Cesium.Color.BLACK.withAlpha(0.4),
-          outlineWidth: 1,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          scaleByDistance: new Cesium.NearFarScalar(1e3, 1.5, 1e7, 0.5),
-        },
-        label: {
-          show: false, // shown on hover only via click handler
-        },
-      });
-      entity._wardData = {source:lk, lat:ll.lat, lon:ll.lng};
-      // Merge popup data if available via _leafletData (we'll set this below)
-      if(m._wardData) entity._wardData = {...entity._wardData, ...m._wardData};
-    });
-  });
-}
-
-// Attach _wardData to Leaflet markers so Cesium can read it
-const _origUpdatePosition = updatePosition;
-
-// Store raw data on markers so Cesium can access them
-function attachMarkerData(marker, data){
-  marker._wardData = {
-    callsign: data.callsign,
-    title:    data.title,
-    source:   data.source,
-    report_type: data.report_type,
-    severity: data.severity,
-    country:  data.country,
-    lat:      data.lat,
-    lon:      data.lon,
-  };
-}
-
-// Patch updatePosition to attach data
-const _patchedUpdatePosition = updatePosition;
-// Override via prototype isn't possible cleanly; instead update Cesium on each count refresh
-function syncCesiumIfActive(){
-  if(globeMode && cesiumViewer) renderCesiumMarkers();
-}
-
-// Globe toggle
-async function toggleGlobe(){
-  const btn = document.getElementById('globe-toggle');
-
-  if(!globeMode){
-    // Switch 2D → 3D
-    btn.textContent='⌛ LOADING...';
-    btn.className='globe-toggle loading';
-    try{
-      await loadCesiumBundle();
-    }catch(e){
-      btn.textContent='◉ 3D/SAT';
-      btn.className='';
-      console.error('Cesium load failed:', e);
-      return;
-    }
-
-    const center = map.getCenter();
-    const zoom   = map.getZoom();
-
-    document.getElementById('leaflet-map').style.display='none';
-    document.getElementById('cesium-map').style.display='block';
-
-    if(!cesiumViewer) initCesium();
-
-    // Fly to current Leaflet viewport
-    cesiumViewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(center.lng, center.lat, zoomToAlt(zoom)),
-      duration: 1.5,
-      orientation:{heading:0, pitch:-Cesium.Math.PI_OVER_TWO, roll:0},
-    });
-
-    renderCesiumMarkers();
-    globeMode=true;
-    btn.textContent='◉ 2D/DARK';
-    btn.className='active';
-
-  } else {
-    // Switch 3D → 2D
-    const cart = cesiumViewer.camera.positionCartographic;
-    const lat  = Cesium.Math.toDegrees(cart.latitude);
-    const lng  = Cesium.Math.toDegrees(cart.longitude);
-    const zoom = Math.max(1, Math.min(18, altToZoom(cart.height)));
-
-    document.getElementById('cesium-map').style.display='none';
-    document.getElementById('leaflet-map').style.display='block';
-
-    map.invalidateSize();
-    map.setView([lat, lng], zoom);
-
-    globeMode=false;
-    btn.textContent='◉ 3D/SAT';
-    btn.className='';
-  }
-}
-
-// Keep Cesium in sync when in globe mode
-const _origRefreshCounts = refreshCounts;
-// Cesium sync hook — called after every count refresh
-setInterval(()=>{ if(globeMode && cesiumViewer) syncCesiumIfActive(); }, 5000);
+function initCesium(){ /* removed — globe.gl handles 3D */ }
+// Cesium removed — globe.gl handles all 3D rendering
+function syncCesiumIfActive(){} // stub
+function renderCesiumMarkers(){} // stub
 
 // ── Video Bar ─────────────────────────────────────────────────────────────────
 function openVideoBar(){
@@ -3351,7 +3206,7 @@ function renderAlerts(){
     `;
     if(a.lat!=null && a.lon!=null){
       div.onclick = ()=>{
-        map.setView([a.lat, a.lon], Math.max(map.getZoom(), 7));
+        flyTo(a.lat, a.lon, 0.7);
         switchTab('alerts');
       };
     }
