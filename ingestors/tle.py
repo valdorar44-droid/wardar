@@ -19,10 +19,10 @@ _TLE_URLS = [
 ]
 
 # Use the "active" catalog — ~7000 objects, manageable
-_ACTIVE_TLE_URL = "https://celestrak.org/pub/TLE/catalog/active.txt"
-
-# Military/sensitive catalog
-_MILITARY_CATALOG = "https://celestrak.org/pub/TLE/catalog/military.txt"
+# Primary: tle.ivanstanojevic.me — JSON API, 24k+ satellites, no key required
+# CelesTrak blocks automated requests from most IPs
+_TLE_API_URL  = "https://tle.ivanstanojevic.me/api/tle/"
+_TLE_HEADERS  = {"User-Agent": "Wardar/0.1 (global situational awareness platform)"}
 
 
 def _parse_tle_lines(text: str) -> list[tuple[str, str, str]]:
@@ -94,21 +94,33 @@ async def fetch() -> list[dict]:
     if not C.ENABLE_SATELLITE:
         return []
 
+    tles: list[tuple[str,str,str]] = []
+    # API max page-size=100; fetch 5 pages = 500 satellites for Phase 1
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.get(_ACTIVE_TLE_URL)
-            if r.status_code != 200:
-                log_warn(f"tle: HTTP {r.status_code} from CelesTrak")
-                return []
-            tles = _parse_tle_lines(r.text)
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            for page in range(1, 6):
+                r = await client.get(
+                    f"{_TLE_API_URL}?page={page}&page-size=100",
+                    headers=_TLE_HEADERS,
+                )
+                if r.status_code != 200:
+                    log_warn(f"tle: HTTP {r.status_code} on page {page}")
+                    break
+                data = r.json()
+                for item in data.get("member") or []:
+                    name = item.get("name", "")
+                    l1   = item.get("line1", "")
+                    l2   = item.get("line2", "")
+                    if l1 and l2:
+                        tles.append((name, l1, l2))
     except Exception as exc:
         log_warn(f"tle: fetch failed: {exc}")
         return []
 
-    # Propagate positions (CPU-bound — run in executor for large catalogs)
+    # Propagate positions (CPU-bound — run in executor)
     results = []
     loop = asyncio.get_event_loop()
-    for name, l1, l2 in tles[:500]:  # cap at 500 for Phase 1
+    for name, l1, l2 in tles:
         p = await loop.run_in_executor(None, _propagate, name, l1, l2)
         if p:
             results.append(p)

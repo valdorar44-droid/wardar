@@ -2,7 +2,27 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python run.py"
-healthcheckPath = "/api/health"
+startCommand = "mkdir -p /data && python run.py"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[deploy.healthcheck]
+path = "/api/health"
 healthcheckTimeout = 30
-restartPolicyType = "on-failure"
+
+# ── IMPORTANT: Persistent Volume ──────────────────────────────────────────────
+# The DB lives at /data/wardar.db — mount a Railway Volume at "/data"
+# Railway dashboard → your service → Volumes → Add Volume
+#   Mount path: /data
+#
+# Required env vars (set in Railway dashboard → Variables):
+#   ADSB_EXCHANGE_API_KEY   — rapidapi.com/adsbexchange (or leave blank for OpenSky)
+#   AISSTREAM_API_KEY       — aisstream.io (free tier available)
+#   ACLED_API_KEY           — acleddata.com (free academic API)
+#   ACLED_EMAIL             — your email (required by ACLED)
+#   ANTHROPIC_API_KEY       — for AI summaries (optional Phase 3)
+#
+# Optional:
+#   OPENSKY_USERNAME / OPENSKY_PASSWORD — higher rate limits (free account)
+#   FAA_CLIENT_ID / FAA_CLIENT_SECRET   — faa.gov developer portal
+#   BRAVE_API_KEY                        — Brave Search API

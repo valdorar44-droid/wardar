@@ -28,10 +28,17 @@ async def _fetch_gdelt() -> list[dict]:
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(C.GDELT_URL, params=params)
+            if r.status_code == 429:
+                log_warn("gdelt: rate limited — skipping (news RSS will cover)")
+                return []
             if r.status_code != 200:
                 log_warn(f"gdelt: HTTP {r.status_code}")
                 return []
-            articles = r.json().get("articles") or []
+            try:
+                articles = r.json().get("articles") or []
+            except Exception:
+                log_warn("gdelt: invalid JSON response — skipping")
+                return []
     except Exception as exc:
         log_warn(f"gdelt: fetch error: {exc}")
         return []
