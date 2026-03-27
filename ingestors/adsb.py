@@ -241,6 +241,30 @@ async def _fetch_adsbfi(lat: float, lon: float, radius_nm: int = 400) -> list[di
         return []
 
 
+async def _fetch_emergency_squawks() -> list[dict]:
+    """
+    Fetch aircraft declaring emergencies (squawk 7700) and radio failures (7600).
+    These are high-priority signals — military emergencies, hijacks, or aircraft in distress.
+    """
+    results = []
+    for squawk in ["7700", "7600", "7500"]:  # 7700=emergency, 7600=radio fail, 7500=hijack
+        try:
+            url = f"https://api.airplanes.live/v2/squawk/{squawk}"
+            async with httpx.AsyncClient(timeout=10, headers={"User-Agent": "Wardar/0.1"}) as client:
+                r = await client.get(url)
+                if r.status_code == 200:
+                    ac = r.json().get("ac") or []
+                    for a in ac:
+                        p = _norm_adsbfi(a)
+                        if p:
+                            p["source"] = "adsb_emergency"
+                            p["military_flag"] = 1  # treat all emergencies as high-priority
+                            results.append(p)
+        except Exception:
+            continue
+    return results
+
+
 async def _fetch_mil_global() -> list[dict]:
     """
     Fetch ALL global military aircraft from dedicated /mil endpoints.
@@ -325,7 +349,13 @@ async def fetch() -> list[dict]:
                 seen.add(key)
                 results.append(p)
 
-    # 0. Global military aircraft via dedicated /mil endpoints (always, free)
+    # 0a. Emergency squawks — highest priority (7700=emergency, 7600=radio fail, 7500=hijack)
+    if C.ENABLE_ADSB:
+        emergencies = await _fetch_emergency_squawks()
+        _merge(emergencies)
+        log(f"adsb: emergency_squawks={len(emergencies)}")
+
+    # 0b. Global military aircraft via dedicated /mil endpoints (always, free)
     mil_global = await _fetch_mil_global()
     _merge(mil_global)
     log(f"adsb: mil_global={len(mil_global)} military aircraft")

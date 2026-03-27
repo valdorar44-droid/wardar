@@ -143,8 +143,8 @@ async def _tick_adsb():
         positions = await adsb.fetch()
         n = _save_positions(positions)
         if n:
-            released = DB.get_released_positions(sources=["adsb", "opensky"], limit=2000)
-            await _broadcast({"type": "positions", "sources": ["adsb", "opensky"], "data": released})
+            released = DB.get_released_positions(sources=["adsb", "opensky", "adsb_emergency"], limit=2000)
+            await _broadcast({"type": "positions", "sources": ["adsb", "opensky", "adsb_emergency"], "data": released})
     except Exception as exc:
         log_err(f"tick_adsb: {exc}")
 

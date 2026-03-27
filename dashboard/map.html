@@ -909,6 +909,13 @@ body::after{
           <span class="layer-name">WIKI SPIKES</span>
           <span class="layer-count" id="cnt-wikipedia" style="background:var(--amber)">0</span>
         </label>
+        <!-- Emergency Squawks -->
+        <label class="layer-item" id="lr-adsb-emergency">
+          <input type="checkbox" class="layer-cb" id="cb-adsb-emergency" checked style="color:var(--red)" onchange="toggleLayer('adsb_emergency')">
+          <span class="layer-icon" style="color:var(--red);animation:alertPulse 1.4s ease-out infinite">🆘</span>
+          <span class="layer-name" style="color:var(--red)">EMERGENCY SQUAWK</span>
+          <span class="layer-count" id="cnt-adsb-emergency" style="background:var(--red)">0</span>
+        </label>
       </div>
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
@@ -1540,14 +1547,14 @@ const markers = {
   adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{},
   fire:{}, seismic:{}, ew:{}, community:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
-  alerts:{}, pikud:{}, wikipedia:{},
+  alerts:{}, pikud:{}, wikipedia:{}, adsb_emergency:{},
 };
 let layers = {};
 const visible = {
   adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true,
   fire:true, seismic:true, ew:true, community:true,
   nuclear:true, mil_base:true, osint_geo:true, unhcr:true, views:true,
-  alerts:true, pikud:true, wikipedia:true,
+  alerts:true, pikud:true, wikipedia:true, adsb_emergency:true,
 };
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -1597,6 +1604,7 @@ const ICONS = {
   convergence:    {fn:()=>makePulseIcon('⚡','#f59e0b','CVG')},
   nuclear_threat: {fn:()=>makePulseIcon('☢','#ef4444','NUC')},
   pipeline_threat:{fn:()=>makePulseIcon('⊗','#f97316','PIPE')},
+  adsb_emergency: {fn:()=>makePulseIcon('🆘','#ef4444','SQUAWK')},
 };
 
 function iconFor(source, mil, extra){
@@ -1609,6 +1617,7 @@ function iconFor(source, mil, extra){
   if(s==='mil_base') return ICONS.mil_base.fn();
   if(s==='pikud_haoref')   return ICONS.pikud_haoref.fn();
   if(s==='wikipedia')      return ICONS.wikipedia.fn();
+  if(s==='adsb_emergency') return ICONS.adsb_emergency.fn();
   // Phase 3 alert sources
   if(s==='dark_vessel')    return ICONS.dark_vessel.fn();
   if(s==='convergence')    return ICONS.convergence.fn();
@@ -1717,6 +1726,7 @@ function buildCommunityPopup(r){
 // ── Layer helpers ─────────────────────────────────────────────────────────────
 function sourceToLayerKey(source){
   const s=(source||'').toLowerCase();
+  if(s==='adsb_emergency') return 'adsb_emergency';
   if(['adsb','opensky'].includes(s)) return 'adsb';
   if(s==='ais')   return 'ais';
   if(s==='tle')   return 'tle';
@@ -1759,7 +1769,7 @@ const LAYER_COLORS = {
   ew:'#e879f9',community:'#22c55e',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
-  pikud:'#ef4444',wikipedia:'#f59e0b',
+  pikud:'#ef4444',wikipedia:'#f59e0b',adsb_emergency:'#ef4444',
 };
 
 function updatePosition(p, isNew){
@@ -1981,6 +1991,9 @@ function refreshCounts(){
   const nWiki = Object.keys(markers.wikipedia||{}).length;
   const cntWiki = document.getElementById('cnt-wikipedia');
   if(cntWiki) cntWiki.textContent = nWiki;
+  const nEmergency = Object.keys(markers.adsb_emergency||{}).length;
+  const cntEmergency = document.getElementById('cnt-adsb-emergency');
+  if(cntEmergency) cntEmergency.textContent = nEmergency;
 
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
@@ -2069,9 +2082,9 @@ function initMap(){
   // New static + event layers
   const NEW_LAYER_COLORS = {
     nuclear:'#eab308', mil_base:'#f59e0b', osint_geo:'#f97316', unhcr:'#a855f7', views:'#ef4444',
-    alerts:'#ef4444', pikud:'#ef4444', wikipedia:'#f59e0b',
+    alerts:'#ef4444', pikud:'#ef4444', wikipedia:'#f59e0b', adsb_emergency:'#ef4444',
   };
-  ['nuclear','mil_base','osint_geo','unhcr','views','alerts','pikud','wikipedia'].forEach(k=>{
+  ['nuclear','mil_base','osint_geo','unhcr','views','alerts','pikud','wikipedia','adsb_emergency'].forEach(k=>{
     const c=NEW_LAYER_COLORS[k]||'#6b7280';
     layers[k]=L.markerClusterGroup({
       ...clusterOpts,
