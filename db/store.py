@@ -193,7 +193,9 @@ def get_released_positions_sampled(per_source: int = 600,
     """
     Return a balanced sample across all sources — prevents AIS (7M+ records)
     from flooding all slots and hiding aircraft/satellites.
-    Used for the initial WS snapshot and the no-filter REST call.
+    Military aircraft are sampled separately to ensure they're always
+    represented (they have a 24h delay so they'd otherwise be buried by
+    civilian aircraft sorted by raw_ts_utc DESC).
     """
     now = _utcnow()
     conn = get_conn()
@@ -203,14 +205,48 @@ def get_released_positions_sampled(per_source: int = 600,
         (now,)
     ).fetchall()
     all_rows: list[dict] = []
+    seen_keys: set = set()
+
     for row in src_rows:
         src = row[0]
-        rows = conn.execute(
-            "SELECT * FROM positions WHERE source=? AND release_ts_utc<=? "
-            "ORDER BY raw_ts_utc DESC LIMIT ?",
-            (src, now, per_source)
-        ).fetchall()
-        all_rows.extend(dict(r) for r in rows)
+        # For aircraft sources, always pull military flag=1 separately first
+        if src in ('adsb', 'opensky'):
+            mil_rows = conn.execute(
+                "SELECT * FROM positions WHERE source=? AND military_flag=1 "
+                "ORDER BY raw_ts_utc DESC LIMIT ?",
+                (src, per_source // 2)
+            ).fetchall()
+            for r in mil_rows:
+                d = dict(r)
+                k = d.get('id')
+                if k not in seen_keys:
+                    seen_keys.add(k)
+                    all_rows.append(d)
+            # Civilian portion
+            civ_rows = conn.execute(
+                "SELECT * FROM positions WHERE source=? AND military_flag=0 AND release_ts_utc<=? "
+                "ORDER BY raw_ts_utc DESC LIMIT ?",
+                (src, now, per_source // 2)
+            ).fetchall()
+            for r in civ_rows:
+                d = dict(r)
+                k = d.get('id')
+                if k not in seen_keys:
+                    seen_keys.add(k)
+                    all_rows.append(d)
+        else:
+            rows = conn.execute(
+                "SELECT * FROM positions WHERE source=? AND release_ts_utc<=? "
+                "ORDER BY raw_ts_utc DESC LIMIT ?",
+                (src, now, per_source)
+            ).fetchall()
+            for r in rows:
+                d = dict(r)
+                k = d.get('id')
+                if k not in seen_keys:
+                    seen_keys.add(k)
+                    all_rows.append(d)
+
     all_rows.sort(key=lambda x: x.get("raw_ts_utc", ""), reverse=True)
     return all_rows[:limit]
 

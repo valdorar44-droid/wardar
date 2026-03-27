@@ -69,6 +69,28 @@ def _propagate(name: str, line1: str, line2: str) -> dict | None:
 
         military_flag = 0  # CelesTrak active catalog is mostly civilian/commercial
 
+        # Compute heading from velocity vector (ECI → heading in degrees)
+        from math import degrees, atan2 as _atan2, cos as _cos, sin as _sin
+        vx, vy, vz = v  # velocity in km/s (ECI)
+        # Project velocity onto local tangent plane at satellite position
+        # East component: velocity projected onto east direction
+        # North component: velocity projected onto north direction
+        lat_r = lat_rad
+        lon_r = atan2(y, x)
+        # East unit vector in ECI: (-sin(lon), cos(lon), 0)
+        east_x, east_y, east_z = -_sin(lon_r), _cos(lon_r), 0.0
+        # North unit vector in ECI: (-sin(lat)*cos(lon), -sin(lat)*sin(lon), cos(lat))
+        north_x = -_sin(lat_r)*_cos(lon_r)
+        north_y = -_sin(lat_r)*_sin(lon_r)
+        north_z =  _cos(lat_r)
+        v_east  = vx*east_x  + vy*east_y  + vz*east_z
+        v_north = vx*north_x + vy*north_y + vz*north_z
+        # Heading: angle from north, clockwise
+        heading = (degrees(_atan2(v_east, v_north)) + 360) % 360
+
+        speed_kms = sqrt(vx*vx + vy*vy + vz*vz)
+        speed_kts = round(speed_kms * 1943.84, 0)  # km/s → knots
+
         return {
             "source":       "tle",
             "callsign":     name.strip()[:30],
@@ -76,11 +98,11 @@ def _propagate(name: str, line1: str, line2: str) -> dict | None:
             "lat":          round(lat, 4),
             "lon":          round(lon, 4),
             "altitude_ft":  round(alt_km * 3280.84, 0),  # km → ft
-            "speed_kts":    None,
-            "heading_deg":  None,
+            "speed_kts":    speed_kts,
+            "heading_deg":  round(heading, 1),
             "country":      "",
             "military_flag": military_flag,
-            "extra":        json.dumps({"alt_km": round(alt_km, 1)}),
+            "extra":        json.dumps({"alt_km": round(alt_km, 1), "speed_kms": round(speed_kms, 2)}),
         }
     except ImportError:
         return None  # sgp4 not installed — skip silently
