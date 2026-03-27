@@ -182,7 +182,7 @@ async def _fetch_mil_bases() -> dict:
     """Fetch military bases — ArcGIS primary, OSM Overpass fallback."""
     from core.engine import log, log_warn
     # Try ArcGIS sources first
-    async with httpx.AsyncClient(timeout=45) as client:
+    async with httpx.AsyncClient(timeout=10) as client:
         for url in _MIL_BASES_URLS:
             try:
                 r = await client.get(url)
@@ -197,7 +197,7 @@ async def _fetch_mil_bases() -> dict:
 
     # OSM Overpass fallback
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=12) as client:
             r = await client.post(
                 _PIPELINE_OVERPASS_URL,
                 data={"data": _MIL_BASES_OSM_QUERY},
@@ -233,7 +233,7 @@ async def _fetch_pipelines() -> dict:
     """Fetch major oil/gas pipelines from OpenStreetMap Overpass API."""
     from core.engine import log, log_warn
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=12) as client:
             r = await client.post(
                 _PIPELINE_OVERPASS_URL,
                 data={"data": _PIPELINE_QUERY},

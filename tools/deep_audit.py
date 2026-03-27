@@ -19,9 +19,12 @@ def log(status, test, detail=""):
     RESULTS.append({"status": status, "test": test, "detail": str(detail)})
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-async def api(page, path):
-    r = await page.request.get(f"{BASE}{path}")
-    return r.status, await r.json()
+async def api(page, path, timeout=20000):
+    try:
+        r = await page.request.get(f"{BASE}{path}", timeout=timeout)
+        return r.status, await r.json()
+    except Exception as e:
+        return 0, {"error": str(e)[:100]}
 
 async def run_audit():
     async with async_playwright() as p:
