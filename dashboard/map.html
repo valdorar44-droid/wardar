@@ -6,6 +6,11 @@
 <title>WARDAR — Global Situational Awareness</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/globe.gl@2/dist/globe.gl.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -107,7 +112,19 @@ body::after{
   position:fixed;left:0;top:52px;bottom:44px;width:260px;
   z-index:500;background:rgba(8,8,12,.92);border-right:1px solid var(--border);
   display:flex;flex-direction:column;overflow:hidden;
+  transition:transform .2s ease;
 }
+#panel.collapsed{transform:translateX(-260px)}
+#panel-tab{
+  position:fixed;left:0;top:50%;transform:translateY(-50%);
+  z-index:501;background:rgba(8,8,12,.92);border:1px solid var(--border);
+  border-left:none;padding:.5rem .25rem;cursor:pointer;
+  font-size:.6rem;letter-spacing:.06em;color:var(--amber);
+  writing-mode:vertical-rl;text-orientation:mixed;
+  display:none;user-select:none;
+}
+#panel-tab:hover{color:var(--text)}
+#panel.collapsed ~ #panel-tab, .panel-collapsed #panel-tab{display:block}
 #rpanel{
   position:fixed;right:0;top:52px;bottom:44px;width:280px;
   z-index:500;background:rgba(8,8,12,.96);border-left:1px solid var(--border);
@@ -116,13 +133,17 @@ body::after{
 #timeline{
   position:fixed;bottom:44px;left:260px;right:280px;
   z-index:500;background:rgba(8,8,12,.88);
+  transition:left .2s ease;
 }
 #statusbar{
   position:fixed;bottom:0;left:0;right:0;height:44px;
   z-index:600;
 }
 #globe-container{
-  position:fixed;inset:0;z-index:1;background:#000;
+  position:fixed;inset:0;z-index:1;background:#000;display:none;
+}
+#leaflet-map{
+  position:fixed;inset:0;z-index:1;background:#000;display:block;
 }
 
 /* ── HEADER BAR ── */
@@ -156,6 +177,19 @@ body::after{
   font-size:.45rem;letter-spacing:.1em;color:var(--dim2);
   flex-shrink:0;cursor:default;
 }
+.mapmode-btn{
+  background:none;border:1px solid var(--border2);color:var(--dim2);
+  font-family:var(--font);font-size:.52rem;letter-spacing:.1em;
+  padding:.2rem .55rem;cursor:pointer;flex-shrink:0;
+  transition:color .15s,border-color .15s;
+}
+.mapmode-btn:hover,.mapmode-btn.active{border-color:var(--amber);color:var(--amber);}
+.panel-collapse-btn{
+  position:absolute;top:.45rem;right:.6rem;
+  background:none;border:none;color:var(--dim2);cursor:pointer;
+  font-size:.7rem;padding:.1rem .3rem;line-height:1;
+}
+.panel-collapse-btn:hover{color:var(--amber)}
 .hdr-bar{
   width:28px;height:3px;background:var(--border);border-radius:0;
   overflow:hidden;position:relative;
@@ -852,6 +886,7 @@ body::after{
 </div>
 
 <div id="globe-container"></div>
+<div id="leaflet-map"></div>
 <div id="globe-popup">
   <button id="globe-popup-close" onclick="closeGlobePopup()">✕</button>
   <div id="globe-popup-content"></div>
@@ -867,6 +902,7 @@ body::after{
 <!-- ══ SHELL ══════════════════════════════════════════════════════════════════ -->
 <div id="shell">
 
+  <div id="panel-tab" onclick="togglePanelCollapse()">SENSORS</div>
   <!-- HEADER BAR -->
   <div id="header">
     <div class="hdr-logo">WARDAR</div>
@@ -875,6 +911,7 @@ body::after{
     <div class="hdr-domains" id="hdr-domains">
       <!-- populated by JS -->
     </div>
+    <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">2D MAP</button>
     <div id="hdr-clock">--:--:-- UTC</div>
     <div class="threat-badge" id="threat-badge">
       <div class="threat-dot" id="threat-dot" style="background:var(--green)"></div>
@@ -887,6 +924,7 @@ body::after{
       <div class="panel-hd">
         <div class="panel-title">SENSOR FEEDS</div>
         <div class="panel-sub">DOMAIN LAYER CONTROL</div>
+        <button class="panel-collapse-btn" onclick="togglePanelCollapse()" title="Collapse panel">◀</button>
       </div>
       <div class="layer-list">
 
@@ -1919,6 +1957,14 @@ let pipelineArcs = [];
 let _gPoints = [], _gRings = [], _gArcs = [];
 const _trails = {};
 let _predictArcs = [];  // AI predicted path arcs — cleared per-prediction
+
+// ── Map mode (2d / 3d) ────────────────────────────────────────────────────────
+let _mapMode = '2d';
+let _map2d = null;
+let _cluster2d = {};   // layerKey → L.MarkerClusterGroup
+let _markers2d = {};   // positionStore key → L.Marker
+let _globeInited = false;
+
 const _TRAIL_MAX = 5;
 let _autoRotate = false;
 let _rebuildScheduled = false;
@@ -1930,13 +1976,26 @@ function _scheduleRebuild(){
   }
 }
 
+// Per-source caps for globe performance (priority items bypass caps)
+const _GLOBE_CAPS = {adsb:150,ais:180,tle:80,acled:120,notam:50,fire:40,seismic:40,osint:60,osint_geo:40,unhcr:30,views:30,polymarket:40,shodan:30,wikipedia:30,nuclear:30,mil_base:40};
+const _GLOBE_UNCAPPED = new Set(['adsb_emergency','dark_vessel','convergence','nuclear_threat','pipeline_threat','pikud_haoref','pikud']);
+
 function _rebuildGlobe(){
   if(!globe) return;
   const pts=[], rings=[];
-  for(const [k,d] of Object.entries(positionStore)){
+  const _srcCnt={};
+  // Sort: military/priority first so caps keep the important ones
+  const _entries = Object.entries(positionStore).sort((a,b)=>(parseInt(b[1].military_flag||0)-parseInt(a[1].military_flag||0)));
+  for(const [k,d] of _entries){
     if(d.lat==null||d.lon==null) continue;
-    const lk=sourceToLayerKey(d.source);
+    const lk=sourceToLayerKey(d.source||d._lk||'');
     if(!visible[lk]) continue;
+    const isPriority = _GLOBE_UNCAPPED.has(d.source) || _GLOBE_UNCAPPED.has(lk) || parseInt(d.military_flag||0);
+    if(!isPriority){
+      const cap = _GLOBE_CAPS[lk] ?? 30;
+      _srcCnt[lk] = (_srcCnt[lk]||0)+1;
+      if(_srcCnt[lk] > cap) continue;
+    }
     const color=LAYER_COLORS[lk]||'#6b7280';
     const isMil=parseInt(d.military_flag||0);
     const isAlert=_ALERT_SOURCES.has(d.source)||d.source==='pikud_haoref'||d.source==='adsb_emergency';
@@ -2013,9 +2072,16 @@ const visible = {
   polymarket:true, shodan:true,
 };
 
-// ── Icons (stubs — globe.gl uses color/size from data, not DOM icons) ─────────
-function makeIcon(emoji, color, size=20){ return null; }
-function makePulseIcon(emoji, color, label){ return null; }
+// ── Icons — return SVG/HTML for Leaflet DivIcon (globe.gl uses color/radius data) ─────────
+function makeIcon(emoji, color, size=20){
+  return `<div style="font-size:${size}px;line-height:1;color:${color};text-shadow:0 0 6px ${color}88;pointer-events:none">${emoji}</div>`;
+}
+function makePulseIcon(emoji, color, label){
+  return `<div style="position:relative;font-size:18px;line-height:1">
+    <span style="color:${color};text-shadow:0 0 8px ${color}">${emoji}</span>
+    <span style="position:absolute;top:-5px;right:-18px;font-size:7px;color:${color};font-family:monospace;white-space:nowrap">${label}</span>
+  </div>`;
+}
 
 const ICONS = {
   adsb:    {fn:(mil)=>makeIcon('✈',  mil?'#ef4444':'#f59e0b', 20)},
@@ -2179,6 +2245,99 @@ function buildCommunityPopup(r){
   </div>`;
 }
 
+// ── 2D Leaflet Map ────────────────────────────────────────────────────────────
+function initMap2D(){
+  if(_map2d) return;
+  const el = document.getElementById('leaflet-map');
+  if(!el || typeof L === 'undefined') return;
+  _map2d = L.map(el, {
+    center:[25,30], zoom:3,
+    zoomControl:false, attributionControl:false,
+    preferCanvas:true,
+  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'© CartoDB',maxZoom:19,
+  }).addTo(_map2d);
+  L.control.zoom({position:'topleft'}).addTo(_map2d);
+
+  // Cluster group per layer key
+  const _allLK = ['adsb','ais','tle','acled','notam','fire','seismic','osint','community',
+    'nuclear','mil_base','ew','alerts','pikud','wikipedia','adsb_emergency','polymarket',
+    'shodan','osint_geo','unhcr','views','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
+  for(const lk of _allLK){
+    _cluster2d[lk] = L.markerClusterGroup({
+      maxClusterRadius:50, disableClusteringAtZoom:9,
+      spiderfyOnMaxZoom:true, showCoverageOnHover:false,
+      iconCreateFunction(cluster){
+        const n=cluster.getChildCount();
+        const c=LAYER_COLORS[lk]||'#f59e0b';
+        return L.divIcon({html:`<div style="background:${c}22;border:1px solid ${c};color:${c};font-family:monospace;font-size:9px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%">${n}</div>`,className:'',iconSize:[28,28]});
+      },
+    });
+    if(visible[lk]) _cluster2d[lk].addTo(_map2d);
+  }
+}
+
+function addMarker2D(key, d){
+  if(!_map2d || d.lat==null || d.lon==null) return;
+  const lk = sourceToLayerKey(d.source||d._lk||'');
+  if(!_cluster2d[lk]) return;
+  const isMil = parseInt(d.military_flag||0)===1;
+  const iconHtml = iconFor(d.source||d._lk||'', isMil);
+  const lIcon = L.divIcon({html:iconHtml||makeIcon('●','#666',14), className:'', iconSize:[22,22], iconAnchor:[11,11]});
+
+  if(_markers2d[key]){
+    _markers2d[key].setLatLng([d.lat, d.lon]);
+  } else {
+    const m = L.marker([d.lat, d.lon], {icon:lIcon});
+    m.on('click', ()=>{
+      _lastPopupData = d;
+      const html = d._isComm ? buildCommunityPopup(d) : buildPopup(d);
+      m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;max-width:280px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:300}).openPopup();
+    });
+    _markers2d[key] = m;
+    _cluster2d[lk].addLayer(m);
+  }
+}
+
+function toggleMapMode(){
+  if(_mapMode === '2d'){
+    // Switch to 3D
+    _mapMode = '3d';
+    document.getElementById('leaflet-map').style.display = 'none';
+    document.getElementById('globe-container').style.display = 'block';
+    const btn = document.getElementById('mapmode-btn');
+    if(btn){ btn.textContent='2D MAP'; btn.classList.add('active'); }
+    if(!_globeInited){
+      _globeInited = true;
+      initGlobe();
+    } else {
+      _scheduleRebuild();
+    }
+  } else {
+    // Switch to 2D
+    _mapMode = '2d';
+    document.getElementById('globe-container').style.display = 'none';
+    document.getElementById('leaflet-map').style.display = 'block';
+    const btn = document.getElementById('mapmode-btn');
+    if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
+    if(_map2d) setTimeout(()=>_map2d.invalidateSize(), 50);
+  }
+}
+
+function togglePanelCollapse(){
+  const panel = document.getElementById('panel');
+  const tab = document.getElementById('panel-tab');
+  const tl = document.getElementById('timeline');
+  const collapsed = panel.classList.toggle('collapsed');
+  if(tab) tab.style.display = collapsed ? 'block' : 'none';
+  if(tl) tl.style.left = collapsed ? '0' : '260px';
+  // Update collapse button arrow
+  const btn = panel.querySelector('.panel-collapse-btn');
+  if(btn) btn.textContent = collapsed ? '▶' : '◀';
+  if(_map2d) setTimeout(()=>_map2d.invalidateSize(), 220);
+}
+
 // ── AI Asset Prediction ───────────────────────────────────────────────────────
 const THREAT_COLORS = {LOW:'#22c55e',MODERATE:'#f59e0b',HIGH:'#f97316',CRITICAL:'#ef4444'};
 
@@ -2300,11 +2459,12 @@ function markerKey(p){
 
 // ── Signal pulse ──────────────────────────────────────────────────────────────
 function spawnPulse(lat, lon, color){
-  if(!globe) return;
-  const ring={lat,lon,_color:(color||'#f59e0b')+'99',_temp:true};
-  _gRings=[..._gRings,ring];
-  globe.ringsData(_gRings);
-  setTimeout(()=>{ _gRings=_gRings.filter(r=>r!==ring); globe.ringsData(_gRings); },3000);
+  if(_mapMode==='3d' && globe){
+    const ring={lat,lon,_color:(color||'#f59e0b')+'99',_temp:true};
+    _gRings=[..._gRings,ring];
+    globe.ringsData(_gRings);
+    setTimeout(()=>{ _gRings=_gRings.filter(r=>r!==ring); globe.ringsData(_gRings); },3000);
+  }
 }
 
 // ── Position updater ──────────────────────────────────────────────────────────
@@ -2333,7 +2493,9 @@ function updatePosition(p, isNew){
   }
   if(isNew&&(p.title||p.callsign)) pushFeed({...p,source:p.source});
   if(isNew&&Math.random()<0.12) spawnPulse(p.lat,p.lon,LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b');
-  _scheduleRebuild();
+  // Update 2D map marker
+  if(_mapMode==='2d') addMarker2D(key, p);
+  else _scheduleRebuild();
 }
 
 const _ALERT_SOURCES = new Set(['dark_vessel','convergence','nuclear_threat','pipeline_threat']);
@@ -2555,11 +2717,24 @@ function toggleLayer(key){
   visible[key]=!visible[key];
   const cb=document.getElementById('cb-'+key);
   if(cb) cb.checked=visible[key];
-  _scheduleRebuild();
+  if(_map2d && _cluster2d[key]){
+    if(visible[key]) _cluster2d[key].addTo(_map2d);
+    else _cluster2d[key].remove();
+  }
+  if(_mapMode==='3d') _scheduleRebuild();
 }
 
 // ── Map init ──────────────────────────────────────────────────────────────────
-function initMap(){ initGlobe(); }
+function initMap(){
+  // Default: start in 2D Leaflet mode
+  initMap2D();
+  loadInitialData();
+  connectWS();
+  initTimeline();
+  // Set button state
+  const btn = document.getElementById('mapmode-btn');
+  if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
+}
 
 function initGlobe(){
   buildDomainBars();
@@ -2600,9 +2775,8 @@ function initGlobe(){
   globe.controls().enableDamping=true;
   globe.controls().dampingFactor=0.08;
 
-  loadInitialData();
-  connectWS();
-  initTimeline();
+  // Populate globe from existing positionStore (data already loaded via 2D mode)
+  _scheduleRebuild();
 }
 
 let _lastPopupData = null;  // used by predictPath() button
