@@ -252,7 +252,7 @@ async def get_static_layer(response: Response, layer: str):
     Serve cached GeoJSON for static infrastructure layers:
     nuclear, cables, mil_bases, pipelines
     """
-    valid = {"nuclear", "cables", "mil_bases", "pipelines"}
+    valid = {"nuclear", "cables", "mil_bases", "pipelines", "isw_ukraine", "isw_middle_east"}
     if layer not in valid:
         raise HTTPException(status_code=404, detail=f"Unknown layer: {layer}")
     try:

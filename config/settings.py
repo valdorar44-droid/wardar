@@ -130,3 +130,20 @@ PIKUD_HAOREF_INTERVAL_SEC  = _i("PIKUD_HAOREF_INTERVAL_SEC",  15)    # poll ever
 # ── Wikipedia Edit Spike Detector ──────────────────────
 ENABLE_WIKIPEDIA_SPIKES      = _b("ENABLE_WIKIPEDIA_SPIKES",      True)
 WIKIPEDIA_SPIKE_INTERVAL_SEC = _i("WIKIPEDIA_SPIKE_INTERVAL_SEC", 120)  # run every 2 min
+
+# ── Polymarket (prediction markets) ────────────────────────
+ENABLE_POLYMARKET       = _b("ENABLE_POLYMARKET",        True)
+POLYMARKET_INTERVAL_SEC = _i("POLYMARKET_INTERVAL_SEC",  3600)  # hourly
+
+# ── ISW Frontlines (control maps) ──────────────────────────
+ENABLE_ISW              = _b("ENABLE_ISW",               True)
+ISW_REFRESH_SEC         = _i("ISW_REFRESH_SEC",          21600)  # 6h
+
+# ── Shodan (infrastructure intelligence) ───────────────────
+SHODAN_API_KEY          = _s("SHODAN_API_KEY",           "")
+ENABLE_SHODAN           = _b("ENABLE_SHODAN",            False)  # requires paid key ($69/mo)
+SHODAN_INTERVAL_SEC     = _i("SHODAN_INTERVAL_SEC",      14400)  # 4h
+
+# ── OpenSanctions (entity screening) ───────────────────────
+OPENSANCTIONS_API_KEY   = _s("OPENSANCTIONS_API_KEY",    "")
+ENABLE_OPENSANCTIONS    = _b("ENABLE_OPENSANCTIONS",     False)

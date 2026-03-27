@@ -221,6 +221,73 @@ async def _fetch_pipelines() -> dict:
     return {"type": "FeatureCollection", "features": []}
 
 
+# ISW Ukraine frontline data — multi-source with fallbacks
+_ISW_UKRAINE_URLS = [
+    # DeepState Map — the authoritative Ukrainian OSINT frontline tracker
+    "https://deepstatemap.live/api/history/last",
+    # Fallback: community-maintained GeoJSON
+    "https://raw.githubusercontent.com/simonbilskyrollins/russia-ukraine-war-geojson/main/ua_frontline.geojson",
+]
+
+async def _fetch_isw_ukraine() -> dict:
+    """Fetch Ukraine frontline/control GeoJSON."""
+    from core.engine import log, log_warn
+    async with httpx.AsyncClient(timeout=30, headers={"User-Agent": "Wardar/0.1"}) as client:
+        for url in _ISW_UKRAINE_URLS:
+            try:
+                r = await client.get(url)
+                if r.status_code != 200:
+                    continue
+                data = r.json()
+                # DeepState returns {"state": {...}} or direct GeoJSON
+                if "features" in data:
+                    log(f"isw_ukraine: {len(data['features'])} features")
+                    return data
+                # DeepState wrapped format
+                if "ua" in data or "ru" in data or "state" in data:
+                    # Wrap in FeatureCollection
+                    features = []
+                    for key, geom in data.items():
+                        if isinstance(geom, dict) and geom.get("type") in ("Polygon","MultiPolygon","LineString","MultiLineString","GeometryCollection"):
+                            features.append({"type":"Feature","geometry":geom,"properties":{"zone":key}})
+                    if features:
+                        log(f"isw_ukraine: {len(features)} zones (DeepState format)")
+                        return {"type":"FeatureCollection","features":features}
+            except Exception as exc:
+                log_warn(f"isw_ukraine: {url} failed: {exc}")
+    log_warn("isw_ukraine: all sources failed, returning empty")
+    return {"type":"FeatureCollection","features":[]}
+
+# ISW Middle East — placeholder, add working URL when available
+async def _fetch_isw_middle_east() -> dict:
+    """Fetch Middle East/Gaza frontline GeoJSON."""
+    from core.engine import log, log_warn
+    # UNOCHA Gaza situation maps
+    try:
+        url = "https://data.humdata.org/api/3/action/datastore_search?resource_id=e7e2dc59-8bca-4a73-b806-fcc7dca5f88a&limit=100"
+        async with httpx.AsyncClient(timeout=20, headers={"User-Agent": "Wardar/0.1"}) as client:
+            r = await client.get(url)
+            if r.status_code == 200:
+                data = r.json()
+                records = (data.get("result") or {}).get("records") or []
+                features = []
+                for rec in records:
+                    lat = rec.get("latitude") or rec.get("lat")
+                    lon = rec.get("longitude") or rec.get("lon")
+                    if lat and lon:
+                        features.append({
+                            "type":"Feature",
+                            "geometry":{"type":"Point","coordinates":[float(lon),float(lat)]},
+                            "properties":{"name":rec.get("name",""),"zone":rec.get("zone","")},
+                        })
+                if features:
+                    log(f"isw_middle_east: {len(features)} features")
+                    return {"type":"FeatureCollection","features":features}
+    except Exception as exc:
+        log_warn(f"isw_middle_east: {exc}")
+    return {"type":"FeatureCollection","features":[]}
+
+
 async def get_layer(name: str) -> dict:
     """Return cached layer GeoJSON, fetching fresh if TTL expired."""
     cached = _cache.get(name)
@@ -231,10 +298,12 @@ async def get_layer(name: str) -> dict:
 
     # Fetch fresh
     fetchers = {
-        "nuclear":  _fetch_nuclear,
-        "cables":   _fetch_cables,
-        "mil_bases":_fetch_mil_bases,
-        "pipelines":_fetch_pipelines,
+        "nuclear":         _fetch_nuclear,
+        "cables":          _fetch_cables,
+        "mil_bases":       _fetch_mil_bases,
+        "pipelines":       _fetch_pipelines,
+        "isw_ukraine":     _fetch_isw_ukraine,
+        "isw_middle_east": _fetch_isw_middle_east,
     }
     fn = fetchers.get(name)
     if not fn:
@@ -252,5 +321,8 @@ async def refresh_all():
     if C.ENABLE_SUBCABLES: tasks.append(get_layer("cables"))
     if C.ENABLE_MIL_BASES: tasks.append(get_layer("mil_bases"))
     if C.ENABLE_PIPELINES: tasks.append(get_layer("pipelines"))
+    if C.ENABLE_ISW:
+        tasks.append(get_layer("isw_ukraine"))
+        tasks.append(get_layer("isw_middle_east"))
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)

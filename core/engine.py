@@ -355,6 +355,32 @@ async def _tick_wikipedia_spikes():
     except Exception as exc:
         log_err(f"tick_wikipedia_spikes: {exc}")
 
+async def _tick_polymarket():
+    if not C.ENABLE_POLYMARKET:
+        return
+    try:
+        from ingestors import polymarket
+        events = await polymarket.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["polymarket"], limit=100)
+            await _broadcast({"type": "events", "sources": ["polymarket"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_polymarket: {exc}")
+
+async def _tick_shodan():
+    if not C.ENABLE_SHODAN or not C.SHODAN_API_KEY:
+        return
+    try:
+        from ingestors import shodan_intel
+        events = await shodan_intel.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["shodan"], limit=100)
+            await _broadcast({"type": "events", "sources": ["shodan"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_shodan: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -405,6 +431,8 @@ async def start():
         asyncio.create_task(_run_every(_tick_proximity_alerts,C.PROXIMITY_INTERVAL_SEC,       "proximity")),
         asyncio.create_task(_run_every(_tick_pikud_haoref,   C.PIKUD_HAOREF_INTERVAL_SEC,   "pikud_haoref")),
         asyncio.create_task(_run_every(_tick_wikipedia_spikes,C.WIKIPEDIA_SPIKE_INTERVAL_SEC,"wikipedia_spikes")),
+        asyncio.create_task(_run_every(_tick_polymarket, C.POLYMARKET_INTERVAL_SEC, "polymarket")),
+        asyncio.create_task(_run_every(_tick_shodan,     C.SHODAN_INTERVAL_SEC,     "shodan")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

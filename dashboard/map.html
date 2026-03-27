@@ -224,6 +224,25 @@ body::after{
   font-size:.5rem;letter-spacing:.08em;color:var(--dim2);
   line-height:1.7;flex-shrink:0;
 }
+/* ── Layer group accordion ── */
+.layer-group{border-bottom:1px solid var(--border)}
+.layer-group-hdr{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;cursor:pointer;user-select:none;
+  transition:background .1s;
+  background:var(--panel);
+}
+.layer-group-hdr:hover{background:rgba(255,255,255,.035)}
+.grp-arrow{font-size:7px;color:var(--dim2);transition:transform .15s;flex-shrink:0}
+.layer-group.open>.layer-group-hdr>.grp-arrow{transform:rotate(90deg)}
+.grp-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;opacity:.85}
+.grp-label{flex:1;font-size:.54rem;letter-spacing:.13em;color:var(--dim2)}
+.grp-badge{
+  font-size:.5rem;padding:1px 5px;border-radius:2px;
+  min-width:20px;text-align:center;background:rgba(255,255,255,.07);color:var(--dim2);
+}
+.layer-group-body{display:none;background:rgba(0,0,0,.2)}
+.layer-group.open>.layer-group-body{display:block}
 
 /* ── RIGHT PANEL ── */
 #rpanel{
@@ -779,143 +798,241 @@ body::after{
         <div class="panel-sub">DOMAIN LAYER CONTROL</div>
       </div>
       <div class="layer-list">
-        <label class="layer-item" onclick="toggleLayer('adsb')">
-          <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)">
-          <span class="layer-icon">✈</span>
-          <span class="layer-name">AIRCRAFT</span>
-          <span class="layer-count" id="cnt-adsb" style="background:var(--amber)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('ais')">
-          <input type="checkbox" class="layer-cb" id="cb-ais" checked style="color:var(--cyan)">
-          <span class="layer-icon" style="color:var(--cyan)">⛵</span>
-          <span class="layer-name">MARITIME</span>
-          <span class="layer-count" id="cnt-ais" style="background:var(--cyan)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('tle')">
-          <input type="checkbox" class="layer-cb" id="cb-tle" checked style="color:var(--purple)">
-          <span class="layer-icon" style="color:var(--purple)">◎</span>
-          <span class="layer-name">SATELLITE</span>
-          <span class="layer-count" id="cnt-tle" style="background:var(--purple)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('acled')">
-          <input type="checkbox" class="layer-cb" id="cb-acled" checked style="color:var(--red)">
-          <span class="layer-icon" style="color:var(--red)">💥</span>
-          <span class="layer-name">CONFLICT</span>
-          <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('notam')">
-          <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)">
-          <span class="layer-icon" style="color:var(--yellow)">⚠</span>
-          <span class="layer-name">NOTAM</span>
-          <span class="layer-count" id="cnt-notam" style="background:var(--yellow)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('osint')">
-          <input type="checkbox" class="layer-cb" id="cb-osint" checked style="color:var(--blue)">
-          <span class="layer-icon" style="color:var(--blue)">📡</span>
-          <span class="layer-name">OSINT</span>
-          <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('fire')">
-          <input type="checkbox" class="layer-cb" id="cb-fire" checked style="color:var(--orange)">
-          <span class="layer-icon" style="color:var(--orange)">🔥</span>
-          <span class="layer-name">THERMAL</span>
-          <span class="layer-count" id="cnt-fire" style="background:var(--orange)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('seismic')">
-          <input type="checkbox" class="layer-cb" id="cb-seismic" checked style="color:var(--lime)">
-          <span class="layer-icon" style="color:var(--lime)">◉</span>
-          <span class="layer-name">SEISMIC</span>
-          <span class="layer-count" id="cnt-seismic" style="background:var(--lime)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('ew')">
-          <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)">
-          <span class="layer-icon" style="color:var(--fuchsia)">⚡</span>
-          <span class="layer-name">GPS JAM</span>
-          <span class="layer-count" id="cnt-ew" style="background:var(--fuchsia)">0</span>
-        </label>
-        <label class="layer-item" onclick="toggleLayer('community')">
-          <input type="checkbox" class="layer-cb" id="cb-community" checked style="color:var(--green)">
-          <span class="layer-icon" style="color:var(--green)">◈</span>
-          <span class="layer-name">COMMUNITY</span>
-          <span class="layer-count" id="cnt-community" style="background:var(--green)">0</span>
-        </label>
-        <!-- Nuclear Plants -->
-        <label class="layer-item" id="lr-nuclear">
-          <input type="checkbox" class="layer-cb" id="cb-nuclear" checked style="color:var(--yellow)" onchange="toggleLayer('nuclear')">
-          <span class="layer-icon" style="color:var(--yellow)">☢</span>
-          <span class="layer-name">NUCLEAR PLANTS</span>
-          <span class="layer-count" id="cnt-nuclear" style="background:var(--yellow)">0</span>
-        </label>
-        <!-- Military Bases -->
-        <label class="layer-item" id="lr-milbase">
-          <input type="checkbox" class="layer-cb" id="cb-mil_base" checked style="color:var(--amber)" onchange="toggleLayer('mil_base')">
-          <span class="layer-icon" style="color:var(--amber)">★</span>
-          <span class="layer-name">MILITARY BASES</span>
-          <span class="layer-count" id="cnt-milbase" style="background:var(--amber)">0</span>
-        </label>
-        <!-- Submarine Cables -->
-        <label class="layer-item" id="lr-cables">
-          <input type="checkbox" class="layer-cb" id="chk-cables" checked style="color:var(--cyan)" onchange="toggleCableLayer(this.checked)">
-          <span class="layer-icon" style="color:var(--cyan)">⌇</span>
-          <span class="layer-name">SUBSEA CABLES</span>
-          <span class="layer-count" id="cnt-cables" style="background:var(--cyan)">0</span>
-        </label>
-        <!-- Pipelines -->
-        <label class="layer-item" id="lr-pipelines">
-          <input type="checkbox" class="layer-cb" id="chk-pipelines" checked style="color:var(--orange)" onchange="togglePipelineLayer(this.checked)">
-          <span class="layer-icon" style="color:var(--orange)">⊸</span>
-          <span class="layer-name">OIL/GAS PIPELINES</span>
-          <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
-        </label>
-        <!-- OSINT Verified -->
-        <label class="layer-item" id="lr-osintgeo">
-          <input type="checkbox" class="layer-cb" id="cb-osint_geo" checked style="color:var(--orange)" onchange="toggleLayer('osint_geo')">
-          <span class="layer-icon" style="color:var(--orange)">◈</span>
-          <span class="layer-name">OSINT VERIFIED</span>
-          <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
-        </label>
-        <!-- Displacement -->
-        <label class="layer-item" id="lr-unhcr">
-          <input type="checkbox" class="layer-cb" id="cb-unhcr" checked style="color:var(--purple)" onchange="toggleLayer('unhcr')">
-          <span class="layer-icon" style="color:var(--purple)">⊙</span>
-          <span class="layer-name">DISPLACEMENT</span>
-          <span class="layer-count" id="cnt-unhcr" style="background:var(--purple)">0</span>
-        </label>
-        <!-- Conflict Forecast -->
-        <label class="layer-item" id="lr-views">
-          <input type="checkbox" class="layer-cb" id="cb-views" checked style="color:var(--red)" onchange="toggleLayer('views')">
-          <span class="layer-icon" style="color:var(--red)">◉</span>
-          <span class="layer-name">CONFLICT FORECAST</span>
-          <span class="layer-count" id="cnt-views" style="background:var(--red)">0</span>
-        </label>
-        <!-- Phase 3 Alerts -->
-        <label class="layer-item" id="lr-alerts" style="border-top:1px solid var(--border2);margin-top:.3rem;padding-top:.4rem">
-          <input type="checkbox" class="layer-cb" id="cb-alerts" checked style="color:var(--red)" onchange="toggleLayer('alerts')">
-          <span class="layer-icon" style="color:var(--red);animation:alertPulse 1.4s ease-out infinite">⚡</span>
-          <span class="layer-name" style="color:var(--red)">THREAT ALERTS</span>
-          <span class="layer-count" id="cnt-alerts" style="background:var(--red)">0</span>
-        </label>
-        <!-- Israel Rocket Alerts -->
-        <label class="layer-item" id="lr-pikud">
-          <input type="checkbox" class="layer-cb" id="cb-pikud" checked style="color:var(--red)" onchange="toggleLayer('pikud')">
-          <span class="layer-icon" style="color:var(--red)">🚨</span>
-          <span class="layer-name">IL ROCKET ALERTS</span>
-          <span class="layer-count" id="cnt-pikud" style="background:var(--red)">0</span>
-        </label>
-        <!-- Wikipedia Spikes -->
-        <label class="layer-item" id="lr-wikipedia">
-          <input type="checkbox" class="layer-cb" id="cb-wikipedia" checked style="color:var(--amber)" onchange="toggleLayer('wikipedia')">
-          <span class="layer-icon" style="color:var(--amber)">📖</span>
-          <span class="layer-name">WIKI SPIKES</span>
-          <span class="layer-count" id="cnt-wikipedia" style="background:var(--amber)">0</span>
-        </label>
-        <!-- Emergency Squawks -->
-        <label class="layer-item" id="lr-adsb-emergency">
-          <input type="checkbox" class="layer-cb" id="cb-adsb-emergency" checked style="color:var(--red)" onchange="toggleLayer('adsb_emergency')">
-          <span class="layer-icon" style="color:var(--red);animation:alertPulse 1.4s ease-out infinite">🆘</span>
-          <span class="layer-name" style="color:var(--red)">EMERGENCY SQUAWK</span>
-          <span class="layer-count" id="cnt-adsb-emergency" style="background:var(--red)">0</span>
-        </label>
+
+        <!-- ── LIVE TRACKING ── -->
+        <div class="layer-group open" id="grp-tracking">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--amber)"></span>
+            <span class="grp-label">LIVE TRACKING</span>
+            <span class="grp-badge" id="grp-tracking-badge">0</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" onclick="toggleLayer('adsb')">
+              <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)">
+              <span class="layer-icon">✈</span>
+              <span class="layer-name">AIRCRAFT</span>
+              <span class="layer-count" id="cnt-adsb" style="background:var(--amber)">0</span>
+            </label>
+            <label class="layer-item" onclick="toggleLayer('ais')">
+              <input type="checkbox" class="layer-cb" id="cb-ais" checked style="color:var(--cyan)">
+              <span class="layer-icon" style="color:var(--cyan)">⛵</span>
+              <span class="layer-name">MARITIME</span>
+              <span class="layer-count" id="cnt-ais" style="background:var(--cyan)">0</span>
+            </label>
+            <label class="layer-item" onclick="toggleLayer('tle')">
+              <input type="checkbox" class="layer-cb" id="cb-tle" checked style="color:var(--purple)">
+              <span class="layer-icon" style="color:var(--purple)">◎</span>
+              <span class="layer-name">SATELLITE</span>
+              <span class="layer-count" id="cnt-tle" style="background:var(--purple)">0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── CONFLICT ── -->
+        <div class="layer-group open" id="grp-conflict">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--red)"></span>
+            <span class="grp-label">CONFLICT</span>
+            <span class="grp-badge" id="grp-conflict-badge">0</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" onclick="toggleLayer('acled')">
+              <input type="checkbox" class="layer-cb" id="cb-acled" checked style="color:var(--red)">
+              <span class="layer-icon" style="color:var(--red)">💥</span>
+              <span class="layer-name">CONFLICT EVENTS</span>
+              <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
+            </label>
+            <label class="layer-item" onclick="toggleLayer('notam')">
+              <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)">
+              <span class="layer-icon" style="color:var(--yellow)">⚠</span>
+              <span class="layer-name">NOTAM</span>
+              <span class="layer-count" id="cnt-notam" style="background:var(--yellow)">0</span>
+            </label>
+            <label class="layer-item" onclick="toggleLayer('fire')">
+              <input type="checkbox" class="layer-cb" id="cb-fire" checked style="color:var(--orange)">
+              <span class="layer-icon" style="color:var(--orange)">🔥</span>
+              <span class="layer-name">THERMAL</span>
+              <span class="layer-count" id="cnt-fire" style="background:var(--orange)">0</span>
+            </label>
+            <label class="layer-item" onclick="toggleLayer('seismic')">
+              <input type="checkbox" class="layer-cb" id="cb-seismic" checked style="color:var(--lime)">
+              <span class="layer-icon" style="color:var(--lime)">◉</span>
+              <span class="layer-name">SEISMIC</span>
+              <span class="layer-count" id="cnt-seismic" style="background:var(--lime)">0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── INTELLIGENCE ── -->
+        <div class="layer-group open" id="grp-intel">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--blue)"></span>
+            <span class="grp-label">INTELLIGENCE</span>
+            <span class="grp-badge" id="grp-intel-badge">0</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" onclick="toggleLayer('osint')">
+              <input type="checkbox" class="layer-cb" id="cb-osint" checked style="color:var(--blue)">
+              <span class="layer-icon" style="color:var(--blue)">📡</span>
+              <span class="layer-name">OSINT NEWS</span>
+              <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
+            </label>
+            <label class="layer-item" id="lr-osintgeo">
+              <input type="checkbox" class="layer-cb" id="cb-osint_geo" checked style="color:var(--orange)" onchange="toggleLayer('osint_geo')">
+              <span class="layer-icon" style="color:var(--orange)">◈</span>
+              <span class="layer-name">OSINT VERIFIED</span>
+              <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
+            </label>
+            <label class="layer-item" id="lr-polymarket">
+              <input type="checkbox" class="layer-cb" id="cb-polymarket" checked style="color:var(--amber)" onchange="toggleLayer('polymarket')">
+              <span class="layer-icon" style="color:var(--amber)">📊</span>
+              <span class="layer-name">POLYMARKET ODDS</span>
+              <span class="layer-count" id="cnt-polymarket" style="background:var(--amber)">0</span>
+            </label>
+            <label class="layer-item" id="lr-wikipedia">
+              <input type="checkbox" class="layer-cb" id="cb-wikipedia" checked style="color:var(--amber)" onchange="toggleLayer('wikipedia')">
+              <span class="layer-icon" style="color:var(--amber)">📖</span>
+              <span class="layer-name">WIKI SPIKES</span>
+              <span class="layer-count" id="cnt-wikipedia" style="background:var(--amber)">0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── FRONTLINES ── -->
+        <div class="layer-group open" id="grp-frontline">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--green)"></span>
+            <span class="grp-label">FRONTLINES</span>
+            <span class="grp-badge" id="grp-frontline-badge">—</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" id="lr-isw-ukraine">
+              <input type="checkbox" class="layer-cb" id="cb-isw-ukraine" checked style="color:var(--red)" onchange="toggleIswLayer('ukraine',this.checked)">
+              <span class="layer-icon" style="color:var(--red)">🗺</span>
+              <span class="layer-name">UA FRONTLINE</span>
+              <span class="layer-count" id="cnt-isw-ukraine" style="background:var(--red)">—</span>
+            </label>
+            <label class="layer-item" id="lr-isw-me">
+              <input type="checkbox" class="layer-cb" id="cb-isw-me" checked style="color:var(--orange)" onchange="toggleIswLayer('middle_east',this.checked)">
+              <span class="layer-icon" style="color:var(--orange)">🗺</span>
+              <span class="layer-name">ME ZONES</span>
+              <span class="layer-count" id="cnt-isw-me" style="background:var(--orange)">—</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── INFRASTRUCTURE (closed by default) ── -->
+        <div class="layer-group" id="grp-infra">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--yellow)"></span>
+            <span class="grp-label">INFRASTRUCTURE</span>
+            <span class="grp-badge" id="grp-infra-badge">0</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" id="lr-nuclear">
+              <input type="checkbox" class="layer-cb" id="cb-nuclear" checked style="color:var(--yellow)" onchange="toggleLayer('nuclear')">
+              <span class="layer-icon" style="color:var(--yellow)">☢</span>
+              <span class="layer-name">NUCLEAR PLANTS</span>
+              <span class="layer-count" id="cnt-nuclear" style="background:var(--yellow)">0</span>
+            </label>
+            <label class="layer-item" id="lr-milbase">
+              <input type="checkbox" class="layer-cb" id="cb-mil_base" checked style="color:var(--amber)" onchange="toggleLayer('mil_base')">
+              <span class="layer-icon" style="color:var(--amber)">★</span>
+              <span class="layer-name">MILITARY BASES</span>
+              <span class="layer-count" id="cnt-milbase" style="background:var(--amber)">0</span>
+            </label>
+            <label class="layer-item" id="lr-cables">
+              <input type="checkbox" class="layer-cb" id="chk-cables" checked style="color:var(--cyan)" onchange="toggleCableLayer(this.checked)">
+              <span class="layer-icon" style="color:var(--cyan)">⌇</span>
+              <span class="layer-name">SUBSEA CABLES</span>
+              <span class="layer-count" id="cnt-cables" style="background:var(--cyan)">0</span>
+            </label>
+            <label class="layer-item" id="lr-pipelines">
+              <input type="checkbox" class="layer-cb" id="chk-pipelines" checked style="color:var(--orange)" onchange="togglePipelineLayer(this.checked)">
+              <span class="layer-icon" style="color:var(--orange)">⊸</span>
+              <span class="layer-name">OIL/GAS PIPELINES</span>
+              <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
+            </label>
+            <label class="layer-item" onclick="toggleLayer('ew')">
+              <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)">
+              <span class="layer-icon" style="color:var(--fuchsia)">⚡</span>
+              <span class="layer-name">GPS JAM</span>
+              <span class="layer-count" id="cnt-ew" style="background:var(--fuchsia)">0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── HUMAN TERRAIN (closed by default) ── -->
+        <div class="layer-group" id="grp-human">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--purple)"></span>
+            <span class="grp-label">HUMAN TERRAIN</span>
+            <span class="grp-badge" id="grp-human-badge">0</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" onclick="toggleLayer('community')">
+              <input type="checkbox" class="layer-cb" id="cb-community" checked style="color:var(--green)">
+              <span class="layer-icon" style="color:var(--green)">◈</span>
+              <span class="layer-name">COMMUNITY INTEL</span>
+              <span class="layer-count" id="cnt-community" style="background:var(--green)">0</span>
+            </label>
+            <label class="layer-item" id="lr-unhcr">
+              <input type="checkbox" class="layer-cb" id="cb-unhcr" checked style="color:var(--purple)" onchange="toggleLayer('unhcr')">
+              <span class="layer-icon" style="color:var(--purple)">⊙</span>
+              <span class="layer-name">DISPLACEMENT</span>
+              <span class="layer-count" id="cnt-unhcr" style="background:var(--purple)">0</span>
+            </label>
+            <label class="layer-item" id="lr-views">
+              <input type="checkbox" class="layer-cb" id="cb-views" checked style="color:var(--red)" onchange="toggleLayer('views')">
+              <span class="layer-icon" style="color:var(--red)">◉</span>
+              <span class="layer-name">CONFLICT FORECAST</span>
+              <span class="layer-count" id="cnt-views" style="background:var(--red)">0</span>
+            </label>
+            <label class="layer-item" id="lr-shodan">
+              <input type="checkbox" class="layer-cb" id="cb-shodan" checked style="color:var(--cyan)" onchange="toggleLayer('shodan')">
+              <span class="layer-icon" style="color:var(--cyan)">🔌</span>
+              <span class="layer-name">CYBER INFRA</span>
+              <span class="layer-count" id="cnt-shodan" style="background:var(--cyan)">0</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── ALERTS (always open) ── -->
+        <div class="layer-group open" id="grp-alerts">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--red);animation:alertPulse 1.4s ease-out infinite"></span>
+            <span class="grp-label" style="color:var(--red)">ALERTS</span>
+            <span class="grp-badge" id="grp-alerts-badge" style="background:var(--red);color:#000">0</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" id="lr-alerts">
+              <input type="checkbox" class="layer-cb" id="cb-alerts" checked style="color:var(--red)" onchange="toggleLayer('alerts')">
+              <span class="layer-icon" style="color:var(--red)">⚡</span>
+              <span class="layer-name">THREAT ALERTS</span>
+              <span class="layer-count" id="cnt-alerts" style="background:var(--red)">0</span>
+            </label>
+            <label class="layer-item" id="lr-pikud">
+              <input type="checkbox" class="layer-cb" id="cb-pikud" checked style="color:var(--red)" onchange="toggleLayer('pikud')">
+              <span class="layer-icon" style="color:var(--red)">🚨</span>
+              <span class="layer-name">IL ROCKET ALERTS</span>
+              <span class="layer-count" id="cnt-pikud" style="background:var(--red)">0</span>
+            </label>
+            <label class="layer-item" id="lr-adsb-emergency">
+              <input type="checkbox" class="layer-cb" id="cb-adsb-emergency" checked style="color:var(--red)" onchange="toggleLayer('adsb_emergency')">
+              <span class="layer-icon" style="color:var(--red)">🆘</span>
+              <span class="layer-name">EMERGENCY SQUAWK</span>
+              <span class="layer-count" id="cnt-adsb-emergency" style="background:var(--red)">0</span>
+            </label>
+          </div>
+        </div>
+
       </div>
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
@@ -1548,6 +1665,7 @@ const markers = {
   fire:{}, seismic:{}, ew:{}, community:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
   alerts:{}, pikud:{}, wikipedia:{}, adsb_emergency:{},
+  polymarket:{}, shodan:{},
 };
 let layers = {};
 const visible = {
@@ -1555,6 +1673,7 @@ const visible = {
   fire:true, seismic:true, ew:true, community:true,
   nuclear:true, mil_base:true, osint_geo:true, unhcr:true, views:true,
   alerts:true, pikud:true, wikipedia:true, adsb_emergency:true,
+  polymarket:true, shodan:true,
 };
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -1605,6 +1724,8 @@ const ICONS = {
   nuclear_threat: {fn:()=>makePulseIcon('☢','#ef4444','NUC')},
   pipeline_threat:{fn:()=>makePulseIcon('⊗','#f97316','PIPE')},
   adsb_emergency: {fn:()=>makePulseIcon('🆘','#ef4444','SQUAWK')},
+  polymarket:     {fn:()=>makeIcon('📊','#f59e0b',17)},
+  shodan:         {fn:()=>makeIcon('🔌','#06b6d4',17)},
 };
 
 function iconFor(source, mil, extra){
@@ -1618,6 +1739,8 @@ function iconFor(source, mil, extra){
   if(s==='pikud_haoref')   return ICONS.pikud_haoref.fn();
   if(s==='wikipedia')      return ICONS.wikipedia.fn();
   if(s==='adsb_emergency') return ICONS.adsb_emergency.fn();
+  if(s==='polymarket')     return ICONS.polymarket.fn();
+  if(s==='shodan')         return ICONS.shodan.fn();
   // Phase 3 alert sources
   if(s==='dark_vessel')    return ICONS.dark_vessel.fn();
   if(s==='convergence')    return ICONS.convergence.fn();
@@ -1727,6 +1850,8 @@ function buildCommunityPopup(r){
 function sourceToLayerKey(source){
   const s=(source||'').toLowerCase();
   if(s==='adsb_emergency') return 'adsb_emergency';
+  if(s==='polymarket')     return 'polymarket';
+  if(s==='shodan')         return 'shodan';
   if(['adsb','opensky'].includes(s)) return 'adsb';
   if(s==='ais')   return 'ais';
   if(s==='tle')   return 'tle';
@@ -1770,6 +1895,7 @@ const LAYER_COLORS = {
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
   pikud:'#ef4444',wikipedia:'#f59e0b',adsb_emergency:'#ef4444',
+  polymarket:'#f59e0b',shodan:'#06b6d4',
 };
 
 function updatePosition(p, isNew){
@@ -1994,6 +2120,27 @@ function refreshCounts(){
   const nEmergency = Object.keys(markers.adsb_emergency||{}).length;
   const cntEmergency = document.getElementById('cnt-adsb-emergency');
   if(cntEmergency) cntEmergency.textContent = nEmergency;
+  const nPoly = Object.keys(markers.polymarket||{}).length;
+  const cntPoly = document.getElementById('cnt-polymarket');
+  if(cntPoly) cntPoly.textContent = nPoly;
+  const nShodan = Object.keys(markers.shodan||{}).length;
+  const cntShodan = document.getElementById('cnt-shodan');
+  if(cntShodan) cntShodan.textContent = nShodan;
+
+  // Group badge totals
+  const _gb = (id, keys) => {
+    const t = keys.reduce((s,k)=>s+Object.keys(markers[k]||{}).length,0);
+    const el = document.getElementById(id);
+    if(el) el.textContent = t||'';
+  };
+  _gb('grp-tracking-badge', ['adsb','ais','tle']);
+  _gb('grp-conflict-badge',  ['acled','notam','fire','seismic']);
+  _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia']);
+  _gb('grp-infra-badge',     ['nuclear','mil_base','ew']);
+  _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
+  const nAlertTotal = Object.keys(markers.alerts||{}).length + nPikud + nEmergency;
+  const ab = document.getElementById('grp-alerts-badge');
+  if(ab) ab.textContent = nAlertTotal||'';
 
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
@@ -2083,8 +2230,9 @@ function initMap(){
   const NEW_LAYER_COLORS = {
     nuclear:'#eab308', mil_base:'#f59e0b', osint_geo:'#f97316', unhcr:'#a855f7', views:'#ef4444',
     alerts:'#ef4444', pikud:'#ef4444', wikipedia:'#f59e0b', adsb_emergency:'#ef4444',
+    polymarket:'#f59e0b', shodan:'#06b6d4',
   };
-  ['nuclear','mil_base','osint_geo','unhcr','views','alerts','pikud','wikipedia','adsb_emergency'].forEach(k=>{
+  ['nuclear','mil_base','osint_geo','unhcr','views','alerts','pikud','wikipedia','adsb_emergency','polymarket','shodan'].forEach(k=>{
     const c=NEW_LAYER_COLORS[k]||'#6b7280';
     layers[k]=L.markerClusterGroup({
       ...clusterOpts,
@@ -2130,6 +2278,69 @@ async function loadInitialData(){
 
   // Phase 3: heavy static layers — defer 2s after map is interactive
   setTimeout(()=> loadStaticLayers(), 2000);
+  // Phase 4: frontline overlays — defer 3s (large GeoJSON)
+  setTimeout(()=> loadIswLayers(), 3000);
+}
+
+// ── Layer Group Accordion ─────────────────────────────────────────────────────
+function toggleGroup(hdrEl){
+  hdrEl.closest('.layer-group').classList.toggle('open');
+}
+
+// ── ISW Frontline Layers ──────────────────────────────────────────────────────
+let iswUkraineLayer = null;
+let iswMiddleEastLayer = null;
+
+function toggleIswLayer(key, show){
+  const layer = key==='ukraine' ? iswUkraineLayer : iswMiddleEastLayer;
+  if(!layer) return;
+  if(show) layer.addTo(map);
+  else     map.removeLayer(layer);
+}
+
+async function loadIswLayers(){
+  const _styleUkraine = f => ({
+    color:'#ef4444', weight: f.geometry?.type?.includes('Line') ? 2 : 1,
+    opacity:.8, fillColor:'#ef4444', fillOpacity:.1, dashArray:'5 4',
+  });
+  const _styleME = f => ({
+    color:'#f97316', weight:2, opacity:.75,
+    fillColor:'#f97316', fillOpacity:.08, dashArray:'5 4',
+  });
+
+  try{
+    const res = await fetch('/api/layers/isw_ukraine').then(r=>r.json());
+    if(res.features?.length){
+      if(iswUkraineLayer) iswUkraineLayer.remove();
+      iswUkraineLayer = L.geoJSON(res, {
+        style: _styleUkraine,
+        onEachFeature:(f,layer)=>{
+          const p=f.properties||{};
+          layer.bindPopup(`<div class="popup-inner"><div class="popup-call">🗺 UA FRONTLINE</div><div class="popup-row"><span class="popup-label">ZONE</span><span class="popup-val">${esc(p.zone||p.name||p.description||'—')}</span></div></div>`,{maxWidth:260});
+        },
+      });
+      if(document.getElementById('cb-isw-ukraine')?.checked!==false) iswUkraineLayer.addTo(map);
+      const c=document.getElementById('cnt-isw-ukraine');
+      if(c) c.textContent=res.features.length;
+    }
+  }catch(e){}
+
+  try{
+    const res = await fetch('/api/layers/isw_middle_east').then(r=>r.json());
+    if(res.features?.length){
+      if(iswMiddleEastLayer) iswMiddleEastLayer.remove();
+      iswMiddleEastLayer = L.geoJSON(res, {
+        style: _styleME,
+        onEachFeature:(f,layer)=>{
+          const p=f.properties||{};
+          layer.bindPopup(`<div class="popup-inner"><div class="popup-call">🗺 ME ZONE</div><div class="popup-row"><span class="popup-label">NAME</span><span class="popup-val">${esc(p.name||p.zone||'—')}</span></div></div>`,{maxWidth:260});
+        },
+      });
+      if(document.getElementById('cb-isw-me')?.checked!==false) iswMiddleEastLayer.addTo(map);
+      const c=document.getElementById('cnt-isw-me');
+      if(c) c.textContent=res.features.length;
+    }
+  }catch(e){}
 }
 
 // ── Static Infrastructure GeoJSON Layers ────────────────────────────────────
