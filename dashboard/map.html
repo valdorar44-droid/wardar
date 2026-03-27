@@ -887,6 +887,23 @@ body::after{
 
 <div id="globe-container"></div>
 <div id="leaflet-map"></div>
+
+<!-- Drill-down hint: shows as user zooms close on globe -->
+<div id="globe-drilldown-hint" style="display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+  background:rgba(8,8,12,0.92);border:1px solid #f59e0b;color:#f59e0b;
+  font-family:monospace;font-size:.65rem;letter-spacing:.12em;
+  padding:.35rem .9rem;pointer-events:none;z-index:900;white-space:nowrap">
+  ▼ KEEP ZOOMING — STREET VIEW AVAILABLE
+</div>
+
+<!-- Drill transition notice: flashes when switching from globe to 2D -->
+<div id="drill-notice" style="display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+  background:rgba(8,8,12,0.95);border:1px solid #22c55e;color:#22c55e;
+  font-family:monospace;font-size:.65rem;letter-spacing:.12em;
+  padding:.35rem .9rem;pointer-events:none;z-index:900;white-space:nowrap">
+  ◎ STREET-LEVEL VIEW — 2D MAP ACTIVE
+</div>
+
 <div id="globe-popup">
   <button id="globe-popup-close" onclick="closeGlobePopup()">✕</button>
   <div id="globe-popup-content"></div>
@@ -1973,6 +1990,8 @@ let _map2d = null;
 let _cluster2d = {};   // layerKey → L.MarkerClusterGroup
 let _markers2d = {};   // positionStore key → L.Marker
 let _globeInited = false;
+let _globeZoomTarget = null;  // {lat,lng,zoom} — set before auto-transitioning to 2D
+let _globeZoomHintShown = false;
 
 const _TRAIL_MAX = 5;
 let _autoRotate = false;
@@ -2397,6 +2416,21 @@ function initMap2D(){
   }).addTo(_map2d);
   L.control.zoom({position:'topleft'}).addTo(_map2d);
 
+  // Zoom-out → back to 3D globe (when user zooms below z=3 on 2D map)
+  _map2d.on('zoomend', () => {
+    if (_mapMode !== '2d') return;
+    if (_map2d.getZoom() < 3) {
+      const c = _map2d.getCenter();
+      // Compute globe altitude from Leaflet zoom (z3→alt2.0, z2→alt3.0)
+      const alt = Math.min(3.5, 0.5 * Math.pow(2, 4 - _map2d.getZoom()));
+      toggleMapMode();  // → 3D
+      // After globe init, fly to same region
+      setTimeout(() => {
+        if (globe) void globe.pointOfView({lat: c.lat, lng: c.lng, altitude: alt}, 0);
+      }, 300);
+    }
+  });
+
   // Cluster group per layer key
   const _allLK = ['adsb','ais','tle','acled','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','alerts','pikud','wikipedia','adsb_emergency','polymarket',
@@ -2464,8 +2498,29 @@ function toggleMapMode(){
     if(milBtn)   milBtn.style.display   = 'none';
     const btn = document.getElementById('mapmode-btn');
     if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
-    if(_map2d) setTimeout(()=>_map2d.invalidateSize(), 50);
+    if(_map2d) setTimeout(() => {
+      _map2d.invalidateSize();
+      // If transitioning from globe close-zoom, fly to that location
+      if (_globeZoomTarget) {
+        _map2d.setView([_globeZoomTarget.lat, _globeZoomTarget.lng], _globeZoomTarget.zoom, {animate: false});
+        _globeZoomTarget = null;
+        // Flash the drill-down notification
+        _showDrillNotice();
+      }
+    }, 50);
   }
+}
+
+function _showDrillNotice(){
+  const el = document.getElementById('drill-notice');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.opacity = '1';
+  setTimeout(() => {
+    el.style.transition = 'opacity 1.2s';
+    el.style.opacity = '0';
+    setTimeout(() => { el.style.display = 'none'; el.style.transition = ''; }, 1300);
+  }, 2500);
 }
 
 function togglePanelCollapse(){
@@ -2927,6 +2982,43 @@ function initGlobe(){
   ctrl.zoomSpeed        = 1.2;
   ctrl.panSpeed         = 0.8;
   ctrl.rotateSpeed      = 0.6;
+
+  // ── Auto drill-down to 2D map at street level ──────────────────────────────
+  // When user zooms very close (altitude < 0.05 ≈ 300km), transition to 2D
+  // Leaflet which supports tile zoom all the way to building level (z=19)
+  let _drillTimer = null;
+  ctrl.addEventListener('change', () => {
+    if (_mapMode !== '3d') return;
+    const pov = globe.pointOfView();
+    const alt = pov.altitude ?? 2;
+
+    // Show hint when getting close (alt < 0.15)
+    const hint = document.getElementById('globe-drilldown-hint');
+    if (hint) {
+      if (alt < 0.15 && alt > 0.05) {
+        hint.style.opacity = Math.min(1, (0.15 - alt) / 0.10).toFixed(2);
+        hint.style.display = 'block';
+      } else {
+        hint.style.display = 'none';
+      }
+    }
+
+    // Threshold: altitude < 0.045 → drill down to 2D map
+    if (alt < 0.045) {
+      if (_drillTimer) return;  // already pending
+      _drillTimer = setTimeout(() => {
+        _drillTimer = null;
+        if (_mapMode !== '3d') return;
+        const pov2 = globe.pointOfView();
+        // Map altitude → Leaflet zoom: 0.04→z14, 0.02→z15, 0.01→z16
+        const zoom = Math.min(17, Math.max(12, Math.round(14 + Math.log2(0.04 / Math.max(pov2.altitude, 0.005)))));
+        _globeZoomTarget = { lat: pov2.lat, lng: pov2.lng, zoom };
+        toggleMapMode();  // switches to 2D, toggleMapMode handles _globeZoomTarget
+      }, 350);
+    } else {
+      if (_drillTimer) { clearTimeout(_drillTimer); _drillTimer = null; }
+    }
+  });
 
   // Populate globe from existing positionStore (data already loaded via 2D mode)
   _scheduleRebuild();
