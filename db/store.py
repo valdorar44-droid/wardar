@@ -93,6 +93,16 @@ _MIGRATIONS: list[str] = [
     """ALTER TABLE community_reports ADD COLUMN severity    INTEGER DEFAULT 3""",
     """ALTER TABLE community_reports ADD COLUMN confidence  TEXT DEFAULT 'medium'""",
     """ALTER TABLE community_reports ADD COLUMN image_url   TEXT DEFAULT ''""",
+
+    # v5 — country intel chat
+    """CREATE TABLE IF NOT EXISTS country_chat (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        country      TEXT NOT NULL,
+        author_token TEXT NOT NULL,
+        message      TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_chat_country ON country_chat(country, created_at)""",
 ]
 
 def get_conn() -> sqlite3.Connection:
@@ -387,6 +397,28 @@ def vote_community_report(report_id: int, voter_token: str, vote: int) -> dict:
         """, (ups, downs, verified, hidden, report_id))
         conn.commit()
     return get_community_report(report_id)
+
+# ── Country Intel Chat ───────────────────────────────────────────────────────
+
+def insert_chat_message(country: str, author_token: str, message: str) -> dict:
+    now = _utcnow()
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute(
+            "INSERT INTO country_chat (country, author_token, message, created_at) VALUES (?,?,?,?)",
+            (country.lower().strip(), author_token, message, now)
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM country_chat WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+def get_chat_messages(country: str, limit: int = 100) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM country_chat WHERE country=? ORDER BY created_at DESC LIMIT ?",
+        (country.lower().strip(), limit)
+    ).fetchall()
+    return [dict(r) for r in reversed(rows)]  # oldest first for chat display
 
 # ── Stats ────────────────────────────────────────────────────────────────────
 

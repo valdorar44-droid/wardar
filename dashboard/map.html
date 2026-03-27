@@ -98,7 +98,7 @@ body::after{
 ══════════════════════════════════════════════════════════════ */
 #shell{
   display:grid;
-  grid-template-rows:52px 1fr auto auto;
+  grid-template-rows:52px 1fr auto auto auto;
   grid-template-columns:1fr;
   height:100vh;
   position:relative;
@@ -309,30 +309,94 @@ body::after{
   background:rgba(245,158,11,.1);color:var(--amber);
 }
 .news-title{
-  font-size:.62rem;color:var(--text);line-height:1.4;letter-spacing:.02em;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  font-size:.7rem;color:var(--text);line-height:1.45;letter-spacing:.02em;
 }
-.news-title:hover{color:var(--amber)}
-.news-ts{font-size:.45rem;color:var(--dim2);letter-spacing:.04em;margin-top:3px}
+.news-item:hover .news-title{color:var(--amber)}
+.news-ts{font-size:.46rem;color:var(--dim2);letter-spacing:.04em;margin-top:.25rem}
+.news-desc{font-size:.54rem;color:var(--dim2);letter-spacing:.02em;line-height:1.4;margin-top:.2rem;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .news-filter-btn{
   background:none;border:1px solid var(--border2);color:var(--dim2);
   font-family:var(--font);font-size:.42rem;letter-spacing:.08em;
   padding:.1rem .35rem;cursor:pointer;transition:all .12s;
 }
 .news-filter-btn:hover,.news-filter-btn.active{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.08)}
-.news-ticker{
-  background:rgba(239,68,68,.06);border-bottom:1px solid rgba(239,68,68,.2);
-  padding:.35rem .75rem;font-size:.55rem;color:var(--red);letter-spacing:.06em;
-  overflow:hidden;white-space:nowrap;
+/* Ticker removed — replaced with static breaking badge count */
+.news-breaking-bar{
+  background:rgba(239,68,68,.08);border-bottom:1px solid rgba(239,68,68,.2);
+  padding:.3rem .75rem;font-size:.52rem;color:var(--red);letter-spacing:.1em;
+  display:flex;align-items:center;gap:.5rem;flex-shrink:0;
 }
-.news-ticker-inner{
-  display:inline-block;
-  animation:ticker 40s linear infinite;
+.news-breaking-dot{
+  width:6px;height:6px;background:var(--red);border-radius:50%;
+  animation:brkpulse 1s ease-in-out infinite alternate;flex-shrink:0;
 }
-@keyframes ticker{
-  0%{transform:translateX(100%)}
-  100%{transform:translateX(-100%)}
+
+/* ── COUNTRY INTEL CHAT PANEL ── */
+#chat-panel{
+  position:fixed;right:0;top:52px;bottom:0;width:360px;
+  background:var(--panel);border-left:2px solid var(--border2);
+  z-index:600;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+  box-shadow:-8px 0 40px rgba(0,0,0,.6);
 }
+#chat-panel.open{transform:translateX(0)}
+#chat-hd{
+  background:rgba(12,12,18,.98);border-bottom:1px solid var(--border2);
+  padding:.55rem .8rem;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+#chat-country-label{
+  font-size:.72rem;letter-spacing:.14em;font-weight:700;color:var(--amber);
+}
+#chat-msg-list{
+  flex:1;overflow-y:auto;padding:.5rem .75rem;display:flex;flex-direction:column;gap:.5rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#chat-msg-list::-webkit-scrollbar{width:3px}
+#chat-msg-list::-webkit-scrollbar-thumb{background:var(--border)}
+.chat-msg{
+  background:rgba(8,8,12,.6);border:1px solid var(--border);
+  border-radius:0;padding:.4rem .65rem;
+}
+.chat-msg.mine{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.04)}
+.chat-msg-author{font-size:.44rem;color:var(--amber);letter-spacing:.1em;margin-bottom:.2rem}
+.chat-msg-body{font-size:.65rem;color:var(--text);line-height:1.45;letter-spacing:.02em;word-break:break-word}
+.chat-msg-ts{font-size:.42rem;color:var(--dim2);letter-spacing:.06em;margin-top:.25rem}
+#chat-input-bar{
+  border-top:1px solid var(--border2);padding:.55rem .75rem;
+  display:flex;gap:.5rem;flex-shrink:0;background:rgba(8,8,12,.97);
+}
+#chat-input{
+  flex:1;background:transparent;border:1px solid var(--border2);
+  color:var(--text);font-family:var(--font);font-size:.62rem;
+  padding:.35rem .6rem;letter-spacing:.04em;outline:none;
+}
+#chat-input:focus{border-color:var(--amber)}
+#chat-send{
+  background:rgba(245,158,11,.12);border:1px solid var(--amber);
+  color:var(--amber);font-family:var(--font);font-size:.56rem;
+  letter-spacing:.1em;padding:.3rem .65rem;cursor:pointer;
+  transition:all .12s;flex-shrink:0;
+}
+#chat-send:hover{background:rgba(245,158,11,.2)}
+.chat-empty{
+  color:var(--dim2);font-size:.55rem;letter-spacing:.08em;
+  text-align:center;padding:2rem 0;
+}
+.chat-status{font-size:.44rem;color:var(--dim2);letter-spacing:.06em}
+
+/* ── IMAGE UPLOAD AREA ── */
+.dlg-upload-area{
+  border:1px dashed var(--border2);padding:.7rem;cursor:pointer;
+  transition:border-color .15s;text-align:center;
+  background:rgba(8,8,12,.5);
+}
+.dlg-upload-area:hover{border-color:var(--amber)}
+.dlg-upload-area.has-img{border-color:var(--green);border-style:solid}
+.dlg-upload-label{font-size:.52rem;letter-spacing:.08em;color:var(--dim2)}
+.dlg-upload-preview{max-width:100%;max-height:120px;margin-top:.4rem;display:none}
+.dlg-upload-status{font-size:.46rem;letter-spacing:.06em;color:var(--dim2);margin-top:.2rem}
 
 /* COMMUNITY PANEL */
 #comm-list{
@@ -392,7 +456,7 @@ body::after{
   display:none;transform:translate(12px,-100%);
 }
 
-/* ── GLOBE TOGGLE ── */
+/* ── MAP OVERLAY BUTTONS ── */
 #globe-toggle{
   position:absolute;top:10px;right:10px;z-index:800;
   background:rgba(8,8,12,.92);border:1px solid var(--border2);
@@ -403,6 +467,48 @@ body::after{
 #globe-toggle:hover{border-color:var(--amber);color:var(--amber)}
 #globe-toggle.active{border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,.08)}
 #globe-toggle.loading{color:var(--dim);pointer-events:none}
+#fullscreen-toggle{
+  position:absolute;top:42px;right:10px;z-index:800;
+  background:rgba(8,8,12,.92);border:1px solid var(--border2);
+  color:var(--dim2);font-family:var(--font);font-size:.56rem;
+  letter-spacing:.1em;padding:.3rem .65rem;cursor:pointer;
+  transition:all .15s;
+}
+#fullscreen-toggle:hover{border-color:var(--green);color:var(--green)}
+#fullscreen-toggle.active{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.08)}
+
+/* ── VIDEO BAR ── */
+#videobar{
+  background:rgba(4,4,6,.98);border-top:1px solid var(--border2);
+  display:none;flex-direction:column;
+  grid-column:1/-1;
+  max-height:220px;
+}
+#videobar.open{display:flex}
+#video-bar-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.3rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#video-bar-hd span{font-size:.56rem;letter-spacing:.14em;color:var(--red)}
+.video-close-btn{
+  background:none;border:none;color:var(--dim2);cursor:pointer;
+  font-family:var(--font);font-size:.55rem;letter-spacing:.08em;
+}
+#video-scroll{
+  display:flex;gap:.75rem;padding:.5rem .75rem;overflow-x:auto;flex:1;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#video-scroll::-webkit-scrollbar{height:3px}
+#video-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.video-card{
+  flex-shrink:0;display:flex;flex-direction:column;gap:.25rem;
+}
+.video-card iframe{
+  border:1px solid var(--border2);display:block;
+}
+.video-card-label{
+  font-size:.44rem;letter-spacing:.1em;color:var(--dim2);text-align:center;
+}
 
 /* ── TIMELINE ── */
 #timeline{
@@ -717,6 +823,7 @@ body::after{
       <div id="cesium-map"  style="width:100%;height:100%;display:none"></div>
       <div id="cursor-readout"></div>
       <button id="globe-toggle" onclick="toggleGlobe()" title="Toggle 3D satellite view">◉ 3D/SAT</button>
+      <button id="fullscreen-toggle" onclick="toggleFullscreen()" title="Toggle fullscreen">⛶ FULLSCREEN</button>
     </div>
 
     <!-- RIGHT PANEL -->
@@ -743,8 +850,14 @@ body::after{
             </div>
             <div id="news-filters" style="display:flex;gap:.3rem;flex-wrap:wrap"></div>
           </div>
-          <div id="news-ticker" style="display:none"></div>
+          <div id="news-breaking-bar" style="display:none" class="news-breaking-bar">
+            <div class="news-breaking-dot"></div>
+            <span id="news-breaking-text">0 BREAKING</span>
+          </div>
           <div id="news-list"></div>
+          <button style="margin:.5rem .75rem;padding:.3rem .6rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);font-family:var(--font);font-size:.48rem;letter-spacing:.1em;cursor:pointer" onclick="openVideoBar()">
+            ▶ OPEN LIVE WAR NEWS STREAMS
+          </button>
         </div>
         <!-- COMMUNITY pane -->
         <div class="rp-pane" id="pane-comm">
@@ -762,6 +875,41 @@ body::after{
     </div>
 
   </div><!-- /main -->
+
+  <!-- VIDEO BAR -->
+  <div id="videobar">
+    <div id="video-bar-hd">
+      <span>⬛ LIVE WAR NEWS STREAMS</span>
+      <button class="video-close-btn" onclick="closeVideoBar()">✕ CLOSE</button>
+    </div>
+    <div id="video-scroll">
+      <!-- Al Jazeera English -->
+      <div class="video-card">
+        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=0" frameborder="0" allowfullscreen title="Al Jazeera English"></iframe>
+        <div class="video-card-label">AL JAZEERA ENGLISH</div>
+      </div>
+      <!-- DW News -->
+      <div class="video-card">
+        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=0" frameborder="0" allowfullscreen title="DW News"></iframe>
+        <div class="video-card-label">DW NEWS</div>
+      </div>
+      <!-- France 24 -->
+      <div class="video-card">
+        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCQfwfsi5VrQ8yKZ-UWmAoBg&autoplay=0" frameborder="0" allowfullscreen title="France 24 English"></iframe>
+        <div class="video-card-label">FRANCE 24 ENGLISH</div>
+      </div>
+      <!-- WION -->
+      <div class="video-card">
+        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCPFrMM7ner_bDed6KKmNDvg&autoplay=0" frameborder="0" allowfullscreen title="WION"></iframe>
+        <div class="video-card-label">WION</div>
+      </div>
+      <!-- Sky News -->
+      <div class="video-card">
+        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ&autoplay=0" frameborder="0" allowfullscreen title="Sky News"></iframe>
+        <div class="video-card-label">SKY NEWS</div>
+      </div>
+    </div>
+  </div>
 
   <!-- TIMELINE -->
   <div id="timeline">
@@ -810,6 +958,24 @@ body::after{
   </div>
 
 </div><!-- /shell -->
+
+<!-- COUNTRY INTEL CHAT PANEL -->
+<div id="chat-panel">
+  <div id="chat-hd">
+    <span id="chat-country-label">— INTEL CHAT</span>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span class="chat-status" id="chat-status">LIVE</span>
+      <button style="background:none;border:none;color:var(--dim2);cursor:pointer;font-size:.9rem;font-family:var(--font)"
+        onclick="closeChat()">✕</button>
+    </div>
+  </div>
+  <div id="chat-msg-list"><div class="chat-empty">NO MESSAGES YET — BE FIRST TO REPORT</div></div>
+  <div id="chat-input-bar">
+    <input id="chat-input" type="text" maxlength="1000" placeholder="SHARE INTEL — PRESS ENTER TO SEND..."
+      onkeydown="if(event.key==='Enter')sendChatMsg()">
+    <button id="chat-send" onclick="sendChatMsg()">SEND ▶</button>
+  </div>
+</div>
 
 <!-- COMMUNITY SUBMIT DIALOG -->
 <dialog id="submit-dialog">
@@ -920,10 +1086,20 @@ body::after{
         <input class="dlg-input" id="dlg-url" type="url" maxlength="500" placeholder="https://...">
       </div>
     </div>
-    <!-- Row 6: Image URL -->
+    <!-- Row 6: Image — upload or URL -->
     <div class="dlg-row">
-      <label class="dlg-label">IMAGE URL</label>
-      <input class="dlg-input" id="dlg-imgurl" type="url" maxlength="1000" placeholder="Link to photo/satellite image evidence (external URL)">
+      <label class="dlg-label">PHOTO EVIDENCE</label>
+      <div class="dlg-upload-area" id="dlg-upload-area" onclick="document.getElementById('dlg-file-input').click()">
+        <input type="file" id="dlg-file-input" accept="image/*" capture="environment"
+          style="display:none" onchange="handleFileSelect(this)">
+        <div class="dlg-upload-label">📷 TAP TO CAPTURE / UPLOAD PHOTO (max 10 MB)</div>
+        <img class="dlg-upload-preview" id="dlg-preview">
+        <div class="dlg-upload-status" id="dlg-upload-status"></div>
+      </div>
+    </div>
+    <div class="dlg-row">
+      <label class="dlg-label">OR IMAGE URL</label>
+      <input class="dlg-input" id="dlg-imgurl" type="url" maxlength="1000" placeholder="https://...  (external link — leave blank if uploaded above)">
     </div>
     <div style="font-size:.48rem;color:var(--dim2);letter-spacing:.06em;margin-top:.3rem;line-height:1.6">
       ANONYMOUS · NO ACCOUNT REQUIRED · COMMUNITY VERIFICATION APPLIES DELAY POLICY
@@ -1158,8 +1334,9 @@ async function loadWarNews(){
 
 function renderNews(){
   const list = document.getElementById('news-list');
-  const ticker = document.getElementById('news-ticker');
   const countEl = document.getElementById('news-count');
+  const bbar = document.getElementById('news-breaking-bar');
+  const btxt = document.getElementById('news-breaking-text');
   if(!list) return;
 
   const now = Date.now();
@@ -1176,14 +1353,15 @@ function renderNews(){
 
   if(countEl) countEl.textContent = items.length;
 
-  // Breaking ticker — items <1hr old
+  // Breaking banner — static count badge (no slow ticker)
   const breaking = items.filter(n=> now - n._ts < 3600000);
-  if(breaking.length && ticker){
-    const tickText = breaking.map(n=>` ▌ ${esc(n.title||'')} [${esc((NEWS_SRC_LABELS[n.source]||n.source||'').toUpperCase())}]`).join('   ');
-    ticker.style.display='block';
-    ticker.innerHTML=`<div class="news-ticker-inner">⚡ BREAKING: ${tickText} &nbsp;&nbsp;&nbsp;</div>`;
-  } else if(ticker){
-    ticker.style.display='none';
+  if(bbar && btxt){
+    if(breaking.length){
+      bbar.style.display='flex';
+      btxt.textContent = `⚡ ${breaking.length} BREAKING IN LAST HOUR`;
+    } else {
+      bbar.style.display='none';
+    }
   }
 
   list.innerHTML='';
@@ -1204,7 +1382,8 @@ function renderNews(){
         ${n.country?`<span class="news-zone">${esc(n.country.toUpperCase())}</span>`:''}
       </div>
       <div class="news-title">${esc(n.title||'')}</div>
-      <div class="news-ts">${esc(tsStr)} UTC${n.description?' · '+esc(n.description.substring(0,80)):''}</div>
+      ${n.description?`<div class="news-desc">${esc(n.description.substring(0,140))}</div>`:''}
+      <div class="news-ts">${esc(tsStr)} UTC</div>
     `;
     if(href){
       div.onclick=()=>window.open(href,'_blank','noopener');
@@ -1308,6 +1487,7 @@ function buildPopup(p){
       ${p.description?`<div class="popup-row" style="flex-direction:column"><span class="popup-label">DESC</span><span class="popup-val" style="color:var(--dim2);font-size:.6rem;margin-top:.2rem">${esc(p.description.substring(0,220))}</span></div>`:''}
       ${p.url?`<div class="popup-row"><span class="popup-label">URL</span><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.6rem">OPEN ↗</a></div>`:''}
       ${badge}
+    ${p.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT: ${esc(p.country.toUpperCase())}</button></div>`:''}
     </div>`;
   }
 
@@ -1325,6 +1505,7 @@ function buildPopup(p){
     <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(p.country||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">SEEN</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
     ${badge}
+    ${p.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT: ${esc(p.country.toUpperCase())}</button></div>`:''}
   </div>`;
 }
 
@@ -1372,6 +1553,7 @@ function buildCommunityPopup(r){
       <button class="pvote-btn down" onclick="castVote(${r.id},-1)">▼ DN (${r.downvotes||0})</button>
       <span class="pvote-score">NET ${net>=0?'+':''}${net}</span>
     </div>
+    ${r.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(r.country)}')">⚡ INTEL CHAT: ${esc(r.country.toUpperCase())}</button></div>`:''}
   </div>`;
 }
 
@@ -1556,7 +1738,7 @@ async function submitReport(){
     report_type: document.getElementById('dlg-rtype').value,
     severity:    parseInt(document.getElementById('dlg-severity').value)||3,
     confidence:  document.getElementById('dlg-confidence').value,
-    image_url:   document.getElementById('dlg-imgurl').value.trim(),
+    image_url:   _uploadedImageUrl || document.getElementById('dlg-imgurl').value.trim(),
   };
   try{
     const res=await fetch('/api/community',{
@@ -1569,6 +1751,16 @@ async function submitReport(){
       ['dlg-title','dlg-desc','dlg-lat','dlg-lon','dlg-country','dlg-url','dlg-imgurl'].forEach(id=>{
         document.getElementById(id).value='';
       });
+      // Reset upload state
+      _uploadedImageUrl='';
+      const prev=document.getElementById('dlg-preview');
+      if(prev){prev.style.display='none';prev.src='';}
+      const area=document.getElementById('dlg-upload-area');
+      if(area) area.classList.remove('has-img');
+      const st=document.getElementById('dlg-upload-status');
+      if(st) st.textContent='';
+      const fi=document.getElementById('dlg-file-input');
+      if(fi) fi.value='';
       loadCommunityGlobal();
     }
   }catch(e){ console.warn('submit failed',e); }
@@ -2003,9 +2195,8 @@ function loadCesiumBundle(){
 }
 
 function initCesium(){
-  // Remove Cesium ion watermark by setting an empty token
-  // (Free usage — no ion assets needed, we use ArcGIS satellite)
-  Cesium.Ion.defaultAccessToken='';
+  // No Ion token needed — all imagery from Esri ArcGIS (free, no key)
+  // Leave Cesium.Ion.defaultAccessToken at its default; we don't request any Ion assets
 
   // Esri World Imagery satellite tiles (free, no API key)
   const imageryProvider = new Cesium.UrlTemplateImageryProvider({
@@ -2210,6 +2401,160 @@ async function toggleGlobe(){
 const _origRefreshCounts = refreshCounts;
 // Cesium sync hook — called after every count refresh
 setInterval(()=>{ if(globeMode && cesiumViewer) syncCesiumIfActive(); }, 5000);
+
+// ── Video Bar ─────────────────────────────────────────────────────────────────
+function openVideoBar(){
+  document.getElementById('videobar').classList.add('open');
+}
+function closeVideoBar(){
+  document.getElementById('videobar').classList.remove('open');
+}
+
+// ── Fullscreen ────────────────────────────────────────────────────────────────
+function toggleFullscreen(){
+  const btn = document.getElementById('fullscreen-toggle');
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  } else {
+    document.exitFullscreen();
+  }
+}
+document.addEventListener('fullscreenchange', ()=>{
+  const btn = document.getElementById('fullscreen-toggle');
+  if(document.fullscreenElement){
+    btn.textContent='⛶ EXIT FULL';
+    btn.classList.add('active');
+  } else {
+    btn.textContent='⛶ FULLSCREEN';
+    btn.classList.remove('active');
+  }
+});
+
+// ── Photo Upload ──────────────────────────────────────────────────────────────
+let _uploadedImageUrl = '';
+
+function handleFileSelect(input){
+  const file = input.files[0];
+  if(!file) return;
+  const area = document.getElementById('dlg-upload-area');
+  const preview = document.getElementById('dlg-preview');
+  const status = document.getElementById('dlg-upload-status');
+
+  // Show local preview immediately
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+
+  // Upload to server
+  status.textContent = '⌛ UPLOADING...';
+  status.style.color = 'var(--amber)';
+  _uploadedImageUrl = '';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fetch('/api/community/upload', {method:'POST', body: fd})
+    .then(r => {
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      _uploadedImageUrl = data.url;
+      area.classList.add('has-img');
+      status.textContent = '✓ UPLOADED — ' + data.url.split('/').pop();
+      status.style.color = 'var(--green)';
+    })
+    .catch(err => {
+      status.textContent = '✗ UPLOAD FAILED — check file type/size';
+      status.style.color = 'var(--red)';
+    });
+}
+
+// ── Country Intel Chat ────────────────────────────────────────────────────────
+let chatCountry = '';
+let chatPollTimer = null;
+let chatLastTs = '';
+
+const COUNTRY_FLAGS = {
+  ukraine:'🇺🇦', russia:'🇷🇺', iran:'🇮🇷', israel:'🇮🇱', usa:'🇺🇸',
+  china:'🇨🇳', taiwan:'🇹🇼', syria:'🇸🇾', iraq:'🇮🇶', yemen:'🇾🇪',
+  lebanon:'🇱🇧', myanmar:'🇲🇲', sudan:'🇸🇩', ethiopia:'🇪🇹', gaza:'🇵🇸',
+  pakistan:'🇵🇰', india:'🇮🇳', azerbaijan:'🇦🇿', armenia:'🇦🇲', libya:'🇱🇾',
+};
+
+function openChat(country){
+  chatCountry = country.trim();
+  const label = document.getElementById('chat-country-label');
+  const flag = COUNTRY_FLAGS[chatCountry.toLowerCase()] || '⚡';
+  label.textContent = `${flag} ${chatCountry.toUpperCase()} — INTEL CHAT`;
+
+  // Close any open map popup
+  if(map) map.closePopup();
+
+  document.getElementById('chat-panel').classList.add('open');
+  document.getElementById('chat-input').focus();
+
+  // Load immediately + start polling
+  loadChatMessages();
+  clearInterval(chatPollTimer);
+  chatPollTimer = setInterval(loadChatMessages, 15000);
+}
+
+function closeChat(){
+  document.getElementById('chat-panel').classList.remove('open');
+  clearInterval(chatPollTimer);
+  chatCountry = '';
+}
+
+async function loadChatMessages(){
+  if(!chatCountry) return;
+  try{
+    const res = await fetch(`/api/chat/${encodeURIComponent(chatCountry)}?limit=100`).then(r=>r.json());
+    renderChatMessages(res.data || []);
+    document.getElementById('chat-status').textContent = 'LIVE ' + new Date().toISOString().substring(11,16);
+  }catch(e){ document.getElementById('chat-status').textContent = 'ERR'; }
+}
+
+function renderChatMessages(msgs){
+  const list = document.getElementById('chat-msg-list');
+  if(!msgs.length){
+    list.innerHTML = '<div class="chat-empty">NO MESSAGES YET — BE FIRST TO REPORT</div>';
+    return;
+  }
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  list.innerHTML = '';
+  msgs.forEach(m => {
+    const isMine = m.author_token === AUTHOR_TOKEN;
+    const shortId = m.author_token.substring(0,6).toUpperCase();
+    const ts = m.created_at ? new Date(m.created_at).toISOString().replace('T',' ').substring(11,16)+' UTC' : '';
+    const div = document.createElement('div');
+    div.className = 'chat-msg' + (isMine ? ' mine' : '');
+    div.innerHTML = `
+      <div class="chat-msg-author">${isMine?'▶ YOU':'◆ ANON-'}${isMine?'':esc(shortId)}</div>
+      <div class="chat-msg-body">${esc(m.message)}</div>
+      <div class="chat-msg-ts">${esc(ts)}</div>
+    `;
+    list.appendChild(div);
+  });
+  if(atBottom) list.scrollTop = list.scrollHeight;
+}
+
+async function sendChatMsg(){
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg || !chatCountry) return;
+  input.value = '';
+  try{
+    await fetch(`/api/chat/${encodeURIComponent(chatCountry)}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({author_token: AUTHOR_TOKEN, message: msg}),
+    });
+    loadChatMessages(); // refresh immediately
+  }catch(e){ input.value = msg; }  // restore if failed
+}
 </script>
 </body>
 </html>

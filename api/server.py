@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+import shutil, uuid
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings as C
 from db import store as DB
+from db.store import insert_chat_message, get_chat_messages
 from core.engine import (
     log, log_warn, log_err,
     register_ws_client, unregister_ws_client,
@@ -44,8 +46,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve frontend
+# Serve frontend + uploads
 _DASH = os.path.join(os.path.dirname(__file__), "..", "dashboard")
+_UPLOADS_DIR = os.path.join(_DASH, "uploads")
+os.makedirs(_UPLOADS_DIR, exist_ok=True)
 if os.path.isdir(_DASH):
     app.mount("/static", StaticFiles(directory=_DASH), name="static")
 
@@ -207,6 +211,47 @@ async def vote_community_report(report_id: int, body: VoteIn):
     if updated is None:
         raise HTTPException(status_code=404, detail="not found")
     return JSONResponse(updated)
+
+# ── Image Upload ─────────────────────────────────────────────────────────────
+
+_ALLOWED_TYPES = {"image/jpeg","image/png","image/gif","image/webp","image/heic"}
+_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+
+@app.post("/api/community/upload")
+async def upload_image(file: UploadFile = File(...)):
+    if file.content_type not in _ALLOWED_TYPES:
+        raise HTTPException(status_code=415, detail="Image files only (JPEG/PNG/GIF/WEBP/HEIC)")
+    data = await file.read()
+    if len(data) > _MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Max 10 MB")
+    ext = (file.filename or "img").rsplit(".", 1)[-1].lower()
+    if ext not in ("jpg", "jpeg", "png", "gif", "webp", "heic"):
+        ext = "jpg"
+    fname = f"{uuid.uuid4().hex}.{ext}"
+    dest  = os.path.join(_UPLOADS_DIR, fname)
+    with open(dest, "wb") as f:
+        f.write(data)
+    return JSONResponse({"url": f"/static/uploads/{fname}"})
+
+# ── Country Intel Chat ────────────────────────────────────────────────────────
+
+class ChatMessageIn(BaseModel):
+    author_token: str = Field(..., min_length=8, max_length=128)
+    message:      str = Field(..., min_length=1, max_length=1000)
+
+@app.get("/api/chat/{country}")
+async def get_country_chat(country: str, limit: int = 100):
+    if not country.strip():
+        raise HTTPException(status_code=400, detail="country required")
+    msgs = get_chat_messages(country, limit=min(limit, 200))
+    return JSONResponse({"country": country, "count": len(msgs), "data": msgs})
+
+@app.post("/api/chat/{country}", status_code=201)
+async def post_country_chat(country: str, body: ChatMessageIn):
+    if not country.strip():
+        raise HTTPException(status_code=400, detail="country required")
+    msg = insert_chat_message(country, body.author_token, body.message)
+    return JSONResponse(msg, status_code=201)
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 
