@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import shutil, uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field, field_validator
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,6 +40,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Wardar", version="0.1.0", lifespan=lifespan)
 
+# GZip all JSON responses > 1KB — typically 5-10x smaller on the wire
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -75,10 +78,12 @@ async def health():
 
 @app.get("/api/positions")
 async def get_positions(
+    response: Response,
     sources: str = "",
     w: float = -180, s: float = -90, e: float = 180, n: float = 90,
     limit: int = 5000,
 ):
+    response.headers["Cache-Control"] = "public, max-age=8"  # 8s — matches ADS-B poll
     src_list = [x.strip() for x in sources.split(",") if x.strip()] if sources else None
     bbox     = (w, s, e, n)
     if src_list:
@@ -90,10 +95,12 @@ async def get_positions(
 
 @app.get("/api/events")
 async def get_events(
+    response: Response,
     sources: str = "",
     w: float = -180, s: float = -90, e: float = 180, n: float = 90,
     limit: int = 1000,
 ):
+    response.headers["Cache-Control"] = "public, max-age=15"
     src_list = [x.strip() for x in sources.split(",") if x.strip()] if sources else None
     bbox     = (w, s, e, n)
     data     = DB.get_released_events(bbox=bbox, sources=src_list, limit=limit)
@@ -240,7 +247,7 @@ async def upload_image(file: UploadFile = File(...)):
 # ── Static Infrastructure Layers ─────────────────────────────────────────────
 
 @app.get("/api/layers/{layer}")
-async def get_static_layer(layer: str):
+async def get_static_layer(response: Response, layer: str):
     """
     Serve cached GeoJSON for static infrastructure layers:
     nuclear, cables, mil_bases, pipelines
@@ -251,6 +258,7 @@ async def get_static_layer(layer: str):
     try:
         from ingestors.static_layers import get_layer
         data = await get_layer(layer)
+        response.headers["Cache-Control"] = "public, max-age=3600"  # 1h — static data
         return JSONResponse(data)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

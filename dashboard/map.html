@@ -1265,16 +1265,15 @@ const BOOT_LINES = [
 
 function runBoot(){
   const container = document.getElementById('boot-lines');
+  // Start initMap immediately in background — don't wait for animation
+  initMap();
   let i=0;
   function step(){
     if(i >= BOOT_LINES.length){
       setTimeout(()=>{
         document.getElementById('boot').classList.add('fade');
-        setTimeout(()=>{
-          document.getElementById('boot').remove();
-          initMap();
-        }, 700);
-      }, 500);
+        setTimeout(()=>{ document.getElementById('boot').remove(); }, 600);
+      }, 200);
       return;
     }
     const d = document.createElement('div');
@@ -1282,9 +1281,9 @@ function runBoot(){
     const isLast = i === BOOT_LINES.length - 1;
     d.innerHTML = '<b>›</b> ' + esc(BOOT_LINES[i].t) + (isLast?'':'<span class="boot-cursor"></span>');
     container.appendChild(d);
-    requestAnimationFrame(()=>{ setTimeout(()=>d.classList.add('show'), 20); });
+    requestAnimationFrame(()=>{ setTimeout(()=>d.classList.add('show'), 10); });
     i++;
-    setTimeout(step, i===1 ? 400 : 190);
+    setTimeout(step, i===1 ? 150 : 80);  // faster — 80ms per line vs 190ms
   }
   step();
 }
@@ -2094,29 +2093,30 @@ function initMap(){
 
 // ── REST initial load ─────────────────────────────────────────────────────────
 async function loadInitialData(){
+  // Phase 1: critical data — positions + recent events (fast, small)
   try{
     const [posRes, evtRes]=await Promise.all([
-      fetch('/api/positions?limit=3000').then(r=>r.json()),
-      fetch('/api/events?limit=500').then(r=>r.json()),
+      fetch('/api/positions?limit=2000').then(r=>r.json()),
+      fetch('/api/events?limit=300').then(r=>r.json()),
     ]);
     (posRes.data||[]).forEach(p=>updatePosition(p,false));
     (evtRes.data||[]).forEach(e=>updateEvent(e,false));
-    // Seed feed with recent events
     [...(evtRes.data||[])].slice(0,30).reverse().forEach(e=>{
       if(e.title) pushFeed(e);
     });
     refreshCounts();
   }catch(e){ console.warn('Initial load failed:',e); }
 
+  // Phase 2: secondary data — start immediately but don't block map render
   loadCommunityGlobal();
   buildNewsFilters();
   loadWarNews();
-  // Auto-refresh war news every 2 minutes
   setInterval(loadWarNews, 120000);
-  loadStaticLayers();
-  // Load Phase 3 alerts + refresh every 5 minutes
   loadAlerts();
   setInterval(loadAlerts, 300000);
+
+  // Phase 3: heavy static layers — defer 2s after map is interactive
+  setTimeout(()=> loadStaticLayers(), 2000);
 }
 
 // ── Static Infrastructure GeoJSON Layers ────────────────────────────────────
@@ -2124,7 +2124,11 @@ let cableLayer = null;
 let pipelineLayer = null;
 
 async function loadStaticLayers(){
-  await Promise.all([loadNuclear(), loadMilBases(), loadCables(), loadPipelines()]);
+  // Nuclear + mil_bases are small — load immediately
+  // Cables + pipelines are large GeoJSON — load in background after a beat
+  await Promise.all([loadNuclear(), loadMilBases()]);
+  // Cables and pipelines deferred — large payloads, load non-blocking
+  Promise.all([loadCables(), loadPipelines()]).catch(()=>{});
 }
 
 async function loadNuclear(){
