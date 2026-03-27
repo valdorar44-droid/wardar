@@ -122,3 +122,11 @@ DARK_VESSEL_GAP_HOURS      = _i("DARK_VESSEL_GAP_HOURS",      2)     # hours bef
 NUCLEAR_ALERT_KM           = _i("NUCLEAR_ALERT_KM",           10)    # km radius
 PIPELINE_ALERT_KM          = _i("PIPELINE_ALERT_KM",          5)     # km radius
 CONVERGENCE_SCORE_THRESHOLD= _i("CONVERGENCE_SCORE_THRESHOLD", 4)    # min score
+
+# ── Pikud HaOref (Israel rocket alerts) ────────────────
+ENABLE_PIKUD_HAOREF        = _b("ENABLE_PIKUD_HAOREF",        True)
+PIKUD_HAOREF_INTERVAL_SEC  = _i("PIKUD_HAOREF_INTERVAL_SEC",  15)    # poll every 15s
+
+# ── Wikipedia Edit Spike Detector ──────────────────────
+ENABLE_WIKIPEDIA_SPIKES      = _b("ENABLE_WIKIPEDIA_SPIKES",      True)
+WIKIPEDIA_SPIKE_INTERVAL_SEC = _i("WIKIPEDIA_SPIKE_INTERVAL_SEC", 120)  # run every 2 min

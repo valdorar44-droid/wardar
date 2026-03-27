@@ -241,6 +241,36 @@ async def _fetch_adsbfi(lat: float, lon: float, radius_nm: int = 400) -> list[di
         return []
 
 
+async def _fetch_mil_global() -> list[dict]:
+    """
+    Fetch ALL global military aircraft from dedicated /mil endpoints.
+    airplanes.live and adsb.fi both expose a /mil endpoint that returns
+    every military-squawking aircraft worldwide — no lat/lon targeting needed.
+    """
+    for url in [
+        "https://api.airplanes.live/v2/mil",
+        "https://opendata.adsb.fi/api/v2/mil",
+    ]:
+        try:
+            async with httpx.AsyncClient(timeout=20, headers={"User-Agent": "Wardar/0.1"}) as client:
+                r = await client.get(url)
+                if r.status_code != 200:
+                    continue
+                data = r.json()
+                ac = data.get("ac") or data.get("aircraft") or []
+                results = []
+                for a in ac:
+                    p = _norm_adsbfi(a)
+                    if p:
+                        p["military_flag"] = 1  # all from /mil endpoint are military
+                        results.append(p)
+                if results:
+                    return results
+        except Exception:
+            continue
+    return []
+
+
 async def _fetch_hotspots_community() -> list[dict]:
     """Pull all hotspot regions from community feeds (airplanes.live primary, adsb.lol backup)."""
     tasks = []
@@ -294,6 +324,11 @@ async def fetch() -> list[dict]:
             if key not in seen:
                 seen.add(key)
                 results.append(p)
+
+    # 0. Global military aircraft via dedicated /mil endpoints (always, free)
+    mil_global = await _fetch_mil_global()
+    _merge(mil_global)
+    log(f"adsb: mil_global={len(mil_global)} military aircraft")
 
     # 1. ADS-B Exchange (paid key — best global + military coverage)
     if C.ENABLE_ADSB and C.ADSB_EXCHANGE_API_KEY:

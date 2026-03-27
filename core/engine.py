@@ -326,6 +326,28 @@ async def _tick_views():
     except Exception as exc:
         log_err(f"tick_views: {exc}")
 
+async def _tick_pikud_haoref():
+    try:
+        from ingestors import pikud_haoref
+        events = await pikud_haoref.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["pikud_haoref"], limit=200)
+            await _broadcast({"type": "events", "sources": ["pikud_haoref"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_pikud_haoref: {exc}")
+
+async def _tick_wikipedia_spikes():
+    try:
+        from ingestors import wikipedia_spikes
+        events = await wikipedia_spikes.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["wikipedia"], limit=50)
+            await _broadcast({"type": "events", "sources": ["wikipedia"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_wikipedia_spikes: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -373,7 +395,9 @@ async def start():
         asyncio.create_task(_run_every(_tick_views,           C.VIEWS_INTERVAL_SEC,      "views")),
         asyncio.create_task(_run_every(_tick_dark_vessel,     C.DARK_VESSEL_INTERVAL_SEC,"dark_vessel")),
         asyncio.create_task(_run_every(_tick_convergence,     C.CONVERGENCE_INTERVAL_SEC,"convergence")),
-        asyncio.create_task(_run_every(_tick_proximity_alerts,C.PROXIMITY_INTERVAL_SEC,  "proximity")),
+        asyncio.create_task(_run_every(_tick_proximity_alerts,C.PROXIMITY_INTERVAL_SEC,       "proximity")),
+        asyncio.create_task(_run_every(_tick_pikud_haoref,   C.PIKUD_HAOREF_INTERVAL_SEC,   "pikud_haoref")),
+        asyncio.create_task(_run_every(_tick_wikipedia_spikes,C.WIKIPEDIA_SPIKE_INTERVAL_SEC,"wikipedia_spikes")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

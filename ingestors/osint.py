@@ -437,15 +437,70 @@ async def _fetch_krebs_rss(count: int = 20) -> list[dict]:
         log_warn(f'krebs: RSS error: {exc}')
         return []
 
+def _make_rss_fetcher(source: str, url: str, count: int = 20, atom: bool = False):
+    """Factory that creates an RSS/Atom fetch coroutine for a given source."""
+    async def _fetch() -> list[dict]:
+        from core.engine import log_warn
+        if not C.ENABLE_DEFENSE_FEEDS:
+            return []
+        try:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                r = await client.get(url, headers={"User-Agent": "Wardar/0.1 (+https://wardar.app)"})
+                if r.status_code != 200:
+                    return []
+            items = []
+            now = datetime.now(timezone.utc).isoformat()
+            pattern = r'<entry>(.*?)</entry>' if atom else r'<item>(.*?)</item>'
+            for block in re.findall(pattern, r.text, re.DOTALL)[:count]:
+                if atom:
+                    title = re.search(r'<title[^>]*>(.*?)</title>', block, re.DOTALL)
+                    link  = re.search(r'<link[^>]*href="([^"]+)"', block)
+                    desc  = re.search(r'<summary[^>]*>(.*?)</summary>', block, re.DOTALL) or \
+                            re.search(r'<content[^>]*>(.*?)</content>', block, re.DOTALL)
+                else:
+                    title = re.search(r'<title>(.*?)</title>', block, re.DOTALL)
+                    link  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
+                    desc  = re.search(r'<description>(.*?)</description>', block, re.DOTALL)
+                if not title:
+                    continue
+                t = re.sub(r'<[^>]+>', '', title.group(1)).strip()[:200]
+                if atom:
+                    u = (link.group(1) if link else '').strip()
+                else:
+                    u = (link.group(1) if link else '').strip()
+                d = re.sub(r'<[^>]+>', '', desc.group(1) if desc else '').strip()[:300]
+                if not t:
+                    continue
+                items.append({
+                    'source': source, 'title': t, 'description': d,
+                    'lat': None, 'lon': None, 'country': '',
+                    'category': 'news', 'raw_ts_utc': now, 'url': u, 'extra': '{}',
+                })
+            return items
+        except Exception as exc:
+            log_warn(f'{source}: RSS error: {exc}')
+            return []
+    _fetch.__name__ = f'_fetch_{source}'
+    return _fetch
+
+
+# ── Additional war/conflict RSS feeds ────────────────────────────────────────
+_fetch_isw           = _make_rss_fetcher('isw',        'https://www.iswresearch.org/feeds/posts/default')
+_fetch_aljazeera     = _make_rss_fetcher('aljazeera',  'https://www.aljazeera.com/xml/rss/all.xml')
+_fetch_middleeastmon = _make_rss_fetcher('mem',        'https://www.middleeastmonitor.com/feed/')
+_fetch_toi           = _make_rss_fetcher('toi',        'https://www.timesofisrael.com/feed/')
+_fetch_ukrinform     = _make_rss_fetcher('ukrinform',  'https://www.ukrinform.net/rss/block-lastnews')
+_fetch_kyivind       = _make_rss_fetcher('kyiv_ind',   'https://kyivindependent.com/feed/')
+_fetch_reliefweb     = _make_rss_fetcher('reliefweb',  'https://reliefweb.int/updates/rss.xml')
+_fetch_centcom       = _make_rss_fetcher('centcom',    'https://www.centcom.mil/RSS/CENTCOM-News/', atom=True)
+_fetch_reuters_world = _make_rss_fetcher('reuters',    'https://feeds.reuters.com/reuters/worldNews')
+_fetch_bbc_world     = _make_rss_fetcher('bbc',        'https://feeds.bbci.co.uk/news/world/rss.xml')
+
+
 async def fetch() -> list[dict]:
     from core.engine import log
     import asyncio
-    (
-        gdelt, news,
-        twz, usni, bellingcat, oryx,
-        defnews, defone, ukmod, rusi,
-        gcaptain, krebs,
-    ) = await asyncio.gather(
+    results_list = await asyncio.gather(
         _fetch_gdelt(),
         _fetch_news_rss(),
         _fetch_twz_rss(),
@@ -458,19 +513,20 @@ async def fetch() -> list[dict]:
         _fetch_rusi_rss(),
         _fetch_gcaptain_rss(),
         _fetch_krebs_rss(),
+        # New feeds
+        _fetch_isw(),
+        _fetch_aljazeera(),
+        _fetch_middleeastmon(),
+        _fetch_toi(),
+        _fetch_ukrinform(),
+        _fetch_kyivind(),
+        _fetch_reliefweb(),
+        _fetch_centcom(),
+        _fetch_reuters_world(),
+        _fetch_bbc_world(),
     )
-    results = (
-        gdelt + news +
-        twz + usni + bellingcat + oryx +
-        defnews + defone + ukmod + rusi +
-        gcaptain + krebs
-    )
-    log(
-        f"osint: {len(results)} articles ("
-        f"gdelt={len(gdelt)}, news={len(news)}, "
-        f"twz={len(twz)}, usni={len(usni)}, bellingcat={len(bellingcat)}, "
-        f"oryx={len(oryx)}, defnews={len(defnews)}, defone={len(defone)}, "
-        f"ukmod={len(ukmod)}, rusi={len(rusi)}, "
-        f"gcaptain={len(gcaptain)}, krebs={len(krebs)})"
-    )
+    results = []
+    for chunk in results_list:
+        results.extend(chunk)
+    log(f"osint: {len(results)} total articles from {len(results_list)} sources")
     return results

@@ -895,6 +895,20 @@ body::after{
           <span class="layer-name" style="color:var(--red)">THREAT ALERTS</span>
           <span class="layer-count" id="cnt-alerts" style="background:var(--red)">0</span>
         </label>
+        <!-- Israel Rocket Alerts -->
+        <label class="layer-item" id="lr-pikud">
+          <input type="checkbox" class="layer-cb" id="cb-pikud" checked style="color:var(--red)" onchange="toggleLayer('pikud')">
+          <span class="layer-icon" style="color:var(--red)">🚨</span>
+          <span class="layer-name">IL ROCKET ALERTS</span>
+          <span class="layer-count" id="cnt-pikud" style="background:var(--red)">0</span>
+        </label>
+        <!-- Wikipedia Spikes -->
+        <label class="layer-item" id="lr-wikipedia">
+          <input type="checkbox" class="layer-cb" id="cb-wikipedia" checked style="color:var(--amber)" onchange="toggleLayer('wikipedia')">
+          <span class="layer-icon" style="color:var(--amber)">📖</span>
+          <span class="layer-name">WIKI SPIKES</span>
+          <span class="layer-count" id="cnt-wikipedia" style="background:var(--amber)">0</span>
+        </label>
       </div>
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
@@ -1527,14 +1541,14 @@ const markers = {
   adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{},
   fire:{}, seismic:{}, ew:{}, community:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
-  alerts:{},
+  alerts:{}, pikud:{}, wikipedia:{},
 };
 let layers = {};
 const visible = {
   adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true,
   fire:true, seismic:true, ew:true, community:true,
   nuclear:true, mil_base:true, osint_geo:true, unhcr:true, views:true,
-  alerts:true,
+  alerts:true, pikud:true, wikipedia:true,
 };
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -1575,6 +1589,10 @@ const ICONS = {
   unhcr:         {fn:()=>makeIcon('⊙','#a855f7',17)},
   views:         {fn:()=>makeIcon('◉','#ef4444',17)},
   views_forecast:{fn:()=>makeIcon('◉','#ef4444',17)},
+  // Israel rocket alerts — fast-flash red
+  pikud_haoref:  {fn:()=>makePulseIcon('🚨','#ef4444','ALERT')},
+  // Wikipedia edit spikes — breaking news signal
+  wikipedia:     {fn:()=>makeIcon('📖','#f59e0b',17)},
   // Phase 3 alert sources — pulsing red/orange threat icons
   dark_vessel:    {fn:()=>makePulseIcon('⛵','#06b6d4','DARK')},
   convergence:    {fn:()=>makePulseIcon('⚡','#f59e0b','CVG')},
@@ -1590,6 +1608,8 @@ function iconFor(source, mil, extra){
   if(s==='views_forecast') return ICONS.views.fn();
   if(s==='nuclear') return ICONS.nuclear.fn();
   if(s==='mil_base') return ICONS.mil_base.fn();
+  if(s==='pikud_haoref')   return ICONS.pikud_haoref.fn();
+  if(s==='wikipedia')      return ICONS.wikipedia.fn();
   // Phase 3 alert sources
   if(s==='dark_vessel')    return ICONS.dark_vessel.fn();
   if(s==='convergence')    return ICONS.convergence.fn();
@@ -1714,6 +1734,8 @@ function sourceToLayerKey(source){
   if(s==='nuclear') return 'nuclear';
   if(s==='mil_base') return 'mil_base';
   if(['dark_vessel','convergence','nuclear_threat','pipeline_threat'].includes(s)) return 'alerts';
+  if(s==='pikud_haoref') return 'pikud';
+  if(s==='wikipedia')    return 'wikipedia';
   return 'osint';
 }
 
@@ -1738,6 +1760,7 @@ const LAYER_COLORS = {
   ew:'#e879f9',community:'#22c55e',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
+  pikud:'#ef4444',wikipedia:'#f59e0b',
 };
 
 function updatePosition(p, isNew){
@@ -1953,6 +1976,12 @@ function refreshCounts(){
   if(alertTabCount) alertTabCount.textContent = nAlerts;
   const cntAlerts = document.getElementById('cnt-alerts');
   if(cntAlerts) cntAlerts.textContent = nAlerts;
+  const nPikud = Object.keys(markers.pikud||{}).length;
+  const cntPikud = document.getElementById('cnt-pikud');
+  if(cntPikud) cntPikud.textContent = nPikud;
+  const nWiki = Object.keys(markers.wikipedia||{}).length;
+  const cntWiki = document.getElementById('cnt-wikipedia');
+  if(cntWiki) cntWiki.textContent = nWiki;
 
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
@@ -2041,9 +2070,9 @@ function initMap(){
   // New static + event layers
   const NEW_LAYER_COLORS = {
     nuclear:'#eab308', mil_base:'#f59e0b', osint_geo:'#f97316', unhcr:'#a855f7', views:'#ef4444',
-    alerts:'#ef4444',
+    alerts:'#ef4444', pikud:'#ef4444', wikipedia:'#f59e0b',
   };
-  ['nuclear','mil_base','osint_geo','unhcr','views','alerts'].forEach(k=>{
+  ['nuclear','mil_base','osint_geo','unhcr','views','alerts','pikud','wikipedia'].forEach(k=>{
     const c=NEW_LAYER_COLORS[k]||'#6b7280';
     layers[k]=L.markerClusterGroup({
       ...clusterOpts,
