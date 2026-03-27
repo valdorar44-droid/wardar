@@ -92,6 +92,7 @@ body::after{
   animation:blink .6s step-end infinite;
 }
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes alertPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}
 
 /* ══════════════════════════════════════════════════════════════
    MAIN LAYOUT
@@ -331,6 +332,34 @@ body::after{
   width:6px;height:6px;background:var(--red);border-radius:50%;
   animation:brkpulse 1s ease-in-out infinite alternate;flex-shrink:0;
 }
+
+/* ── ALERT NOTIFICATION BAR ── */
+#alert-bar{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:850;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.5);
+  padding:.35rem .9rem;font-size:.58rem;letter-spacing:.1em;color:var(--red);
+  pointer-events:auto;cursor:pointer;max-width:600px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;backdrop-filter:blur(4px);
+  animation:alertpulse 2s ease-in-out infinite alternate;
+}
+@keyframes alertpulse{
+  from{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.08)}
+  to{border-color:rgba(239,68,68,.8);background:rgba(239,68,68,.18)}
+}
+/* Alert list items */
+.alert-item{
+  padding:.5rem .75rem;border-bottom:1px solid rgba(22,22,31,.7);
+  cursor:pointer;transition:background .1s;
+}
+.alert-item:hover{background:rgba(239,68,68,.04)}
+.alert-type-badge{
+  display:inline-block;font-size:.42rem;letter-spacing:.1em;
+  padding:.08rem .3rem;margin-right:.35rem;border:1px solid;font-weight:700;
+}
+.alert-item-title{font-size:.64rem;color:var(--text);line-height:1.35;letter-spacing:.02em;margin-top:.2rem}
+.alert-item-desc{font-size:.52rem;color:var(--dim2);line-height:1.4;margin-top:.2rem;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.alert-item-ts{font-size:.43rem;color:var(--dim2);letter-spacing:.05em;margin-top:.2rem}
 
 /* ── COUNTRY INTEL CHAT PANEL ── */
 #chat-panel{
@@ -859,6 +888,13 @@ body::after{
           <span class="layer-name">CONFLICT FORECAST</span>
           <span class="layer-count" id="cnt-views" style="background:var(--red)">0</span>
         </label>
+        <!-- Phase 3 Alerts -->
+        <label class="layer-item" id="lr-alerts" style="border-top:1px solid var(--border2);margin-top:.3rem;padding-top:.4rem">
+          <input type="checkbox" class="layer-cb" id="cb-alerts" checked style="color:var(--red)" onchange="toggleLayer('alerts')">
+          <span class="layer-icon" style="color:var(--red);animation:alertPulse 1.4s ease-out infinite">⚡</span>
+          <span class="layer-name" style="color:var(--red)">THREAT ALERTS</span>
+          <span class="layer-count" id="cnt-alerts" style="background:var(--red)">0</span>
+        </label>
       </div>
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
@@ -871,6 +907,7 @@ body::after{
       <div id="leaflet-map" style="width:100%;height:100%"></div>
       <div id="cesium-map"  style="width:100%;height:100%;display:none"></div>
       <div id="cursor-readout"></div>
+      <div id="alert-bar" style="display:none"></div>
       <button id="globe-toggle" onclick="toggleGlobe()" title="Toggle 3D satellite view">◉ 3D/SAT</button>
       <button id="fullscreen-toggle" onclick="toggleFullscreen()" title="Toggle fullscreen">⛶ FULLSCREEN</button>
     </div>
@@ -881,6 +918,7 @@ body::after{
         <div class="rp-tab active" id="tab-feed" onclick="switchTab('feed')">SIGINT</div>
         <div class="rp-tab" id="tab-news" onclick="switchTab('news')">WAR NEWS</div>
         <div class="rp-tab" id="tab-comm" onclick="switchTab('comm')">COMMUNITY</div>
+        <div class="rp-tab" id="tab-alerts" onclick="switchTab('alerts')" style="color:var(--red)">⚡ ALERTS <span id="alert-tab-count" style="background:var(--red);color:#fff;font-size:.38rem;padding:.05rem .25rem;border-radius:2px;margin-left:.15rem">0</span></div>
       </div>
       <div class="rp-body">
         <!-- SIGINT FEED pane -->
@@ -919,6 +957,17 @@ body::after{
           <button class="comm-submit-btn" onclick="openSubmitDialog(null,null)">
             + SUBMIT INTEL REPORT
           </button>
+        </div>
+        <!-- ALERTS pane -->
+        <div class="rp-pane" id="pane-alerts">
+          <div class="rp-head" style="flex-direction:column;gap:.2rem;align-items:flex-start">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+              <span style="color:var(--red)">⚡ ACTIVE ALERTS <span id="alert-count">0</span></span>
+              <button onclick="clearAlertBar()" style="background:none;border:none;color:var(--dim2);cursor:pointer;font-family:var(--font);font-size:.42rem;letter-spacing:.06em">CLEAR</button>
+            </div>
+            <div style="font-size:.42rem;color:var(--dim2);letter-spacing:.06em">DARK VESSEL · CONVERGENCE · NUCLEAR · PIPELINE</div>
+          </div>
+          <div id="alert-list"><div style="padding:1rem .75rem;color:var(--dim2);font-size:.55rem;letter-spacing:.06em">NO ALERTS — SYSTEMS NOMINAL</div></div>
         </div>
       </div>
     </div>
@@ -1311,6 +1360,8 @@ const SRC_COLORS = {
   rusi:'var(--purple)',gcaptain:'var(--cyan)',krebs:'var(--fuchsia)',
   nuclear:'var(--yellow)', mil_base:'var(--amber)', osint_geo:'var(--orange)',
   unhcr:'var(--purple)', views_forecast:'var(--red)',
+  dark_vessel:'var(--cyan)', convergence:'var(--amber)',
+  nuclear_threat:'var(--yellow)', pipeline_threat:'var(--orange)',
 };
 
 function renderFeed(){
@@ -1476,12 +1527,14 @@ const markers = {
   adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{},
   fire:{}, seismic:{}, ew:{}, community:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
+  alerts:{},
 };
 let layers = {};
 const visible = {
   adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true,
   fire:true, seismic:true, ew:true, community:true,
   nuclear:true, mil_base:true, osint_geo:true, unhcr:true, views:true,
+  alerts:true,
 };
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -1490,6 +1543,16 @@ function makeIcon(emoji, color, size=20){
     html:`<div style="font-size:${size}px;line-height:1;color:${color};text-shadow:0 0 8px ${color}88;filter:drop-shadow(0 0 3px ${color}55)">${emoji}</div>`,
     className:'', iconSize:[size,size], iconAnchor:[size/2,size/2], popupAnchor:[0,-size/2],
   });
+}
+
+function makePulseIcon(emoji, color, label){
+  const html=`<div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center">
+    <div style="position:absolute;inset:0;border-radius:50%;border:2px solid ${color};animation:alertPulse 1.4s ease-out infinite;opacity:.7"></div>
+    <div style="position:absolute;inset:4px;border-radius:50%;border:1px solid ${color}66;animation:alertPulse 1.4s ease-out infinite .4s;opacity:.5"></div>
+    <div style="font-size:16px;line-height:1;color:${color};text-shadow:0 0 10px ${color};z-index:1">${emoji}</div>
+    <div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);font-size:6px;color:${color};white-space:nowrap;letter-spacing:.06em;font-family:'JetBrains Mono',monospace">${label}</div>
+  </div>`;
+  return L.divIcon({html, className:'', iconSize:[36,44], iconAnchor:[18,18], popupAnchor:[0,-18]});
 }
 
 const ICONS = {
@@ -1512,6 +1575,11 @@ const ICONS = {
   unhcr:         {fn:()=>makeIcon('⊙','#a855f7',17)},
   views:         {fn:()=>makeIcon('◉','#ef4444',17)},
   views_forecast:{fn:()=>makeIcon('◉','#ef4444',17)},
+  // Phase 3 alert sources — pulsing red/orange threat icons
+  dark_vessel:    {fn:()=>makePulseIcon('⛵','#06b6d4','DARK')},
+  convergence:    {fn:()=>makePulseIcon('⚡','#f59e0b','CVG')},
+  nuclear_threat: {fn:()=>makePulseIcon('☢','#ef4444','NUC')},
+  pipeline_threat:{fn:()=>makePulseIcon('⊗','#f97316','PIPE')},
 };
 
 function iconFor(source, mil, extra){
@@ -1522,6 +1590,11 @@ function iconFor(source, mil, extra){
   if(s==='views_forecast') return ICONS.views.fn();
   if(s==='nuclear') return ICONS.nuclear.fn();
   if(s==='mil_base') return ICONS.mil_base.fn();
+  // Phase 3 alert sources
+  if(s==='dark_vessel')    return ICONS.dark_vessel.fn();
+  if(s==='convergence')    return ICONS.convergence.fn();
+  if(s==='nuclear_threat') return ICONS.nuclear_threat.fn();
+  if(s==='pipeline_threat')return ICONS.pipeline_threat.fn();
   if(ICONS[s]) return ICONS[s].fn(!!mil);
   return makeIcon('●','#4b5563',12);
 }
@@ -1640,6 +1713,7 @@ function sourceToLayerKey(source){
   if(s==='views_forecast') return 'views';
   if(s==='nuclear') return 'nuclear';
   if(s==='mil_base') return 'mil_base';
+  if(['dark_vessel','convergence','nuclear_threat','pipeline_threat'].includes(s)) return 'alerts';
   return 'osint';
 }
 
@@ -1663,6 +1737,7 @@ const LAYER_COLORS = {
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
   ew:'#e879f9',community:'#22c55e',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
+  alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
 };
 
 function updatePosition(p, isNew){
@@ -1687,10 +1762,16 @@ function updatePosition(p, isNew){
   }
 }
 
+const _ALERT_SOURCES = new Set(['dark_vessel','convergence','nuclear_threat','pipeline_threat']);
+
 function updateEvent(e, isNew){
+  if(_ALERT_SOURCES.has(e.source)){
+    if(isNew) pushAlert(e);
+    if(e.lat!=null && e.lon!=null) updatePosition(e, isNew);
+    return;
+  }
   if(e.lat!=null&&e.lon!=null) updatePosition(e,isNew);
-  else if(isNew && e.title) pushFeed(e);        // news/events with no coords → SIGINT only
-  // Always push to news buffer for WAR NEWS tab
+  else if(isNew && e.title) pushFeed(e);
   if(e.title) pushNews(e);
 }
 
@@ -1867,6 +1948,11 @@ function refreshCounts(){
   document.getElementById('cnt-osintgeo').textContent  = Object.keys(markers.osint_geo||{}).length;
   document.getElementById('cnt-unhcr').textContent     = Object.keys(markers.unhcr||{}).length;
   document.getElementById('cnt-views').textContent     = Object.keys(markers.views||{}).length;
+  const nAlerts = Object.keys(markers.alerts||{}).length;
+  const alertTabCount = document.getElementById('alert-tab-count');
+  if(alertTabCount) alertTabCount.textContent = nAlerts;
+  const cntAlerts = document.getElementById('cnt-alerts');
+  if(cntAlerts) cntAlerts.textContent = nAlerts;
 
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
@@ -1955,8 +2041,9 @@ function initMap(){
   // New static + event layers
   const NEW_LAYER_COLORS = {
     nuclear:'#eab308', mil_base:'#f59e0b', osint_geo:'#f97316', unhcr:'#a855f7', views:'#ef4444',
+    alerts:'#ef4444',
   };
-  ['nuclear','mil_base','osint_geo','unhcr','views'].forEach(k=>{
+  ['nuclear','mil_base','osint_geo','unhcr','views','alerts'].forEach(k=>{
     const c=NEW_LAYER_COLORS[k]||'#6b7280';
     layers[k]=L.markerClusterGroup({
       ...clusterOpts,
@@ -1998,6 +2085,9 @@ async function loadInitialData(){
   // Auto-refresh war news every 2 minutes
   setInterval(loadWarNews, 120000);
   loadStaticLayers();
+  // Load Phase 3 alerts + refresh every 5 minutes
+  loadAlerts();
+  setInterval(loadAlerts, 300000);
 }
 
 // ── Static Infrastructure GeoJSON Layers ────────────────────────────────────
@@ -2701,6 +2791,91 @@ function handleFileSelect(input){
       status.textContent = '✗ UPLOAD FAILED — check file type/size';
       status.style.color = 'var(--red)';
     });
+}
+
+// ── Alert Engine (client-side) ────────────────────────────────────────────────
+const alertBuffer = [];
+let _alertBarTimer = null;
+
+const ALERT_META = {
+  dark_vessel:     {label:'DARK VESSEL', color:'var(--cyan)',   icon:'⛵'},
+  convergence:     {label:'CONVERGENCE', color:'var(--amber)',  icon:'⚡'},
+  nuclear_threat:  {label:'NUCLEAR',     color:'var(--yellow)', icon:'☢'},
+  pipeline_threat: {label:'PIPELINE',    color:'var(--orange)', icon:'⊸'},
+};
+
+function pushAlert(e){
+  const key = (e.source||'') + '|' + (e.title||'').substring(0,60);
+  if(alertBuffer.some(a=>a._key===key)) return;  // client-side dedup
+  e._key = key;
+  e._ts  = Date.now();
+  alertBuffer.unshift(e);
+  if(alertBuffer.length > 50) alertBuffer.pop();
+  renderAlerts();
+  showAlertBar(e);
+  // Also push to SIGINT feed
+  pushFeed({...e, source: e.source});
+}
+
+function renderAlerts(){
+  const list = document.getElementById('alert-list');
+  const countEl = document.getElementById('alert-count');
+  const tabCountEl = document.getElementById('alert-tab-count');
+  if(!list) return;
+  if(countEl) countEl.textContent = alertBuffer.length;
+  if(tabCountEl) tabCountEl.textContent = alertBuffer.length;
+
+  if(!alertBuffer.length){
+    list.innerHTML='<div style="padding:1rem .75rem;color:var(--dim2);font-size:.55rem;letter-spacing:.06em">NO ALERTS — SYSTEMS NOMINAL</div>';
+    return;
+  }
+  list.innerHTML = '';
+  alertBuffer.forEach(a=>{
+    const meta = ALERT_META[a.source] || {label:a.source.toUpperCase(), color:'var(--red)', icon:'⚡'};
+    const ts = a.raw_ts_utc ? new Date(a.raw_ts_utc).toISOString().replace('T',' ').substring(0,16)+' UTC' : '';
+    const div = document.createElement('div');
+    div.className = 'alert-item';
+    div.innerHTML = `
+      <div>
+        <span class="alert-type-badge" style="color:${meta.color};border-color:${meta.color}">${esc(meta.label)}</span>
+        ${a.country?`<span style="font-size:.42rem;color:var(--dim2);letter-spacing:.08em">${esc(a.country.toUpperCase())}</span>`:''}
+      </div>
+      <div class="alert-item-title">${meta.icon} ${esc(a.title||'')}</div>
+      <div class="alert-item-desc">${esc(a.description||'')}</div>
+      <div class="alert-item-ts">${esc(ts)}</div>
+    `;
+    if(a.lat!=null && a.lon!=null){
+      div.onclick = ()=>{
+        map.setView([a.lat, a.lon], Math.max(map.getZoom(), 7));
+        switchTab('alerts');
+      };
+    }
+    list.appendChild(div);
+  });
+}
+
+function showAlertBar(e){
+  const bar = document.getElementById('alert-bar');
+  if(!bar) return;
+  const meta = ALERT_META[e.source] || {icon:'⚡', label:''};
+  bar.textContent = `${meta.icon} ${e.title||''}`;
+  bar.style.display = 'block';
+  bar.onclick = ()=>{ switchTab('alerts'); clearAlertBar(); };
+  clearTimeout(_alertBarTimer);
+  _alertBarTimer = setTimeout(clearAlertBar, 12000);
+}
+
+function clearAlertBar(){
+  const bar = document.getElementById('alert-bar');
+  if(bar) bar.style.display = 'none';
+}
+
+// Fetch current alerts from API on load + periodically
+async function loadAlerts(){
+  try{
+    const res = await fetch('/api/events?sources=dark_vessel,convergence,nuclear_threat,pipeline_threat&limit=50').then(r=>r.json());
+    (res.data||[]).forEach(e=>pushAlert(e));
+  }catch(_){}
 }
 
 // ── Country Intel Chat ────────────────────────────────────────────────────────

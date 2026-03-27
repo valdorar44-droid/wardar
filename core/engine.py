@@ -245,6 +245,47 @@ async def _tick_purge():
     except Exception as exc:
         log_err(f"tick_purge: {exc}")
 
+async def _tick_dark_vessel():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_dark_vessel_check
+        n = run_dark_vessel_check()
+        if n:
+            released = DB.get_released_events(sources=["dark_vessel"], limit=50)
+            await _broadcast({"type": "events", "sources": ["dark_vessel"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_dark_vessel: {exc}")
+
+async def _tick_convergence():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_convergence_check
+        n = run_convergence_check()
+        if n:
+            released = DB.get_released_events(sources=["convergence"], limit=50)
+            await _broadcast({"type": "events", "sources": ["convergence"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_convergence: {exc}")
+
+async def _tick_proximity_alerts():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_nuclear_proximity_check, run_pipeline_proximity_check
+        n1 = await run_nuclear_proximity_check()
+        n2 = await run_pipeline_proximity_check()
+        if n1 + n2 > 0:
+            released = DB.get_released_events(
+                sources=["nuclear_threat", "pipeline_threat"], limit=50
+            )
+            await _broadcast({"type": "events",
+                              "sources": ["nuclear_threat", "pipeline_threat"],
+                              "data": released})
+    except Exception as exc:
+        log_err(f"tick_proximity_alerts: {exc}")
+
 async def _tick_static_layers():
     try:
         from ingestors import static_layers
@@ -326,10 +367,13 @@ async def start():
         asyncio.create_task(_run_every(_tick_usgs,   C.USGS_INTERVAL_SEC,      "usgs")),
         asyncio.create_task(_run_every(_tick_gpsjam, C.GPSJAM_INTERVAL_SEC,    "gpsjam")),
         asyncio.create_task(_run_every(_tick_purge,  3600,                     "purge")),
-        asyncio.create_task(_run_every(_tick_static_layers, C.STATIC_REFRESH_SEC,   "static_layers")),
-        asyncio.create_task(_run_every(_tick_osint_geo,    C.OSINT_GEO_INTERVAL_SEC, "osint_geo")),
-        asyncio.create_task(_run_every(_tick_unhcr,         C.UNHCR_INTERVAL_SEC,    "unhcr")),
-        asyncio.create_task(_run_every(_tick_views,         C.VIEWS_INTERVAL_SEC,    "views")),
+        asyncio.create_task(_run_every(_tick_static_layers,    C.STATIC_REFRESH_SEC,      "static_layers")),
+        asyncio.create_task(_run_every(_tick_osint_geo,       C.OSINT_GEO_INTERVAL_SEC,  "osint_geo")),
+        asyncio.create_task(_run_every(_tick_unhcr,           C.UNHCR_INTERVAL_SEC,      "unhcr")),
+        asyncio.create_task(_run_every(_tick_views,           C.VIEWS_INTERVAL_SEC,      "views")),
+        asyncio.create_task(_run_every(_tick_dark_vessel,     C.DARK_VESSEL_INTERVAL_SEC,"dark_vessel")),
+        asyncio.create_task(_run_every(_tick_convergence,     C.CONVERGENCE_INTERVAL_SEC,"convergence")),
+        asyncio.create_task(_run_every(_tick_proximity_alerts,C.PROXIMITY_INTERVAL_SEC,  "proximity")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

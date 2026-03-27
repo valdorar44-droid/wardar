@@ -112,3 +112,13 @@ UNHCR_INTERVAL_SEC  = _i("UNHCR_INTERVAL_SEC",   86400)  # daily
 # ── VIEWS Conflict Forecast ────────────────────────────
 ENABLE_VIEWS        = _b("ENABLE_VIEWS",         True)
 VIEWS_INTERVAL_SEC  = _i("VIEWS_INTERVAL_SEC",   86400)  # daily
+
+# ── Phase 3 Alert Engine ───────────────────────────────
+ENABLE_ALERTS              = _b("ENABLE_ALERTS",              True)
+DARK_VESSEL_INTERVAL_SEC   = _i("DARK_VESSEL_INTERVAL_SEC",   900)   # every 15 min
+CONVERGENCE_INTERVAL_SEC   = _i("CONVERGENCE_INTERVAL_SEC",   1800)  # every 30 min
+PROXIMITY_INTERVAL_SEC     = _i("PROXIMITY_INTERVAL_SEC",     3600)  # hourly
+DARK_VESSEL_GAP_HOURS      = _i("DARK_VESSEL_GAP_HOURS",      2)     # hours before "dark"
+NUCLEAR_ALERT_KM           = _i("NUCLEAR_ALERT_KM",           10)    # km radius
+PIPELINE_ALERT_KM          = _i("PIPELINE_ALERT_KM",          5)     # km radius
+CONVERGENCE_SCORE_THRESHOLD= _i("CONVERGENCE_SCORE_THRESHOLD", 4)    # min score
