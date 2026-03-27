@@ -32,6 +32,7 @@ _MIGRATIONS: list[str] = [
     """CREATE INDEX IF NOT EXISTS idx_pos_release  ON positions(release_ts_utc)""",
     """CREATE INDEX IF NOT EXISTS idx_pos_source   ON positions(source)""",
     """CREATE INDEX IF NOT EXISTS idx_pos_callsign ON positions(callsign)""",
+    """CREATE INDEX IF NOT EXISTS idx_pos_raw_ts   ON positions(raw_ts_utc)""",  # playback queries
 
     # events — conflict/OSINT overlays
     """CREATE TABLE IF NOT EXISTS events (
@@ -108,6 +109,91 @@ def get_released_positions(bbox: tuple[float,float,float,float] | None = None,
         params + [limit]
     ).fetchall()
     return [dict(r) for r in rows]
+
+# ── Playback ─────────────────────────────────────────────────────────────────
+
+def get_playback_summary() -> dict:
+    """Return time range and per-minute bucket counts for the playback timeline."""
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT MIN(raw_ts_utc) as oldest, MAX(raw_ts_utc) as newest, COUNT(*) as total
+        FROM positions
+    """).fetchone()
+    if not row or not row["oldest"]:
+        return {"oldest": None, "newest": None, "total": 0, "buckets": []}
+
+    # Per-5-minute bucket counts — strftime rounds to 5-min interval
+    buckets_raw = conn.execute("""
+        SELECT
+          strftime('%Y-%m-%dT%H:', raw_ts_utc) ||
+            printf('%02d', (CAST(strftime('%M', raw_ts_utc) AS INTEGER) / 5) * 5)
+            || ':00+00:00' AS bucket,
+          COUNT(DISTINCT callsign) AS callsigns
+        FROM positions
+        GROUP BY bucket
+        ORDER BY bucket
+    """).fetchall()
+
+    return {
+        "oldest":  row["oldest"],
+        "newest":  row["newest"],
+        "total":   row["total"],
+        "buckets": [{"ts": r["bucket"], "callsigns": r["callsigns"]} for r in buckets_raw],
+    }
+
+def get_positions_at(ts: str, window_sec: int = 600,
+                     sources: list[str] | None = None,
+                     bbox: tuple | None = None,
+                     limit: int = 5000) -> list[dict]:
+    """
+    Return the latest position per callsign/source visible at timestamp `ts`.
+
+    Looks back up to `window_sec` to find the most recent fix per callsign.
+    Default 600s: handles ADS-B (10s cycle), AIS (event-driven), TLE (hourly).
+    Delay policy enforced: only returns positions where release_ts_utc <= ts.
+    """
+    conn = get_conn()
+    window_start = _offset_ts(ts, -window_sec)
+
+    base_clauses  = ["raw_ts_utc <= ?", "raw_ts_utc >= ?", "release_ts_utc <= ?"]
+    base_params: list = [ts, window_start, ts]
+
+    if sources:
+        ph = ",".join("?" * len(sources))
+        base_clauses.append(f"source IN ({ph})")
+        base_params.extend(sources)
+    if bbox:
+        w, s, e, n = bbox
+        base_clauses.append("lon BETWEEN ? AND ? AND lat BETWEEN ? AND ?")
+        base_params.extend([w, e, s, n])
+
+    where = " AND ".join(base_clauses)
+
+    # Latest fix per (callsign, source) in the window — single-pass with join
+    rows = conn.execute(f"""
+        SELECT p.*
+        FROM positions p
+        INNER JOIN (
+            SELECT callsign, source, MAX(raw_ts_utc) AS max_ts
+            FROM positions
+            WHERE {where}
+            GROUP BY callsign, source
+        ) latest
+          ON  p.callsign   = latest.callsign
+          AND p.source     = latest.source
+          AND p.raw_ts_utc = latest.max_ts
+        LIMIT ?
+    """, base_params + [limit]).fetchall()
+
+    return [dict(r) for r in rows]
+
+def _offset_ts(ts: str, delta_sec: int) -> str:
+    from datetime import datetime, timedelta, timezone
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except Exception:
+        dt = datetime.now(timezone.utc)
+    return (dt + timedelta(seconds=delta_sec)).isoformat()
 
 def purge_old_positions() -> int:
     """Delete positions older than POSITION_RETAIN_HOURS."""

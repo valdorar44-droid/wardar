@@ -94,6 +94,31 @@ async def get_events(
 async def get_stats():
     return JSONResponse(DB.get_counts())
 
+# ── Playback endpoints ────────────────────────────────────────────────────────
+
+@app.get("/api/playback/summary")
+async def playback_summary():
+    """Return time range + 5-minute bucket counts for the timeline scrubber."""
+    return JSONResponse(DB.get_playback_summary())
+
+@app.get("/api/playback/frame")
+async def playback_frame(
+    ts: str,
+    window: int = 600,
+    sources: str = "",
+    w: float = -180, s: float = -90, e: float = 180, n: float = 90,
+    limit: int = 5000,
+):
+    """
+    Return the latest known position per callsign at timestamp `ts`.
+    window = look-back seconds (default 30 — matches ADS-B poll interval).
+    Delay policy is enforced: release_ts_utc <= ts.
+    """
+    src_list = [x.strip() for x in sources.split(",") if x.strip()] if sources else None
+    bbox     = (w, s, e, n)
+    data     = DB.get_positions_at(ts=ts, window_sec=window, sources=src_list, bbox=bbox, limit=limit)
+    return JSONResponse({"ts": ts, "count": len(data), "data": data})
+
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")

@@ -173,6 +173,74 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   color:var(--text)!important;font-family:var(--font)!important;
 }
 .leaflet-control-zoom a:hover{background:var(--panel2)!important;color:var(--amber)!important}
+
+/* ── TIMELINE ── */
+#timeline{
+  position:absolute;bottom:32px;left:0;right:0;z-index:500;
+  background:rgba(10,10,14,.96);border-top:1px solid var(--border);
+  padding:.5rem 1rem .45rem;
+  backdrop-filter:blur(8px);
+  display:none; /* hidden until data loaded */
+}
+#timeline.visible{display:block}
+.tl-top{display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem}
+.tl-btn{
+  background:none;border:1px solid var(--border);color:var(--dim);
+  font-family:var(--font);font-size:.7rem;letter-spacing:.06em;
+  padding:.2rem .55rem;cursor:pointer;transition:all .15s;flex-shrink:0;
+}
+.tl-btn:hover{border-color:var(--amber);color:var(--amber)}
+.tl-btn.active{border-color:var(--amber);color:#000;background:var(--amber)}
+.tl-btn.live-btn.active{border-color:var(--green);color:#000;background:var(--green)}
+#tl-time{
+  font-size:.72rem;letter-spacing:.06em;color:var(--amber);
+  flex-shrink:0;min-width:190px;
+}
+#tl-mode{
+  font-size:.6rem;letter-spacing:.1em;
+  padding:.1rem .45rem;border:1px solid rgba(245,158,11,.3);
+  color:var(--amber);background:rgba(245,158,11,.08);flex-shrink:0;
+}
+#tl-mode.replay{border-color:rgba(168,85,247,.4);color:var(--purple);background:rgba(168,85,247,.08)}
+.tl-speed-group{display:flex;gap:.3rem;flex-shrink:0}
+.tl-trail-toggle{margin-left:auto;display:flex;align-items:center;gap:.4rem;font-size:.62rem;color:var(--dim);cursor:pointer;flex-shrink:0}
+.tl-trail-toggle input{cursor:pointer;accent-color:var(--amber)}
+.tl-scrubber-wrap{position:relative;height:28px;cursor:pointer}
+/* Background track */
+.tl-track{
+  position:absolute;top:50%;left:0;right:0;height:2px;
+  background:var(--border);transform:translateY(-50%);
+}
+/* Data density fill — painted by JS */
+#tl-density{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;overflow:hidden;
+}
+/* Scrubber thumb */
+#tl-thumb{
+  position:absolute;top:50%;width:3px;background:var(--amber);
+  height:20px;transform:translate(-50%,-50%);
+  box-shadow:0 0 8px var(--amber);pointer-events:none;
+  transition:left .08s linear;
+}
+/* Time labels */
+.tl-label-start,.tl-label-end{
+  position:absolute;bottom:-1px;font-size:.55rem;
+  letter-spacing:.04em;color:var(--dim);
+}
+.tl-label-start{left:0}
+.tl-label-end{right:0}
+/* Hover crosshair */
+#tl-hover-line{
+  position:absolute;top:0;bottom:0;width:1px;
+  background:rgba(255,255,255,.2);pointer-events:none;display:none;
+}
+#tl-hover-time{
+  position:absolute;bottom:20px;font-size:.58rem;
+  color:var(--text);background:var(--panel);
+  border:1px solid var(--border);padding:.1rem .3rem;
+  pointer-events:none;display:none;white-space:nowrap;transform:translateX(-50%);
+}
 </style>
 </head>
 <body>
@@ -234,6 +302,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <div class="panel-footer">
     DATA DELAYED PER POLICY<br>
     CIVILIAN +30s · MILITARY +24H
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div id="timeline">
+  <div class="tl-top">
+    <button class="tl-btn live-btn active" id="tl-live" onclick="setLive()">● LIVE</button>
+    <button class="tl-btn" id="tl-play" onclick="togglePlay()">▶ PLAY</button>
+    <div class="tl-speed-group">
+      <button class="tl-btn" onclick="setSpeed(1)"  id="sp-1" >1×</button>
+      <button class="tl-btn active" onclick="setSpeed(30)" id="sp-30">30×</button>
+      <button class="tl-btn" onclick="setSpeed(120)" id="sp-120">120×</button>
+      <button class="tl-btn" onclick="setSpeed(300)" id="sp-300">300×</button>
+    </div>
+    <span id="tl-mode">LIVE</span>
+    <span id="tl-time">──</span>
+    <label class="tl-trail-toggle" title="Show movement trails">
+      <input type="checkbox" id="tl-trails" checked onchange="toggleTrails(this.checked)"> TRAILS
+    </label>
+  </div>
+  <div class="tl-scrubber-wrap" id="tl-scrubber"
+       onmousemove="scrubHover(event)" onmouseleave="scrubLeave()"
+       onmousedown="scrubStart(event)">
+    <div class="tl-track"></div>
+    <canvas id="tl-density"></canvas>
+    <div id="tl-thumb" style="left:100%"></div>
+    <div id="tl-hover-line"></div>
+    <div id="tl-hover-time"></div>
+    <span class="tl-label-start" id="tl-lstart">—</span>
+    <span class="tl-label-end"   id="tl-lend">—</span>
   </div>
 </div>
 
@@ -495,6 +593,7 @@ function initMap(){
   // Load initial data via REST then connect WS
   loadInitialData();
   connectWS();
+  initTimeline();
 }
 
 // ── REST initial load ─────────────────────────────────────────────────────────
@@ -550,11 +649,13 @@ function connectWS(){
         (msg.positions||[]).forEach(updatePosition);
         (msg.events||[]).forEach(updateEvent);
       } else if(msg.type === 'positions'){
-        (msg.data||[]).forEach(updatePosition);
+        if(TL.isLive) (msg.data||[]).forEach(updatePosition);
       } else if(msg.type === 'events'){
-        (msg.data||[]).forEach(updateEvent);
+        if(TL.isLive) (msg.data||[]).forEach(updateEvent);
       }
       refreshCounts();
+      // Expand timeline scrubber as new data arrives
+      if(TL.isLive && TL.summary) refreshTimelineBounds(msg);
     }catch(err){console.warn('WS parse error:',err);}
   };
 
@@ -573,6 +674,352 @@ setInterval(()=>{ if(ws && ws.readyState===1) ws.send(JSON.stringify({type:'ping
 
 // Refresh counts / clock every second
 setInterval(refreshCounts, 1000);
+
+// ── TIMELINE / PLAYBACK ──────────────────────────────────────────────────────
+
+const TL = {
+  // summary data from /api/playback/summary
+  summary: null,
+  buckets: [],          // [{ts, callsigns}, ...]
+  startMs: 0,           // oldest timestamp in ms
+  endMs:   0,           // newest timestamp in ms
+
+  // playback state
+  isLive:    true,
+  isPlaying: false,
+  currentMs: 0,         // current replay position in ms
+  speed:     30,        // real-time multiplier
+  showTrails: true,
+
+  // frame cache: ts_iso → positions[]
+  frameCache: new Map(),
+  CACHE_MAX: 200,
+
+  // trails: callsign+source → [[lat,lon], ...]
+  trails: {},
+  trailPolylines: {},   // callsign+source → L.polyline
+
+  // playback loop
+  _rafId: null,
+  _lastRealMs: null,
+
+  // scrubber dragging
+  _dragging: false,
+};
+
+function refreshTimelineBounds(msg){
+  // Extend the timeline end when new positions arrive in live mode
+  const now = Date.now();
+  if(now > TL.endMs + 5000){
+    TL.endMs = now;
+    if(TL.isLive){
+      TL.currentMs = TL.endMs;
+      updateScrubberThumb();
+      updateTimeLabel(TL.endMs);
+    }
+    setLabelDates();
+    renderDensityCanvas();
+  }
+}
+
+async function initTimeline(){
+  try{
+    const res = await fetch('/api/playback/summary').then(r=>r.json());
+    if(!res.oldest || !res.newest) return;
+    TL.summary = res;
+    TL.buckets = res.buckets || [];
+    TL.startMs  = new Date(res.oldest).getTime();
+    TL.endMs    = new Date(res.newest).getTime();
+    TL.currentMs = TL.endMs;
+
+    document.getElementById('timeline').classList.add('visible');
+    renderDensityCanvas();
+    updateScrubberThumb();
+    updateTimeLabel(TL.endMs);
+    setLabelDates();
+  }catch(e){
+    console.warn('Timeline init failed:', e);
+  }
+}
+
+function setLabelDates(){
+  const fmt = ms => {
+    const d = new Date(ms);
+    return d.toISOString().substring(5,16).replace('T',' ');
+  };
+  document.getElementById('tl-lstart').textContent = fmt(TL.startMs);
+  document.getElementById('tl-lend').textContent   = fmt(TL.endMs);
+}
+
+function renderDensityCanvas(){
+  const canvas = document.getElementById('tl-density');
+  const wrap   = document.getElementById('tl-scrubber');
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if(!TL.buckets.length || TL.endMs <= TL.startMs) return;
+
+  const maxCount = Math.max(...TL.buckets.map(b=>b.callsigns), 1);
+  const span = TL.endMs - TL.startMs;
+
+  TL.buckets.forEach(b => {
+    const bMs = new Date(b.ts).getTime();
+    const x   = Math.floor(((bMs - TL.startMs) / span) * W);
+    const h   = Math.max(2, Math.floor((b.callsigns / maxCount) * (H * 0.7)));
+    const alpha = 0.15 + 0.55 * (b.callsigns / maxCount);
+    ctx.fillStyle = `rgba(245,158,11,${alpha.toFixed(2)})`;
+    ctx.fillRect(x, H - h, Math.max(2, Math.floor(W / TL.buckets.length) - 1), h);
+  });
+}
+
+function msToThumbPct(ms){
+  if(TL.endMs <= TL.startMs) return 100;
+  return Math.max(0, Math.min(100, ((ms - TL.startMs) / (TL.endMs - TL.startMs)) * 100));
+}
+
+function updateScrubberThumb(){
+  const pct = TL.isLive ? 100 : msToThumbPct(TL.currentMs);
+  document.getElementById('tl-thumb').style.left = pct + '%';
+}
+
+function updateTimeLabel(ms){
+  const d = new Date(ms);
+  document.getElementById('tl-time').textContent =
+    d.toISOString().replace('T',' ').substring(0,19) + ' UTC';
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+
+function setLive(){
+  TL.isLive    = true;
+  TL.isPlaying = false;
+  stopPlayLoop();
+  clearTrails();
+
+  document.getElementById('tl-live').classList.add('active');
+  document.getElementById('tl-play').textContent = '▶ PLAY';
+  document.getElementById('tl-mode').textContent = 'LIVE';
+  document.getElementById('tl-mode').className   = '';
+
+  updateScrubberThumb();
+  // Re-load live data
+  loadInitialData();
+}
+
+function togglePlay(){
+  if(TL.isLive){
+    // Switch into replay mode at the END of available data
+    TL.isLive    = false;
+    TL.currentMs = TL.endMs;
+    document.getElementById('tl-live').classList.remove('active');
+    document.getElementById('tl-mode').textContent = 'REPLAY';
+    document.getElementById('tl-mode').className   = 'replay';
+  }
+  TL.isPlaying = !TL.isPlaying;
+  document.getElementById('tl-play').textContent = TL.isPlaying ? '⏸ PAUSE' : '▶ PLAY';
+  if(TL.isPlaying){
+    TL._lastRealMs = performance.now();
+    startPlayLoop();
+  } else {
+    stopPlayLoop();
+  }
+}
+
+function setSpeed(s){
+  TL.speed = s;
+  ['1','30','120','300'].forEach(v=>{
+    document.getElementById('sp-'+v).classList.toggle('active', parseInt(v)===s);
+  });
+}
+
+function toggleTrails(on){
+  TL.showTrails = on;
+  if(!on) clearTrails();
+}
+
+// ── Play loop ─────────────────────────────────────────────────────────────────
+
+function startPlayLoop(){
+  function tick(now){
+    if(!TL.isPlaying){ return; }
+    const elapsed = now - (TL._lastRealMs || now);
+    TL._lastRealMs = now;
+    TL.currentMs += elapsed * TL.speed;
+
+    // Clamp & wrap at end
+    if(TL.currentMs >= TL.endMs){
+      TL.currentMs = TL.endMs;
+      TL.isPlaying = false;
+      document.getElementById('tl-play').textContent = '▶ PLAY';
+    }
+
+    updateScrubberThumb();
+    updateTimeLabel(TL.currentMs);
+    loadFrame(new Date(TL.currentMs).toISOString());
+
+    if(TL.isPlaying) TL._rafId = requestAnimationFrame(tick);
+  }
+  TL._rafId = requestAnimationFrame(tick);
+}
+
+function stopPlayLoop(){
+  if(TL._rafId){ cancelAnimationFrame(TL._rafId); TL._rafId = null; }
+}
+
+// ── Frame loading ─────────────────────────────────────────────────────────────
+
+let _frameDebounce = null;
+function loadFrame(tsIso){
+  // Throttle: don't fetch more than ~10/s during fast playback
+  clearTimeout(_frameDebounce);
+  _frameDebounce = setTimeout(async ()=>{
+    const cacheKey = tsIso.substring(0,16); // minute precision for cache
+    let data;
+    if(TL.frameCache.has(cacheKey)){
+      data = TL.frameCache.get(cacheKey);
+    } else {
+      try{
+        const res = await fetch(`/api/playback/frame?ts=${encodeURIComponent(tsIso)}&window=600&limit=3000`).then(r=>r.json());
+        data = res.data || [];
+        // LRU-ish: evict oldest if cache full
+        if(TL.frameCache.size >= TL.CACHE_MAX){
+          TL.frameCache.delete(TL.frameCache.keys().next().value);
+        }
+        TL.frameCache.set(cacheKey, data);
+      }catch(e){ return; }
+    }
+    applyFrame(data);
+  }, TL.isPlaying ? 80 : 0);
+}
+
+function applyFrame(positions){
+  // Clear all markers
+  Object.values(layers).forEach(lg => lg.clearLayers());
+  Object.values(markers).forEach(m => { for(const k in m) delete m[k]; });
+
+  // Draw positions + update trails
+  positions.forEach(p => {
+    if(p.lat == null || p.lon == null) return;
+    const lk  = sourceToLayerKey(p.source);
+    const key  = markerKey(p);
+    const icon = iconFor(p.source, parseInt(p.military_flag||0));
+    const m = L.marker([p.lat, p.lon], {icon}).bindPopup(buildPopup(p), {maxWidth:320,minWidth:240});
+    if(!markers[lk]) markers[lk] = {};
+    markers[lk][key] = m;
+    if(layers[lk] && visible[lk]) layers[lk].addLayer(m);
+
+    // Update trail
+    if(TL.showTrails){
+      const tk = key;
+      if(!TL.trails[tk]) TL.trails[tk] = [];
+      const trail = TL.trails[tk];
+      const last = trail[trail.length-1];
+      // Only add if moved (avoid duplicate static points)
+      if(!last || last[0] !== p.lat || last[1] !== p.lon){
+        trail.push([p.lat, p.lon]);
+        if(trail.length > 25) trail.shift();
+      }
+      drawTrail(tk, trail, lk);
+    }
+  });
+
+  refreshCounts();
+}
+
+// ── Trails ────────────────────────────────────────────────────────────────────
+
+const trailColors = {
+  adsb:'#f59e0b', opensky:'#f59e0b', ais:'#06b6d4',
+  tle:'#a855f7',  acled:'#ef4444',   notam:'#eab308', osint:'#3b82f6',
+};
+
+function drawTrail(key, points, layerKey){
+  if(points.length < 2) return;
+  const color = trailColors[layerKey] || '#6b7280';
+  if(TL.trailPolylines[key]){
+    TL.trailPolylines[key].setLatLngs(points);
+  } else {
+    TL.trailPolylines[key] = L.polyline(points, {
+      color, weight:1.5, opacity:0.5, dashArray:'4 3',
+    }).addTo(map);
+  }
+}
+
+function clearTrails(){
+  Object.values(TL.trailPolylines).forEach(pl => { try{ map.removeLayer(pl); }catch{} });
+  TL.trailPolylines = {};
+  TL.trails = {};
+}
+
+// ── Scrubber interaction ──────────────────────────────────────────────────────
+
+function scrubPosToMs(x){
+  const wrap = document.getElementById('tl-scrubber');
+  const rect = wrap.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+  return TL.startMs + pct * (TL.endMs - TL.startMs);
+}
+
+function scrubStart(e){
+  if(TL.startMs === TL.endMs) return;
+  TL._dragging = true;
+  TL.isLive    = false;
+  TL.isPlaying = false;
+  stopPlayLoop();
+  document.getElementById('tl-live').classList.remove('active');
+  document.getElementById('tl-play').textContent = '▶ PLAY';
+  document.getElementById('tl-mode').textContent = 'REPLAY';
+  document.getElementById('tl-mode').className   = 'replay';
+
+  const move = ev => {
+    TL.currentMs = scrubPosToMs(ev.clientX);
+    updateScrubberThumb();
+    updateTimeLabel(TL.currentMs);
+    loadFrame(new Date(TL.currentMs).toISOString());
+  };
+  const up = () => {
+    TL._dragging = false;
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup',   up);
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup',   up);
+  move(e);
+}
+
+function scrubHover(e){
+  const ms  = scrubPosToMs(e.clientX);
+  const wrap = document.getElementById('tl-scrubber');
+  const rect = wrap.getBoundingClientRect();
+  const x   = e.clientX - rect.left;
+  const d   = new Date(ms);
+  const str = d.toISOString().replace('T',' ').substring(0,16)+' UTC';
+
+  const hl = document.getElementById('tl-hover-line');
+  const ht = document.getElementById('tl-hover-time');
+  hl.style.display = 'block';
+  hl.style.left    = x + 'px';
+  ht.style.display = 'block';
+  ht.style.left    = x + 'px';
+  ht.textContent   = str;
+}
+
+function scrubLeave(){
+  document.getElementById('tl-hover-line').style.display = 'none';
+  document.getElementById('tl-hover-time').style.display = 'none';
+}
+
+// Re-render density canvas on resize
+window.addEventListener('resize', ()=>{
+  if(TL.summary) renderDensityCanvas();
+});
+
+// Load timeline after map boots
+// (called from initMap at the end)
+
 </script>
 </body>
 </html>
