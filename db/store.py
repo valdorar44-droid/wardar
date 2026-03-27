@@ -107,8 +107,8 @@ _MIGRATIONS: list[str] = [
     # v6 — composite indexes for sampled queries (source+release for per-source latest)
     """CREATE INDEX IF NOT EXISTS idx_pos_src_release ON positions(source, release_ts_utc DESC, raw_ts_utc DESC)""",
     """CREATE INDEX IF NOT EXISTS idx_evt_src_release ON events(source, release_ts_utc DESC, raw_ts_utc DESC)""",
-    # Partial index for released positions only — the most common read path
-    """CREATE INDEX IF NOT EXISTS idx_pos_released ON positions(source, raw_ts_utc DESC) WHERE release_ts_utc <= datetime('now')""",
+    # Regular index on release_ts_utc for fast released-position queries
+    """CREATE INDEX IF NOT EXISTS idx_pos_released ON positions(release_ts_utc, source, raw_ts_utc DESC)""",
 ]
 
 def get_conn() -> sqlite3.Connection:
