@@ -1546,17 +1546,19 @@ function runBoot(){
   // Hard failsafe — boot overlay ALWAYS removed after 8s regardless of any error
   const failsafeTimer = setTimeout(_dismissBoot, 8000);
 
-  // Start initMap — wrapped so any Leaflet/CDN exception doesn't kill the animation
-  try { initMap(); } catch(e) {
-    console.error('initMap failed:', e);
-    // Show error in boot output
-    const errLine = document.createElement('div');
-    errLine.className = 'boot-line warn show';
-    errLine.innerHTML = '<b>›</b> MAP INIT ERROR — RETRYING...';
-    container.appendChild(errLine);
-    // Retry once after 1s (CDN might just be slow)
-    setTimeout(()=>{ try{ initMap(); }catch(e2){ console.error('initMap retry failed:', e2); } }, 1000);
-  }
+  // Defer initMap by one tick so all let/const declarations are initialized (avoids TDZ)
+  setTimeout(()=>{
+    try { initMap(); } catch(e) {
+      console.error('initMap failed:', e);
+      // Show error in boot output
+      const errLine = document.createElement('div');
+      errLine.className = 'boot-line warn show';
+      errLine.innerHTML = '<b>›</b> MAP INIT ERROR — RETRYING...';
+      container.appendChild(errLine);
+      // Retry once after 1s (CDN might just be slow)
+      setTimeout(()=>{ try{ initMap(); }catch(e2){ console.error('initMap retry failed:', e2); } }, 1000);
+    }
+  }, 0);
 
   let i=0;
   function step(){
@@ -1832,9 +1834,9 @@ let newsZoneFilter = null;
 let newsRefreshTimer = null;
 
 function pushNews(item){
-  // Avoid duplicates by checking source_url or title+source combo
-  const key = item.source_url || (item.title+'|'+(item.source||''));
-  if(newsBuffer.some(n=>(n.source_url||n._key)===key)) return;
+  // Avoid duplicates by checking source_url / url or title+source combo
+  const key = item.source_url || item.url || (item.title+'|'+(item.source||''));
+  if(newsBuffer.some(n=>(n.source_url||n.url||n._key)===key)) return;
   item._key = key;
   item._ts  = item.raw_ts_utc ? new Date(item.raw_ts_utc).getTime() : Date.now();
   newsBuffer.unshift(item);
@@ -1898,7 +1900,7 @@ function renderNews(){
     const srcLabel = NEWS_SRC_LABELS[srcKey] || srcKey.toUpperCase();
     const srcColor = SRC_COLORS[srcKey] || 'var(--blue)';
     const tsStr = n.raw_ts_utc ? new Date(n.raw_ts_utc).toISOString().replace('T',' ').substring(0,16) : '';
-    const href = n.source_url ? esc(n.source_url) : null;
+    const href = (n.source_url || n.url) ? esc(n.source_url || n.url) : null;
 
     const div = document.createElement('div');
     div.className = 'news-item';
