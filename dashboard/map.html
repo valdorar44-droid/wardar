@@ -283,6 +283,57 @@ body::after{
   100%{background:transparent}
 }
 
+/* WAR NEWS PANEL */
+#news-list{
+  flex:1;overflow-y:auto;padding:.3rem 0;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#news-list::-webkit-scrollbar{width:3px}
+#news-list::-webkit-scrollbar-thumb{background:var(--border)}
+.news-item{
+  padding:.4rem .75rem;border-bottom:1px solid rgba(22,22,31,.6);
+  cursor:pointer;transition:background .1s;
+  text-decoration:none;display:block;color:inherit;
+}
+.news-item:hover{background:rgba(239,68,68,.04)}
+.news-meta{display:flex;align-items:center;gap:.35rem;margin-bottom:3px;flex-wrap:wrap}
+.news-src{font-size:.45rem;letter-spacing:.1em;font-weight:700}
+.news-breaking{
+  font-size:.42rem;letter-spacing:.1em;padding:.1rem .28rem;
+  background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);
+  animation:brkpulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes brkpulse{from{opacity:.7}to{opacity:1}}
+.news-zone{
+  font-size:.42rem;letter-spacing:.08em;padding:.1rem .28rem;
+  background:rgba(245,158,11,.1);color:var(--amber);
+}
+.news-title{
+  font-size:.62rem;color:var(--text);line-height:1.4;letter-spacing:.02em;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.news-title:hover{color:var(--amber)}
+.news-ts{font-size:.45rem;color:var(--dim2);letter-spacing:.04em;margin-top:3px}
+.news-filter-btn{
+  background:none;border:1px solid var(--border2);color:var(--dim2);
+  font-family:var(--font);font-size:.42rem;letter-spacing:.08em;
+  padding:.1rem .35rem;cursor:pointer;transition:all .12s;
+}
+.news-filter-btn:hover,.news-filter-btn.active{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.08)}
+.news-ticker{
+  background:rgba(239,68,68,.06);border-bottom:1px solid rgba(239,68,68,.2);
+  padding:.35rem .75rem;font-size:.55rem;color:var(--red);letter-spacing:.06em;
+  overflow:hidden;white-space:nowrap;
+}
+.news-ticker-inner{
+  display:inline-block;
+  animation:ticker 40s linear infinite;
+}
+@keyframes ticker{
+  0%{transform:translateX(100%)}
+  100%{transform:translateX(-100%)}
+}
+
 /* COMMUNITY PANEL */
 #comm-list{
   flex:1;overflow-y:auto;padding:.3rem 0;
@@ -671,7 +722,8 @@ body::after{
     <!-- RIGHT PANEL -->
     <div id="rpanel">
       <div class="rp-tabs">
-        <div class="rp-tab active" id="tab-feed" onclick="switchTab('feed')">SIGINT FEED</div>
+        <div class="rp-tab active" id="tab-feed" onclick="switchTab('feed')">SIGINT</div>
+        <div class="rp-tab" id="tab-news" onclick="switchTab('news')">WAR NEWS</div>
         <div class="rp-tab" id="tab-comm" onclick="switchTab('comm')">COMMUNITY</div>
       </div>
       <div class="rp-body">
@@ -681,6 +733,18 @@ body::after{
             LIVE EVENTS <span id="feed-count">0</span> IN BUFFER
           </div>
           <div id="feed-list"></div>
+        </div>
+        <!-- WAR NEWS pane -->
+        <div class="rp-pane" id="pane-news">
+          <div class="rp-head" style="flex-direction:column;gap:.3rem;align-items:flex-start">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+              <span>WAR NEWS <span id="news-count" style="color:var(--amber)">0</span> ARTICLES</span>
+              <span id="news-status" style="font-size:.44rem;color:var(--dim2)">LOADING...</span>
+            </div>
+            <div id="news-filters" style="display:flex;gap:.3rem;flex-wrap:wrap"></div>
+          </div>
+          <div id="news-ticker" style="display:none"></div>
+          <div id="news-list"></div>
         </div>
         <!-- COMMUNITY pane -->
         <div class="rp-pane" id="pane-comm">
@@ -1000,6 +1064,7 @@ function switchTab(t){
   document.querySelectorAll('.rp-pane').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   document.getElementById('pane-'+t).classList.add('active');
+  if(t==='news') renderNews();
 }
 
 // ── SIGINT feed ───────────────────────────────────────────────────────────────
@@ -1016,6 +1081,9 @@ const SRC_COLORS = {
   adsb:'var(--amber)',opensky:'var(--amber)',ais:'var(--cyan)',tle:'var(--purple)',
   acled:'var(--red)',notam:'var(--yellow)',gdelt:'var(--blue)',osint_news:'var(--blue)',
   firms:'var(--orange)',usgs:'var(--lime)',gpsjam:'var(--fuchsia)',community:'var(--green)',
+  twz:'var(--red)',usni:'var(--cyan)',bellingcat:'var(--orange)',oryx:'var(--orange)',
+  defense_news:'var(--blue)',defense_one:'var(--blue)',ukmod:'var(--cyan)',
+  rusi:'var(--purple)',gcaptain:'var(--cyan)',krebs:'var(--fuchsia)',
 };
 
 function renderFeed(){
@@ -1037,6 +1105,139 @@ function renderFeed(){
     list.appendChild(div);
   });
   document.getElementById('feed-count').textContent = feedBuffer.length;
+}
+
+// ── WAR NEWS tab ──────────────────────────────────────────────────────────────
+const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled'];
+const NEWS_SRC_LABELS = {
+  twz:'TWZ',usni:'USNI',bellingcat:'BELLINGCAT',oryx:'ORYX',
+  defense_news:'DEFNEWS',defense_one:'DEFONE',ukmod:'UK MOD',
+  rusi:'RUSI',gcaptain:'GCAPT',krebs:'KREBS',gdelt:'GDELT',osint_news:'OSINT',acled:'ACLED',
+};
+const CONFLICT_ZONES = [
+  {label:'ALL',  tag:null},
+  {label:'UKRAINE', tag:'ukraine'},
+  {label:'MIDDLE EAST', tag:'israel'},
+  {label:'RED SEA', tag:'red sea'},
+  {label:'RUSSIA', tag:'russia'},
+  {label:'CHINA', tag:'china'},
+  {label:'IRAN', tag:'iran'},
+];
+
+let newsBuffer = [];
+let newsZoneFilter = null;
+let newsRefreshTimer = null;
+
+function pushNews(item){
+  // Avoid duplicates by checking source_url or title+source combo
+  const key = item.source_url || (item.title+'|'+(item.source||''));
+  if(newsBuffer.some(n=>(n.source_url||n._key)===key)) return;
+  item._key = key;
+  item._ts  = item.raw_ts_utc ? new Date(item.raw_ts_utc).getTime() : Date.now();
+  newsBuffer.unshift(item);
+  if(newsBuffer.length > 300) newsBuffer.pop();
+  if(document.getElementById('tab-news')?.classList.contains('active')) renderNews();
+}
+
+async function loadWarNews(){
+  const el = document.getElementById('news-status');
+  if(el) el.textContent = 'FETCHING...';
+  try{
+    const url = `/api/events?sources=${NEWS_SOURCES.join(',')}&limit=200`;
+    const res = await fetch(url).then(r=>r.json());
+    const items = (res.data||[]);
+    // Seed into newsBuffer preserving existing entries
+    items.forEach(e=>{if(e.title) pushNews(e);});
+    renderNews();
+    if(el) el.textContent = `UPDATED ${new Date().toISOString().substring(11,16)} UTC`;
+  }catch(err){
+    console.warn('War news load failed:', err);
+    if(el) el.textContent = 'FETCH ERR';
+  }
+}
+
+function renderNews(){
+  const list = document.getElementById('news-list');
+  const ticker = document.getElementById('news-ticker');
+  const countEl = document.getElementById('news-count');
+  if(!list) return;
+
+  const now = Date.now();
+  let items = newsBuffer;
+
+  // Zone filter
+  if(newsZoneFilter){
+    const tag = newsZoneFilter.toLowerCase();
+    items = items.filter(n=>{
+      const haystack = ((n.title||'')+(n.description||'')+(n.country||'')).toLowerCase();
+      return haystack.includes(tag);
+    });
+  }
+
+  if(countEl) countEl.textContent = items.length;
+
+  // Breaking ticker — items <1hr old
+  const breaking = items.filter(n=> now - n._ts < 3600000);
+  if(breaking.length && ticker){
+    const tickText = breaking.map(n=>` ▌ ${esc(n.title||'')} [${esc((NEWS_SRC_LABELS[n.source]||n.source||'').toUpperCase())}]`).join('   ');
+    ticker.style.display='block';
+    ticker.innerHTML=`<div class="news-ticker-inner">⚡ BREAKING: ${tickText} &nbsp;&nbsp;&nbsp;</div>`;
+  } else if(ticker){
+    ticker.style.display='none';
+  }
+
+  list.innerHTML='';
+  items.slice(0,120).forEach(n=>{
+    const isBreaking = now - n._ts < 3600000;
+    const srcKey = (n.source||'').toLowerCase();
+    const srcLabel = NEWS_SRC_LABELS[srcKey] || srcKey.toUpperCase();
+    const srcColor = SRC_COLORS[srcKey] || 'var(--blue)';
+    const tsStr = n.raw_ts_utc ? new Date(n.raw_ts_utc).toISOString().replace('T',' ').substring(0,16) : '';
+    const href = n.source_url ? esc(n.source_url) : null;
+
+    const div = document.createElement('div');
+    div.className = 'news-item';
+    div.innerHTML = `
+      <div class="news-meta">
+        <span class="news-src" style="color:${srcColor}">${esc(srcLabel)}</span>
+        ${isBreaking?'<span class="news-breaking">⚡ BREAKING</span>':''}
+        ${n.country?`<span class="news-zone">${esc(n.country.toUpperCase())}</span>`:''}
+      </div>
+      <div class="news-title">${esc(n.title||'')}</div>
+      <div class="news-ts">${esc(tsStr)} UTC${n.description?' · '+esc(n.description.substring(0,80)):''}</div>
+    `;
+    if(href){
+      div.onclick=()=>window.open(href,'_blank','noopener');
+      div.style.cursor='pointer';
+    }
+    if(n.lat!=null&&n.lon!=null){
+      div.ondblclick=()=>map.setView([n.lat,n.lon],Math.max(map.getZoom(),6));
+    }
+    list.appendChild(div);
+  });
+
+  if(items.length===0){
+    list.innerHTML='<div style="padding:1rem .75rem;color:var(--dim2);font-size:.55rem;letter-spacing:.06em">NO ARTICLES LOADED — FEEDS INITIALIZING</div>';
+  }
+}
+
+function setNewsZone(tag, btn){
+  newsZoneFilter = tag;
+  document.querySelectorAll('.news-filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderNews();
+}
+
+function buildNewsFilters(){
+  const container = document.getElementById('news-filters');
+  if(!container) return;
+  CONFLICT_ZONES.forEach((z,i)=>{
+    const btn=document.createElement('button');
+    btn.className='news-filter-btn'+(i===0?' active':'');
+    btn.textContent=z.label;
+    btn.onclick=()=>setNewsZone(z.tag,btn);
+    container.appendChild(btn);
+  });
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -1233,7 +1434,12 @@ function updatePosition(p, isNew){
   }
 }
 
-function updateEvent(e, isNew){ if(e.lat!=null&&e.lon!=null) updatePosition(e,isNew); }
+function updateEvent(e, isNew){
+  if(e.lat!=null&&e.lon!=null) updatePosition(e,isNew);
+  else if(isNew && e.title) pushFeed(e);        // news/events with no coords → SIGINT only
+  // Always push to news buffer for WAR NEWS tab
+  if(e.title) pushNews(e);
+}
 
 // ── Community markers ─────────────────────────────────────────────────────────
 function communityIcon(r){
@@ -1498,6 +1704,10 @@ async function loadInitialData(){
   }catch(e){ console.warn('Initial load failed:',e); }
 
   loadCommunityGlobal();
+  buildNewsFilters();
+  loadWarNews();
+  // Auto-refresh war news every 2 minutes
+  setInterval(loadWarNews, 120000);
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -1817,8 +2027,7 @@ function initCesium(){
     selectionIndicator: false,
     infoBox:            false,  // we use our own popup overlay
     shadows:            false,
-    terrain:            Cesium.Terrain.fromWorldTerrain({ requestVertexNormals:false, requestWaterMask:false })
-      .catch(()=>undefined),   // terrain optional — fails gracefully without ion token
+    // terrain omitted — requires ion token; Esri satellite gives enough depth cues
   });
 
   // Dark scene atmosphere to match 2D aesthetic
