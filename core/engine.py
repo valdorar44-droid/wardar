@@ -381,6 +381,20 @@ async def _tick_shodan():
     except Exception as exc:
         log_err(f"tick_shodan: {exc}")
 
+async def _tick_intel_brief():
+    if not C.ENABLE_INTEL_BRIEF or not C.ANTHROPIC_API_KEY:
+        return
+    try:
+        from core.intel_brief import generate_global_brief
+        result = await generate_global_brief()
+        if result.get("text"):
+            log(f"intel_brief: generated ({len(result['text'])} chars, model={result.get('model','')})")
+            await _broadcast({"type": "intel_brief", "data": result})
+        elif result.get("error"):
+            log_warn(f"intel_brief: {result['error']}")
+    except Exception as exc:
+        log_err(f"tick_intel_brief: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -431,8 +445,9 @@ async def start():
         asyncio.create_task(_run_every(_tick_proximity_alerts,C.PROXIMITY_INTERVAL_SEC,       "proximity")),
         asyncio.create_task(_run_every(_tick_pikud_haoref,   C.PIKUD_HAOREF_INTERVAL_SEC,   "pikud_haoref")),
         asyncio.create_task(_run_every(_tick_wikipedia_spikes,C.WIKIPEDIA_SPIKE_INTERVAL_SEC,"wikipedia_spikes")),
-        asyncio.create_task(_run_every(_tick_polymarket, C.POLYMARKET_INTERVAL_SEC, "polymarket")),
-        asyncio.create_task(_run_every(_tick_shodan,     C.SHODAN_INTERVAL_SEC,     "shodan")),
+        asyncio.create_task(_run_every(_tick_polymarket,   C.POLYMARKET_INTERVAL_SEC,  "polymarket")),
+        asyncio.create_task(_run_every(_tick_shodan,       C.SHODAN_INTERVAL_SEC,      "shodan")),
+        asyncio.create_task(_run_every(_tick_intel_brief,  C.INTEL_BRIEF_INTERVAL_SEC, "intel_brief")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

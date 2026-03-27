@@ -109,6 +109,16 @@ _MIGRATIONS: list[str] = [
     """CREATE INDEX IF NOT EXISTS idx_evt_src_release ON events(source, release_ts_utc DESC, raw_ts_utc DESC)""",
     # Regular index on release_ts_utc for fast released-position queries
     """CREATE INDEX IF NOT EXISTS idx_pos_released ON positions(release_ts_utc, source, raw_ts_utc DESC)""",
+
+    # v7 — AI intelligence briefs (SITREP)
+    """CREATE TABLE IF NOT EXISTS intel_briefs (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        text          TEXT NOT NULL,
+        generated_at  TEXT NOT NULL,
+        model         TEXT NOT NULL DEFAULT '',
+        sources_used  TEXT NOT NULL DEFAULT '[]'
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_brief_ts ON intel_briefs(generated_at DESC)""",
 ]
 
 def get_conn() -> sqlite3.Connection:
@@ -477,6 +487,31 @@ def get_counts() -> dict:
         "events_live":     evt_live,
         "by_source":       {r["source"]: r["n"] for r in by_source},
     }
+
+# ── Intel Briefs (SITREP) ────────────────────────────────────────────────────
+
+def upsert_intel_brief(brief: dict) -> None:
+    """Insert a new intel brief row. Keeps only the 10 most recent."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO intel_briefs (text, generated_at, model, sources_used) VALUES (?,?,?,?)",
+            (brief["text"], brief["generated_at"],
+             brief.get("model", ""), brief.get("sources_used", "[]"))
+        )
+        # Prune old briefs — keep 10 most recent
+        conn.execute(
+            "DELETE FROM intel_briefs WHERE id NOT IN "
+            "(SELECT id FROM intel_briefs ORDER BY generated_at DESC LIMIT 10)"
+        )
+        conn.commit()
+
+def get_latest_brief() -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM intel_briefs ORDER BY generated_at DESC LIMIT 1"
+    ).fetchone()
+    return dict(row) if row else None
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

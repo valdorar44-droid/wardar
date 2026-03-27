@@ -147,3 +147,7 @@ SHODAN_INTERVAL_SEC     = _i("SHODAN_INTERVAL_SEC",      14400)  # 4h
 # ── OpenSanctions (entity screening) ───────────────────────
 OPENSANCTIONS_API_KEY   = _s("OPENSANCTIONS_API_KEY",    "")
 ENABLE_OPENSANCTIONS    = _b("ENABLE_OPENSANCTIONS",     False)
+
+# ── AI Intelligence Brief (SITREP) ──────────────────────────
+ENABLE_INTEL_BRIEF        = _b("ENABLE_INTEL_BRIEF",        True)   # requires ANTHROPIC_API_KEY
+INTEL_BRIEF_INTERVAL_SEC  = _i("INTEL_BRIEF_INTERVAL_SEC",  21600)  # 6h

@@ -283,6 +283,52 @@ async def post_country_chat(country: str, body: ChatMessageIn):
     msg = insert_chat_message(country, body.author_token, body.message)
     return JSONResponse(msg, status_code=201)
 
+# ── AI Intelligence Brief (SITREP) ───────────────────────────────────────────
+
+@app.get("/api/brief")
+async def get_intel_brief(response: Response):
+    """Return the latest cached AI intelligence brief."""
+    from core.intel_brief import get_cached_brief
+    brief = get_cached_brief()
+    if not brief.get("text"):
+        # Fallback: try DB
+        stored = DB.get_latest_brief()
+        if stored:
+            brief = {"text": stored["text"], "generated_at": stored["generated_at"],
+                     "model": stored.get("model",""), "sources_used": [], "error": None}
+    if not brief.get("text"):
+        raise HTTPException(status_code=404, detail="No brief generated yet — check ANTHROPIC_API_KEY")
+    response.headers["Cache-Control"] = "public, max-age=300"  # 5 min
+    return JSONResponse(brief)
+
+@app.post("/api/brief/generate", status_code=202)
+async def trigger_intel_brief():
+    """Trigger an immediate AI brief regeneration (async — result appears in /api/brief)."""
+    if not C.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+    import asyncio
+    from core.intel_brief import generate_global_brief
+    from core.engine import _broadcast
+    async def _run():
+        result = await generate_global_brief()
+        if result.get("text"):
+            await _broadcast({"type": "intel_brief", "data": result})
+    asyncio.create_task(_run())
+    return JSONResponse({"status": "generating", "message": "Brief will be ready in ~30s"}, status_code=202)
+
+@app.get("/api/brief/country/{country}")
+async def get_country_brief(country: str):
+    """Generate an on-demand AI brief for a specific country."""
+    if not C.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+    if not country.strip():
+        raise HTTPException(status_code=400, detail="country required")
+    from core.intel_brief import generate_country_brief
+    result = await generate_country_brief(country)
+    if result.get("error"):
+        raise HTTPException(status_code=503, detail=result["error"])
+    return JSONResponse(result)
+
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")

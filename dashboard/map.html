@@ -380,6 +380,59 @@ body::after{
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .alert-item-ts{font-size:.43rem;color:var(--dim2);letter-spacing:.05em;margin-top:.2rem}
 
+/* ── SITREP / AI BRIEF PANE ── */
+#sitrep-body{
+  flex:1;overflow-y:auto;padding:.75rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#sitrep-body::-webkit-scrollbar{width:3px}
+#sitrep-body::-webkit-scrollbar-thumb{background:var(--border)}
+#sitrep-text{
+  font-size:.62rem;line-height:1.7;letter-spacing:.02em;color:var(--text);
+  white-space:pre-wrap;word-break:break-word;
+}
+#sitrep-text h2{
+  font-size:.58rem;letter-spacing:.14em;color:var(--amber);
+  margin:1rem 0 .35rem;border-bottom:1px solid var(--border);padding-bottom:.2rem;
+}
+#sitrep-text strong{color:var(--amber)}
+.sitrep-meta{
+  font-size:.45rem;letter-spacing:.09em;color:var(--dim2);
+  display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.6rem;
+  padding:.3rem .75rem;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.sitrep-meta span{display:flex;align-items:center;gap:.25rem}
+.sitrep-badge{
+  display:inline-block;font-size:.4rem;letter-spacing:.1em;
+  padding:.06rem .28rem;background:rgba(245,158,11,.12);
+  border:1px solid rgba(245,158,11,.3);color:var(--amber);border-radius:2px;
+}
+.sitrep-btn{
+  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);
+  color:var(--amber);font-family:var(--font);font-size:.46rem;letter-spacing:.1em;
+  padding:.3rem .7rem;cursor:pointer;transition:all .15s;flex-shrink:0;
+  display:flex;align-items:center;gap:.4rem;
+}
+.sitrep-btn:hover{background:rgba(245,158,11,.18);border-color:var(--amber)}
+.sitrep-btn:disabled{opacity:.4;cursor:not-allowed}
+.sitrep-spinner{
+  width:8px;height:8px;border:1px solid rgba(245,158,11,.3);
+  border-top-color:var(--amber);border-radius:50%;
+  animation:spin .7s linear infinite;display:none;
+}
+.sitrep-btn.loading .sitrep-spinner{display:inline-block}
+.sitrep-btn.loading .sitrep-btn-label::after{content:'...'}
+#sitrep-empty{
+  padding:2rem .75rem;color:var(--dim2);font-size:.58rem;letter-spacing:.06em;
+  text-align:center;line-height:1.8;
+}
+.sitrep-country-btn{
+  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);
+  color:var(--amber);font-family:var(--font);font-size:.44rem;letter-spacing:.08em;
+  padding:.2rem .5rem;cursor:pointer;transition:all .12s;
+}
+.sitrep-country-btn:hover{background:rgba(245,158,11,.18)}
+
 /* ── COUNTRY INTEL CHAT PANEL ── */
 #chat-panel{
   position:fixed;right:0;top:52px;bottom:0;width:360px;
@@ -1057,6 +1110,7 @@ body::after{
         <div class="rp-tab" id="tab-news" onclick="switchTab('news')">WAR NEWS</div>
         <div class="rp-tab" id="tab-comm" onclick="switchTab('comm')">COMMUNITY</div>
         <div class="rp-tab" id="tab-alerts" onclick="switchTab('alerts')" style="color:var(--red)">⚡ ALERTS <span id="alert-tab-count" style="background:var(--red);color:#fff;font-size:.38rem;padding:.05rem .25rem;border-radius:2px;margin-left:.15rem">0</span></div>
+        <div class="rp-tab" id="tab-sitrep" onclick="switchTab('sitrep')" style="color:var(--amber)">🤖 SITREP</div>
       </div>
       <div class="rp-body">
         <!-- SIGINT FEED pane -->
@@ -1106,6 +1160,36 @@ body::after{
             <div style="font-size:.42rem;color:var(--dim2);letter-spacing:.06em">DARK VESSEL · CONVERGENCE · NUCLEAR · PIPELINE</div>
           </div>
           <div id="alert-list"><div style="padding:1rem .75rem;color:var(--dim2);font-size:.55rem;letter-spacing:.06em">NO ALERTS — SYSTEMS NOMINAL</div></div>
+        </div>
+        <!-- SITREP / AI INTEL BRIEF pane -->
+        <div class="rp-pane" id="pane-sitrep">
+          <div class="rp-head" style="flex-direction:column;gap:.3rem;align-items:flex-start">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+              <span style="color:var(--amber)">🤖 AI INTELLIGENCE BRIEF</span>
+              <button class="sitrep-btn" id="sitrep-regen-btn" onclick="regenSitrep()">
+                <span class="sitrep-btn-label">GENERATE</span>
+                <span class="sitrep-spinner"></span>
+              </button>
+            </div>
+            <div class="sitrep-meta" id="sitrep-meta" style="padding:0;border:none;margin:0">
+              <span id="sitrep-ts" style="color:var(--dim2)">NOT YET GENERATED</span>
+              <span id="sitrep-model"></span>
+            </div>
+          </div>
+          <div id="sitrep-body">
+            <div id="sitrep-empty">
+              <div style="font-size:1.4rem;margin-bottom:.75rem;opacity:.4">🤖</div>
+              AI CROSS-DOMAIN SITREP<br>
+              <span style="font-size:.5rem;color:var(--dim2)">
+                Synthesizes: ADS-B · AIS · ACLED · NOTAM · GPS JAM · ROCKET ALERTS · PREDICTION MARKETS
+              </span><br><br>
+              <button class="sitrep-btn" style="margin:0 auto" onclick="regenSitrep()">
+                GENERATE BRIEF
+              </button><br><br>
+              <span style="font-size:.46rem;color:var(--dim2)">Requires ANTHROPIC_API_KEY · ~30s</span>
+            </div>
+            <div id="sitrep-text" style="display:none"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1495,6 +1579,129 @@ function switchTab(t){
   document.getElementById('tab-'+t).classList.add('active');
   document.getElementById('pane-'+t).classList.add('active');
   if(t==='news') renderNews();
+  if(t==='sitrep') loadSitrep();
+}
+
+// ── SITREP / AI Intel Brief ───────────────────────────────────────────────────
+let _sitrepLoaded = false;
+
+function loadSitrep(){
+  if(_sitrepLoaded) return;
+  fetch('/api/brief')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => { if(data && data.text) renderSitrep(data); })
+    .catch(()=>{});
+}
+
+function renderSitrep(data){
+  _sitrepLoaded = true;
+  const empty = document.getElementById('sitrep-empty');
+  const textEl = document.getElementById('sitrep-text');
+  const tsEl   = document.getElementById('sitrep-ts');
+  const modelEl = document.getElementById('sitrep-model');
+  if(!textEl) return;
+
+  // Format markdown-lite (## headers, **bold**)
+  const html = esc(data.text || '')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^- (.+)$/gm, '• $1')
+    .replace(/\n/g, '<br>');
+
+  textEl.innerHTML = html;
+  textEl.style.display = 'block';
+  if(empty) empty.style.display = 'none';
+
+  if(tsEl && data.generated_at){
+    const d = new Date(data.generated_at);
+    tsEl.textContent = 'GENERATED ' + d.toUTCString().replace('GMT','UTC');
+  }
+  if(modelEl && data.model){
+    modelEl.innerHTML = '<span class="sitrep-badge">' + esc(data.model) + '</span>';
+  }
+}
+
+function regenSitrep(){
+  const btn = document.getElementById('sitrep-regen-btn');
+  if(!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  fetch('/api/brief/generate', {method:'POST'})
+    .then(r => {
+      if(!r.ok) return r.json().then(e => { throw new Error(e.detail || 'error'); });
+      // Poll for result every 5s for up to 60s
+      let attempts = 0;
+      const poll = setInterval(()=>{
+        attempts++;
+        fetch('/api/brief')
+          .then(r2 => r2.ok ? r2.json() : null)
+          .then(data => {
+            if(data && data.text){
+              clearInterval(poll);
+              btn.disabled = false;
+              btn.classList.remove('loading');
+              _sitrepLoaded = false;
+              renderSitrep(data);
+            } else if(attempts >= 12){
+              clearInterval(poll);
+              btn.disabled = false;
+              btn.classList.remove('loading');
+            }
+          })
+          .catch(()=>{});
+      }, 5000);
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      const textEl = document.getElementById('sitrep-text');
+      if(textEl){ textEl.innerHTML = '<span style="color:var(--red)">ERROR: ' + esc(err.message) + '</span>'; textEl.style.display='block'; }
+    });
+}
+
+async function getCountryBrief(country){
+  const el = document.getElementById('country-brief-text');
+  const btn = document.getElementById('country-brief-btn');
+  if(!el || !country) return;
+  el.innerHTML = '<span style="color:var(--dim2);font-size:.55rem">GENERATING BRIEF...</span>';
+  if(btn){ btn.disabled = true; btn.textContent = 'GENERATING...'; }
+  try {
+    const r = await fetch('/api/brief/country/' + encodeURIComponent(country));
+    const data = await r.json();
+    if(data.error){ el.innerHTML = '<span style="color:var(--red);font-size:.55rem">'+esc(data.error)+'</span>'; }
+    else { el.innerHTML = '<span style="font-size:.57rem;line-height:1.65;color:var(--text)">'+esc(data.text||'').replace(/\n/g,'<br>')+'</span>'; }
+  } catch(e){
+    el.innerHTML = '<span style="color:var(--red);font-size:.55rem">ERROR: '+esc(String(e))+'</span>';
+  }
+  if(btn){ btn.disabled = false; btn.textContent = '↻ REFRESH'; }
+}
+
+function openCountryBrief(country){
+  // Switch to SITREP tab and show country-specific brief
+  switchTab('sitrep');
+  const body = document.getElementById('sitrep-body');
+  const textEl = document.getElementById('sitrep-text');
+  const empty = document.getElementById('sitrep-empty');
+  if(!body) return;
+
+  // Show a country brief section
+  let countryDiv = document.getElementById('sitrep-country-section');
+  if(!countryDiv){
+    countryDiv = document.createElement('div');
+    countryDiv.id = 'sitrep-country-section';
+    countryDiv.style.cssText='border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem';
+    body.appendChild(countryDiv);
+  }
+  countryDiv.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+      <span style="font-size:.52rem;letter-spacing:.12em;color:var(--amber)">COUNTRY BRIEF: ${esc(country.toUpperCase())}</span>
+      <button id="country-brief-btn" class="sitrep-country-btn" onclick="getCountryBrief('${esc(country)}')">↻ REFRESH</button>
+    </div>
+    <div id="country-brief-text" style="font-size:.57rem;line-height:1.65;color:var(--dim2)">GENERATING...</div>
+  `;
+  body.scrollTop = body.scrollHeight;
+  getCountryBrief(country);
 }
 
 // ── SIGINT feed ───────────────────────────────────────────────────────────────
@@ -1795,7 +2002,10 @@ function buildPopup(p){
       ${p.description?`<div class="popup-row" style="flex-direction:column"><span class="popup-label">DESC</span><span class="popup-val" style="color:var(--dim2);font-size:.6rem;margin-top:.2rem">${esc(p.description.substring(0,220))}</span></div>`:''}
       ${p.url?`<div class="popup-row"><span class="popup-label">URL</span><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.6rem">OPEN ↗</a></div>`:''}
       ${badge}
-    ${p.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT: ${esc(p.country.toUpperCase())}</button></div>`:''}
+    ${p.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>
+    </div>`:''}
     </div>`;
   }
 
@@ -1813,7 +2023,10 @@ function buildPopup(p){
     <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(p.country||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">SEEN</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
     ${badge}
-    ${p.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT: ${esc(p.country.toUpperCase())}</button></div>`:''}
+    ${p.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>
+    </div>`:''}
   </div>`;
 }
 
@@ -1861,7 +2074,10 @@ function buildCommunityPopup(r){
       <button class="pvote-btn down" onclick="castVote(${r.id},-1)">▼ DN (${r.downvotes||0})</button>
       <span class="pvote-score">NET ${net>=0?'+':''}${net}</span>
     </div>
-    ${r.country?`<div style="margin-top:.4rem"><button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openChat('${esc(r.country)}')">⚡ INTEL CHAT: ${esc(r.country.toUpperCase())}</button></div>`:''}
+    ${r.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(r.country)}')">⚡ INTEL CHAT</button>
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(r.country)}')">🤖 AI BRIEF</button>
+    </div>`:''}
   </div>`;
 }
 
@@ -2533,6 +2749,19 @@ function connectWS(){
         if(TL.isLive)(msg.data||[]).forEach(p=>updatePosition(p,true));
       } else if(msg.type==='events'){
         if(TL.isLive)(msg.data||[]).forEach(e=>updateEvent(e,true));
+      } else if(msg.type==='intel_brief'){
+        // New brief generated server-side — update SITREP pane if open
+        if(msg.data && msg.data.text){
+          _sitrepLoaded = false;
+          renderSitrep(msg.data);
+          // Flash SITREP tab
+          const tab = document.getElementById('tab-sitrep');
+          if(tab && !tab.classList.contains('active')){
+            tab.style.animation = 'none';
+            tab.style.color = 'var(--green)';
+            setTimeout(()=>{ tab.style.color='var(--amber)'; }, 3000);
+          }
+        }
       }
       refreshCounts();
       if(TL.isLive&&TL.summary) refreshTimelineBounds();
