@@ -428,10 +428,15 @@ async def websocket_endpoint(ws: WebSocket):
     subscribed_bbox: tuple | None = None
 
     async def _send(payload: str):
-        """Filtered send — only push data matching this client's subscription."""
+        """Filtered send — only push data matching this client's subscription.
+
+        If subscribed_sources is empty (client sent subscribe with domains: [] or never
+        narrowed), no source filter is applied — all engine broadcasts are delivered.
+        """
         try:
             msg = json.loads(payload)
             sources = msg.get("sources") or []
+            # Non-empty subscribed_sources + non-empty broadcast sources → require overlap
             if subscribed_sources and sources:
                 if not any(s in subscribed_sources for s in sources):
                     return

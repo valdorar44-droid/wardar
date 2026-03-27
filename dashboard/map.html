@@ -2893,6 +2893,12 @@ async function loadStaticLayers(){
   Promise.all([loadCables(), loadPipelines()]).catch(()=>{});
 }
 
+function _addStaticPoint(pt){
+  staticPoints.push(pt);
+  if(_mapMode==='2d') addMarker2D(pt._k, pt);
+  else _scheduleRebuild();
+}
+
 async function loadNuclear(){
   try{
     const res=await fetch('/api/layers/nuclear').then(r=>r.json());
@@ -2903,13 +2909,13 @@ async function loadNuclear(){
       const key='nuc_'+lat.toFixed(3)+'_'+lon.toFixed(3);
       if(markers.nuclear[key]) return;
       markers.nuclear[key]=true;
-      staticPoints.push({lat,lon,source:'nuclear',title:props.name||'Nuclear Plant',
+      _addStaticPoint({lat,lon,source:'nuclear',title:props.name||'Nuclear Plant',
         country:props.country||'',description:`Status: ${props.status||'—'} | Type: ${props.type||'—'}`,
         _k:key,_lk:'nuclear',_color:'#eab308',_alt:0.005,_r:0.42,...props});
     });
     const cnt=staticPoints.filter(p=>p._lk==='nuclear').length;
     const el=document.getElementById('cnt-nuclear'); if(el) el.textContent=cnt;
-    _scheduleRebuild();
+    if(_mapMode==='3d') _scheduleRebuild();
   }catch(e){ console.warn('nuclear layer:',e); }
 }
 
@@ -2925,13 +2931,13 @@ async function loadMilBases(){
       markers.mil_base[key]=true;
       const name=props.INSTNAME||props.name||'Military Installation';
       const country=props.COUNTRY||props.STATE_TERR||'USA';
-      staticPoints.push({lat,lon,source:'mil_base',title:name,country,
+      _addStaticPoint({lat,lon,source:'mil_base',title:name,country,
         description:`Branch: ${props.BRANCHNAME||'—'}`,
         _k:key,_lk:'mil_base',_color:'#f59e0b',_alt:0.005,_r:0.35});
     });
     const cnt=staticPoints.filter(p=>p._lk==='mil_base').length;
     const el=document.getElementById('cnt-milbase'); if(el) el.textContent=cnt;
-    _scheduleRebuild();
+    if(_mapMode==='3d') _scheduleRebuild();
   }catch(e){ console.warn('mil_base layer:',e); }
 }
 

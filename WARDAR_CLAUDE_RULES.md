@@ -48,8 +48,8 @@ The `apply_delay()` function in `core/engine.py` is the enforcement point.
 
 ## WebSocket Protocol
 - Server pushes: `{"type": "positions", "data": [...positions]}`
-- Server pushes: `{"type": "event", "data": {...event}}`
-- Client sends: `{"type": "subscribe", "domains": ["adsb","ais"], "bbox": [w,s,e,n]}`
+- Server pushes: `{"type": "events", "sources": [...], "data": [...events]}`
+- Client sends: `{"type": "subscribe", "domains": [], "bbox": [w,s,e,n]}` — **`domains: []` means all sources** (non-empty list filters to overlapping `sources` only)
 - Client sends: `{"type": "unsubscribe"}`
 
 ## Output Format for Every Task

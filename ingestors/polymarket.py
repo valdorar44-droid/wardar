@@ -95,6 +95,8 @@ _BLOCKLIST = {
     "stanley cup","nba finals","super bowl","world series","nfl draft",
     "nba draft","mlb","nhl","nba championship","nfl championship",
     "champions league","premier league","la liga","serie a","bundesliga",
+    "fifa world cup","world cup winner","world cup champion","world cup 2026","world cup 2030",
+    "win the world cup","world cup qualifier","world cup final","world cup group",
     "world cup golden boot","ballon d'or","pga tour","masters tournament",
     "wimbledon","us open","australian open","french open","formula 1",
     "grand prix","nascar","indy 500","ufc","mma title","boxing champion",

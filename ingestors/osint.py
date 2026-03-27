@@ -471,6 +471,18 @@ def _make_rss_fetcher(source: str, url: str, count: int = 20, atom: bool = False
                 d = re.sub(r'<[^>]+>', '', desc.group(1) if desc else '').strip()[:300]
                 if not t:
                     continue
+                # Noise filter — skip sports/entertainment articles
+                tl = t.lower()
+                if any(kw in tl for kw in (
+                    'world cup','fifa','nba','nfl','nhl','premier league',
+                    'champions league','super bowl','stanley cup','formula 1',
+                    'grand prix','olympics','oscar award','grammy award',
+                    'box office','celebrity','reality show','bitcoin price',
+                    'ethereum price','stock market','earnings call',
+                    'match preview','match report','warm-up match',
+                    'sports news','transfer news','injury update',
+                )):
+                    continue
                 items.append({
                     'source': source, 'title': t, 'description': d,
                     'lat': None, 'lon': None, 'country': '',
