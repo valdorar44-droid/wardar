@@ -203,6 +203,39 @@ async def _tick_osint():
     except Exception as exc:
         log_err(f"tick_osint: {exc}")
 
+async def _tick_firms():
+    try:
+        from ingestors import firms
+        events = await firms.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["firms"], limit=500)
+            await _broadcast({"type": "events", "sources": ["firms"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_firms: {exc}")
+
+async def _tick_usgs():
+    try:
+        from ingestors import usgs
+        events = await usgs.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["usgs"], limit=500)
+            await _broadcast({"type": "events", "sources": ["usgs"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_usgs: {exc}")
+
+async def _tick_gpsjam():
+    try:
+        from ingestors import gpsjam
+        events = await gpsjam.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["gpsjam"], limit=300)
+            await _broadcast({"type": "events", "sources": ["gpsjam"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_gpsjam: {exc}")
+
 async def _tick_purge():
     try:
         p = DB.purge_old_positions()
@@ -249,6 +282,9 @@ async def start():
         asyncio.create_task(_run_every(_tick_notam,  C.NOTAM_INTERVAL_SEC,     "notam")),
         asyncio.create_task(_run_every(_tick_acled,  C.ACLED_INTERVAL_SEC,     "acled")),
         asyncio.create_task(_run_every(_tick_osint,  C.GDELT_INTERVAL_SEC,     "osint")),
+        asyncio.create_task(_run_every(_tick_firms,  C.FIRMS_INTERVAL_SEC,     "firms")),
+        asyncio.create_task(_run_every(_tick_usgs,   C.USGS_INTERVAL_SEC,      "usgs")),
+        asyncio.create_task(_run_every(_tick_gpsjam, C.GPSJAM_INTERVAL_SEC,    "gpsjam")),
         asyncio.create_task(_run_every(_tick_purge,  3600,                     "purge")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")

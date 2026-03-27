@@ -24,6 +24,9 @@
   --purple:#a855f7;
   --yellow:#eab308;
   --blue:#3b82f6;
+  --orange:#f97316;
+  --lime:#84cc16;
+  --fuchsia:#e879f9;
   --text:#c8ccd4;
   --dim:#4a4d58;
   --font:'JetBrains Mono',monospace;
@@ -298,6 +301,24 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <span class="layer-name">OSINT</span>
       <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
     </label>
+    <label class="layer-item" onclick="toggleLayer('fire')">
+      <input type="checkbox" class="layer-cb" id="cb-fire" checked style="color:var(--orange)">
+      <span class="layer-icon" style="color:var(--orange)">🔥</span>
+      <span class="layer-name">THERMAL</span>
+      <span class="layer-count" id="cnt-fire" style="background:var(--orange)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('seismic')">
+      <input type="checkbox" class="layer-cb" id="cb-seismic" checked style="color:var(--lime)">
+      <span class="layer-icon" style="color:var(--lime)">◉</span>
+      <span class="layer-name">SEISMIC</span>
+      <span class="layer-count" id="cnt-seismic" style="background:var(--lime)">0</span>
+    </label>
+    <label class="layer-item" onclick="toggleLayer('ew')">
+      <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)">
+      <span class="layer-icon" style="color:var(--fuchsia)">⚡</span>
+      <span class="layer-name">GPS JAM</span>
+      <span class="layer-count" id="cnt-ew" style="background:var(--fuchsia)">0</span>
+    </label>
   </div>
   <div class="panel-footer">
     DATA DELAYED PER POLICY<br>
@@ -366,6 +387,9 @@ const BOOT_LINES = [
   {t:"ACLED CONFLICT DATABASE.........", cls:"ok"},
   {t:"GDELT OSINT MONITOR.............", cls:"ok"},
   {t:"FAA NOTAM FEED..................", cls:"ok"},
+  {t:"NASA FIRMS THERMAL FEED.........", cls:"ok"},
+  {t:"USGS SEISMIC MONITOR............", cls:"ok"},
+  {t:"GPSJAM EW GRID..................", cls:"ok"},
   {t:"DELAY POLICY ENFORCED...........", cls:"ok"},
   {t:"ALL SYSTEMS NOMINAL ▸ WARDAR ACTIVE", cls:""},
 ];
@@ -401,13 +425,13 @@ let map;
 const CLUSTER_THRESHOLD = 500;
 
 // Marker storage: key = callsign+source, value = marker
-const markers = { adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{} };
+const markers = { adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{}, fire:{}, seismic:{}, ew:{} };
 
 // Layer groups
 let layers = {};
 
 // Visibility
-const visible = { adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true };
+const visible = { adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true, fire:true, seismic:true, ew:true };
 
 // ── SVG DivIcons ─────────────────────────────────────────────────────────────
 function makeIcon(emoji, color, size=22){
@@ -429,6 +453,9 @@ const ICONS = {
   notam: { fn: () => makeIcon('⚠','#eab308',20) },
   gdelt: { fn: () => makeIcon('📡','#3b82f6',18) },
   osint_news: { fn: () => makeIcon('📡','#3b82f6',18) },
+  firms: { fn: () => makeIcon('🔥','#f97316',20) },
+  usgs:  { fn: () => makeIcon('◉','#84cc16',18) },
+  gpsjam:{ fn: () => makeIcon('⚡','#e879f9',20) },
 };
 
 function iconFor(source, mil){
@@ -449,7 +476,8 @@ function fmtTs(ts){
 function buildPopup(p){
   const isEvent = !!(p.title);
   const isMil   = parseInt(p.military_flag||0) === 1;
-  const isConflict = ['acled','gdelt','osint_news'].includes((p.source||'').toLowerCase());
+  const src = (p.source||'').toLowerCase();
+  const isConflict = ['acled','gdelt','osint_news'].includes(src);
 
   let badge = '';
   if(isMil) badge = '<div class="delay-badge">[DELAYED 24H — MILITARY]</div>';
@@ -488,12 +516,15 @@ function buildPopup(p){
 // ── Layer helpers ────────────────────────────────────────────────────────────
 function sourceToLayerKey(source){
   const s = (source||'').toLowerCase();
-  if(['adsb','opensky'].includes(s))  return 'adsb';
-  if(s === 'ais')                      return 'ais';
-  if(s === 'tle')                      return 'tle';
-  if(s === 'acled')                    return 'acled';
-  if(s === 'notam')                    return 'notam';
+  if(['adsb','opensky'].includes(s))     return 'adsb';
+  if(s === 'ais')                        return 'ais';
+  if(s === 'tle')                        return 'tle';
+  if(s === 'acled')                      return 'acled';
+  if(s === 'notam')                      return 'notam';
   if(['gdelt','osint_news'].includes(s)) return 'osint';
+  if(s === 'firms')                      return 'fire';
+  if(s === 'usgs')                       return 'seismic';
+  if(s === 'gpsjam')                     return 'ew';
   return 'osint';
 }
 
@@ -525,19 +556,26 @@ function updateEvent(e){
 }
 
 function refreshCounts(){
-  const ac  = Object.keys(markers.adsb||{}).length;
-  const sh  = Object.keys(markers.ais||{}).length;
-  const sat = Object.keys(markers.tle||{}).length;
+  const ac   = Object.keys(markers.adsb||{}).length;
+  const sh   = Object.keys(markers.ais||{}).length;
+  const sat  = Object.keys(markers.tle||{}).length;
+  const nFire    = Object.keys(markers.fire||{}).length;
+  const nSeismic = Object.keys(markers.seismic||{}).length;
+  const nEw      = Object.keys(markers.ew||{}).length;
   const ev  = (Object.keys(markers.acled||{}).length +
                Object.keys(markers.notam||{}).length +
-               Object.keys(markers.osint||{}).length);
+               Object.keys(markers.osint||{}).length +
+               nFire + nSeismic + nEw);
 
-  document.getElementById('cnt-adsb').textContent  = ac;
-  document.getElementById('cnt-ais').textContent   = sh;
-  document.getElementById('cnt-tle').textContent   = sat;
-  document.getElementById('cnt-acled').textContent = Object.keys(markers.acled||{}).length;
-  document.getElementById('cnt-notam').textContent = Object.keys(markers.notam||{}).length;
-  document.getElementById('cnt-osint').textContent = Object.keys(markers.osint||{}).length;
+  document.getElementById('cnt-adsb').textContent    = ac;
+  document.getElementById('cnt-ais').textContent     = sh;
+  document.getElementById('cnt-tle').textContent     = sat;
+  document.getElementById('cnt-acled').textContent   = Object.keys(markers.acled||{}).length;
+  document.getElementById('cnt-notam').textContent   = Object.keys(markers.notam||{}).length;
+  document.getElementById('cnt-osint').textContent   = Object.keys(markers.osint||{}).length;
+  document.getElementById('cnt-fire').textContent    = nFire;
+  document.getElementById('cnt-seismic').textContent = nSeismic;
+  document.getElementById('cnt-ew').textContent      = nEw;
 
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
@@ -573,13 +611,13 @@ function initMap(){
   }).addTo(map);
 
   // Create cluster groups for each layer
-  ['adsb','ais','tle','acled','notam','osint'].forEach(k => {
+  ['adsb','ais','tle','acled','notam','osint','fire','seismic','ew'].forEach(k => {
     layers[k] = L.markerClusterGroup({
       disableClusteringAtZoom: 7,
       maxClusterRadius: 60,
       iconCreateFunction: function(cluster){
         const n = cluster.getChildCount();
-        const colors = {adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',notam:'#eab308',osint:'#3b82f6'};
+        const colors = {adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',ew:'#e879f9'};
         const c = colors[k]||'#6b7280';
         return L.divIcon({
           html:`<div style="background:rgba(10,10,14,.85);border:1px solid ${c}44;color:${c};font-family:'JetBrains Mono',monospace;font-size:.62rem;width:32px;height:32px;display:flex;align-items:center;justify-content:center;letter-spacing:.04em">${n}</div>`,
@@ -638,7 +676,7 @@ function connectWS(){
     wsRetry = 1000;
     ws.send(JSON.stringify({
       type:'subscribe',
-      domains:['adsb','opensky','ais','tle','acled','gdelt','osint_news','notam'],
+      domains:['adsb','opensky','ais','tle','acled','gdelt','osint_news','notam','firms','usgs','gpsjam'],
     }));
   };
 
@@ -934,6 +972,7 @@ function applyFrame(positions){
 const trailColors = {
   adsb:'#f59e0b', opensky:'#f59e0b', ais:'#06b6d4',
   tle:'#a855f7',  acled:'#ef4444',   notam:'#eab308', osint:'#3b82f6',
+  fire:'#f97316', seismic:'#84cc16', ew:'#e879f9',
 };
 
 function drawTrail(key, points, layerKey){

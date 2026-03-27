@@ -52,6 +52,9 @@ _MIGRATIONS: list[str] = [
     """CREATE INDEX IF NOT EXISTS idx_evt_release ON events(release_ts_utc)""",
     """CREATE INDEX IF NOT EXISTS idx_evt_source  ON events(source)""",
     """CREATE INDEX IF NOT EXISTS idx_evt_country ON events(country)""",
+    # v2 — dedup index for georeferenced events (FIRMS/USGS/GPSJam)
+    # NULL lat/lon rows (news articles) are excluded by SQLite NULL semantics.
+    """CREATE UNIQUE INDEX IF NOT EXISTS idx_evt_dedup ON events(source, raw_ts_utc, lat, lon)""",
 ]
 
 def get_conn() -> sqlite3.Connection:
@@ -207,10 +210,11 @@ def purge_old_positions() -> int:
 # ── Events ───────────────────────────────────────────────────────────────────
 
 def upsert_event(e: dict) -> None:
+    """Insert event, skipping exact duplicates (same source/ts/lat/lon)."""
     with _lock:
         conn = get_conn()
         conn.execute("""
-            INSERT INTO events
+            INSERT OR IGNORE INTO events
               (source, title, description, lat, lon, country, category,
                raw_ts_utc, release_ts_utc, url, extra)
             VALUES

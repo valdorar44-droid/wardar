@@ -77,6 +77,18 @@ GDELT_INTERVAL_SEC  = _i("GDELT_INTERVAL_SEC",  900)  # GDELT every 15 min
 POSITION_RETAIN_HOURS = _i("POSITION_RETAIN_HOURS", 72)   # keep 72h of positions
 EVENT_RETAIN_DAYS     = _i("EVENT_RETAIN_DAYS",     30)    # keep 30d of events
 
+# ── Fire / Thermal (NASA FIRMS) ───────────────────────
+ENABLE_FIRMS        = _b("ENABLE_FIRMS",       True)
+FIRMS_INTERVAL_SEC  = _i("FIRMS_INTERVAL_SEC", 10800)  # MODIS updates every ~3h
+
+# ── Seismic (USGS) ────────────────────────────────────
+ENABLE_USGS         = _b("ENABLE_USGS",        True)
+USGS_INTERVAL_SEC   = _i("USGS_INTERVAL_SEC",  900)    # every 15 min
+
+# ── GPS Jamming / Electronic Warfare (GPSJam) ─────────
+ENABLE_GPSJAM       = _b("ENABLE_GPSJAM",      True)
+GPSJAM_INTERVAL_SEC = _i("GPSJAM_INTERVAL_SEC", 3600)  # hourly
+
 # ── AI (optional — for OSINT summaries) ──────────────
 ANTHROPIC_API_KEY = _s("ANTHROPIC_API_KEY", "")
 AI_MODEL          = _s("AI_MODEL", "claude-haiku-4-5-20251001")  # fast + cheap for summaries
