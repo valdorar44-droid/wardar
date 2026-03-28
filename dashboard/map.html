@@ -3029,7 +3029,8 @@ function _render2dIsw(){
     if(!f.geometry) return;
     const strokeCol = f._stroke||'#ef4444';
     gjLayers.push(L.geoJSON({type:'Feature',geometry:f.geometry,properties:{}},{
-      style:{fillColor:strokeCol,fillOpacity:.1,color:strokeCol,weight:1.5,opacity:.65,dashArray:'4 5'}
+      style:{fillColor:strokeCol,fillOpacity:.1,color:strokeCol,weight:1.5,opacity:.65,dashArray:'4 5'},
+      pointToLayer:(feat,latlng)=>L.circleMarker(latlng,{radius:3,color:strokeCol,fillColor:strokeCol,fillOpacity:.7,weight:1}),
     }));
   });
   if(gjLayers.length){
@@ -3689,6 +3690,8 @@ function refreshCounts(){
   for(const[k,d] of Object.entries(positionStore)){ const lk=sourceToLayerKey(d.source); _cnt[lk]=(_cnt[lk]||0)+1; }
   for(const[k,r] of Object.entries(communityStore)){ _cnt.community=(_cnt.community||0)+1; }
   for(const sp of staticPoints){ _cnt[sp._lk]=(_cnt[sp._lk]||0)+1; }
+  // OSINT news articles have no lat/lon so aren't in positionStore — count from newsBuffer
+  _cnt.osint = (_cnt.osint||0) + newsBuffer.filter(n=>sourceToLayerKey(n.source)==='osint').length;
   const ac=(_cnt.adsb||0);
   const sh  = (_cnt.ais||0);
   const sat = (_cnt.tle||0);
