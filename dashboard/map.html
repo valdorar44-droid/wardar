@@ -2041,7 +2041,93 @@ let iswPolygons = [];
 let cableArcs = [];
 let pipelineArcs = [];
 let _cesiumPts = null;   // Cesium PointPrimitiveCollection
+let _cesiumBills = null; // Cesium BillboardCollection — zoom-in icons
 let _cesiumLines = null; // Cesium PolylineCollection
+
+// ── Globe icon sprites (SVG data URIs, cached per type) ─────────────────────
+const _GLOBE_ICON_CACHE = new Map();
+function _globeIconSvg(type, hexColor) {
+  const k = type + hexColor;
+  if (_GLOBE_ICON_CACHE.has(k)) return _GLOBE_ICON_CACHE.get(k);
+  // Use hex color directly in SVG (# in fill is valid SVG), then encode whole string
+  const H = hexColor; // e.g. "#f59e0b"
+  const svgs = {
+    // Overhead commercial aircraft — pointing up = north at heading 0
+    aircraft:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<ellipse cx="0" cy="0" rx="2.8" ry="15" fill="${H}" opacity="0.97"/>` +
+      `<polygon points="0,-4 -18,7 -4,4 0,1 4,4 18,7" fill="${H}" opacity="0.92"/>` +
+      `<ellipse cx="-10" cy="5" rx="2.2" ry="4.5" fill="${H}" opacity="0.82"/>` +
+      `<ellipse cx="10" cy="5" rx="2.2" ry="4.5" fill="${H}" opacity="0.82"/>` +
+      `<polygon points="-7,15 0,10 7,15" fill="${H}" opacity="0.88"/>` +
+      `</svg>`,
+    // Military fighter — delta wing overhead
+    aircraft_mil:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<polygon points="0,-20 -14,12 0,6 14,12" fill="${H}"/>` +
+      `<polygon points="-3,6 -10,18 -3,11" fill="${H}" opacity="0.85"/>` +
+      `<polygon points="3,6 10,18 3,11" fill="${H}" opacity="0.85"/>` +
+      `<rect x="-1.5" y="-22" width="3" height="5" fill="${H}" opacity="0.7"/>` +
+      `</svg>`,
+    // Helicopter
+    helicopter:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<ellipse cx="0" cy="0" rx="5" ry="8" fill="${H}"/>` +
+      `<ellipse cx="0" cy="0" rx="20" ry="2" fill="${H}" opacity="0.5"/>` +
+      `<line x1="0" y1="8" x2="0" y2="14" stroke="${H}" stroke-width="1"/>` +
+      `<ellipse cx="0" cy="14" rx="4" ry="1.5" fill="${H}" opacity="0.6"/>` +
+      `</svg>`,
+    // Ship overhead — bow pointing up
+    ship:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<path d="M0,-19 L8,-8 L8,14 L0,18 L-8,14 L-8,-8 Z" fill="${H}" opacity="0.92"/>` +
+      `<rect x="-4" y="-5" width="8" height="8" fill="${H}" opacity="0.60"/>` +
+      `<line x1="0" y1="-19" x2="0" y2="18" stroke="${H}" stroke-width="0.5" opacity="0.25"/>` +
+      `</svg>`,
+    // Military ship — destroyer profile
+    ship_mil:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<path d="M0,-20 L6,-10 L7,12 L0,16 L-7,12 L-6,-10 Z" fill="${H}"/>` +
+      `<rect x="-3" y="-6" width="6" height="5" fill="${H}" opacity="0.55"/>` +
+      `<circle cx="0" cy="-13" r="2" fill="${H}" opacity="0.8"/>` +
+      `<line x1="-7" y1="0" x2="-12" y2="2" stroke="${H}" stroke-width="1.5" opacity="0.7"/>` +
+      `<line x1="7" y1="0" x2="12" y2="2" stroke="${H}" stroke-width="1.5" opacity="0.7"/>` +
+      `</svg>`,
+    // Satellite with solar panels
+    satellite:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<rect x="-6" y="-6" width="12" height="12" fill="${H}" rx="2"/>` +
+      `<rect x="-22" y="-4" width="14" height="8" fill="${H}" opacity="0.70" rx="1"/>` +
+      `<line x1="-18" y1="-4" x2="-18" y2="4" stroke="${H}" stroke-width="0.6" opacity="0.4"/>` +
+      `<line x1="-13" y1="-4" x2="-13" y2="4" stroke="${H}" stroke-width="0.6" opacity="0.4"/>` +
+      `<rect x="8" y="-4" width="14" height="8" fill="${H}" opacity="0.70" rx="1"/>` +
+      `<line x1="12" y1="-4" x2="12" y2="4" stroke="${H}" stroke-width="0.6" opacity="0.4"/>` +
+      `<line x1="17" y1="-4" x2="17" y2="4" stroke="${H}" stroke-width="0.6" opacity="0.4"/>` +
+      `<line x1="0" y1="-6" x2="0" y2="-14" stroke="${H}" stroke-width="1"/>` +
+      `<circle cx="0" cy="-15" r="2" fill="${H}" opacity="0.75"/>` +
+      `</svg>`,
+  };
+  const svg = svgs[type] || svgs.aircraft;
+  // Encode entire SVG as data URI — encodeURIComponent handles # in hex colors correctly
+  const uri = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  _GLOBE_ICON_CACHE.set(k, uri);
+  return uri;
+}
+function _getGlobeIconType(d) {
+  const src = d.source || '';
+  const mil  = parseInt(d.military_flag || 0);
+  if (src === 'tle') return 'satellite';
+  if (src === 'ais')  return mil ? 'ship_mil' : 'ship';
+  if (src === 'adsb' || src === 'opensky' || src === 'adsb_emergency') {
+    if (mil) return 'aircraft_mil';
+    try {
+      const cat = (JSON.parse(d.extra || '{}').category || '').toUpperCase();
+      if (cat === 'A7') return 'helicopter'; // ICAO rotorcraft category
+    } catch(e) {}
+    return 'aircraft';
+  }
+  return null;
+}
 const _trails = {};
 let _predictArcs = [];  // AI predicted path arcs — cleared per-prediction
 
@@ -2135,6 +2221,7 @@ function _rebuildGlobe(){
 
   // Clear all primitives and ring entities
   _cesiumPts.removeAll();
+  if (_cesiumBills) _cesiumBills.removeAll();
   _cesiumLines.removeAll();
   const toRm=[];
   cesium.entities.values.forEach(e=>{ if(e._wr) toRm.push(e); });
@@ -2187,8 +2274,31 @@ function _rebuildGlobe(){
       outlineWidth:2,
       id:entry,
       scaleByDistance:new Cesium.NearFarScalar(5e3,2.5,1e7,0.7),
-      translucencyByDistance:new Cesium.NearFarScalar(5e5,1.0,1e8,0.3),
+      // Fade out points when zoomed in close (billboard takes over below 20km)
+      translucencyByDistance:new Cesium.NearFarScalar(8000,0.0,30000,1.0),
     });
+
+    // Zoom-in billboard: shows detailed icon (aircraft/ship/satellite) when camera < 25km
+    const iconType = _getGlobeIconType(d);
+    if(iconType && _cesiumBills) {
+      const heading = parseFloat(d.heading_deg || 0);
+      // Convert compass heading to screen-space billboard rotation (CCW radians)
+      const rot = -Cesium.Math.toRadians(heading);
+      const hexCol = color.startsWith('#') ? color : '#f59e0b';
+      _cesiumBills.add({
+        position: Cesium.Cartesian3.fromDegrees(d.lon, d.lat, hM),
+        image: _globeIconSvg(iconType, hexCol),
+        rotation: rot,
+        scale: 0.72,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        id: entry,
+        // Appear when zoomed in below ~25km camera altitude, invisible at global view
+        scaleByDistance: new Cesium.NearFarScalar(300, 2.2, 25000, 0.0),
+        translucencyByDistance: new Cesium.NearFarScalar(5000, 1.0, 20000, 0.0),
+        sizeInMeters: false,
+      });
+    }
 
     // ACLED rings
     if(d.source==='acled'){
@@ -3233,7 +3343,8 @@ async function initGlobe(){
   });
 
   // ── GPU-instanced primitives ─────────────────────────────────────────────────
-  _cesiumPts = cesium.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+  _cesiumPts   = cesium.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+  _cesiumBills = cesium.scene.primitives.add(new Cesium.BillboardCollection());
   _cesiumLines = cesium.scene.primitives.add(new Cesium.PolylineCollection());
 
   // ── Async Ion upgrades — globe is already visible, this happens in background ─
@@ -3258,10 +3369,30 @@ async function initGlobe(){
       cesium.scene.requestRender();
     } catch(e) { console.warn('WARDAR: Ion imagery failed:', e); }
 
-    // Upgrade 3: OSM 3D Buildings (photogrammetry for major cities)
+    // Upgrade 3: OSM 3D Buildings — dark military palette, highlight mil/gov structures
     setLoadStatus('LOADING 3D BUILDINGS...');
     try {
       const buildings = await Cesium.createOsmBuildingsAsync();
+      // REPLACE vertex colors — without this, Cesium multiplies style with baked white
+      // vertex colors and rooftops stay white regardless of the style we set.
+      buildings.colorBlendMode = Cesium.Cesium3DTileColorBlendMode.REPLACE;
+      buildings.style = new Cesium.Cesium3DTileStyle({
+        color: {
+          conditions: [
+            // Military structures → blood red
+            ["${feature['building']} === 'military' || ${feature['military']} !== undefined",
+             "color('#c82020', 0.94)"],
+            // Government / civic → amber
+            ["${feature['building']} === 'government' || ${feature['building']} === 'civic'",
+             "color('#b8720e', 0.90)"],
+            // Industrial / warehouse → steel blue
+            ["${feature['building']} === 'industrial' || ${feature['building']} === 'warehouse'",
+             "color('#3a4a58', 0.90)"],
+            // Dark slate — matches CartoDB DarkMatter ground tiles
+            ["true", "color('#1e2230', 0.94)"]
+          ]
+        }
+      });
       cesium.scene.primitives.add(buildings);
       cesium.scene.requestRender();
     } catch(e) { console.warn('WARDAR: OSM buildings failed:', e); }
