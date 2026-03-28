@@ -977,6 +977,26 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 .dlg-btn:hover{border-color:var(--text);color:var(--text)}
 .dlg-btn.primary{border-color:var(--green);color:var(--green)}
 .dlg-btn.primary:hover{background:var(--green-dim)}
+
+/* ── Zoom-aware icon labels ── */
+.wdr-lbl{
+  position:absolute;top:calc(100% + 2px);left:50%;
+  transform:translateX(-50%);font-size:6.5px;font-family:var(--font);
+  color:var(--amber);white-space:nowrap;pointer-events:none;
+  text-shadow:0 0 4px #000000,0 0 2px #000;letter-spacing:.04em;
+}
+/* Tile brightness transition */
+#leaflet-map .leaflet-tile-pane{transition:filter .3s ease;}
+/* Measure tooltip */
+.measure-tip.leaflet-tooltip{
+  background:rgba(8,8,12,.92)!important;border:1px solid var(--green)!important;
+  color:var(--green)!important;font-family:var(--font)!important;
+  font-size:.55rem!important;padding:.2rem .45rem!important;
+  border-radius:0!important;white-space:nowrap;
+}
+/* ISW 2D frontline flash on load */
+@keyframes iswPulse{0%{opacity:0}50%{opacity:1}100%{opacity:.65}}
+.isw2d-layer{animation:iswPulse .8s ease forwards}
 </style>
 </head>
 <body>
@@ -1073,6 +1093,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     </div>
     <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only display" style="border-color:#ef4444;color:#ef4444;display:none">MIL ALL</button>
     <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">3D GLOBE</button>
+    <button id="bright-btn" class="mapmode-btn" onclick="cycleBrightness()" title="Map brightness">☀ DIM</button>
+    <button id="measure-btn" class="mapmode-btn" onclick="toggleMeasure()" title="Measure distance (click two points)">⊢ DIST</button>
     <button id="timeline-btn" class="mapmode-btn" onclick="toggleTimeline()" title="Show/hide timeline">⏱ TL</button>
     <button id="cinema-btn"   class="mapmode-btn" onclick="toggleCinema()"   title="Map-only mode — hide all panels">⊞ MAP</button>
     <button id="fullscreen-toggle" class="mapmode-btn" onclick="toggleFullscreen()" title="Browser fullscreen">⛶ FULL</button>
@@ -2773,6 +2795,162 @@ function iconFor(source, mil, extra){
   return makeIcon('●','#4b5563',12);
 }
 
+// ── Zoom-aware 2D icon system ─────────────────────────────────────────────────
+// Three rendering tiers:
+//   zoom < 5  → tiny colored dot (pure CSS)
+//   zoom 5-7  → 18px emoji icon
+//   zoom >= 8 → SVG directional shape (aircraft/ship/sat) + label at zoom>=10
+
+function _svgAircraft(col, hdg, isMil, sz){
+  const h = sz/2, r = `rotate(${hdg!=null?hdg:0}deg)`;
+  if(isMil){
+    return `<svg width="${sz}" height="${sz}" viewBox="-${h} -${h} ${sz} ${sz}"
+      style="transform:${r};display:block;overflow:visible">
+      <path d="M0,-${h*.88} L${h*.84},${h*.48} L${h*.18},${h*.1} L${h*.18},${h*.74} L-${h*.18},${h*.74} L-${h*.18},${h*.1} L-${h*.84},${h*.48} Z"
+        fill="${col}" stroke="${col}66" stroke-width=".5" opacity=".95"
+        filter="drop-shadow(0 0 3px ${col}bb)"/>
+      <circle r="${h*.13}" fill="${col}" opacity=".75"/>
+    </svg>`;
+  }
+  return `<svg width="${sz}" height="${sz}" viewBox="-${h} -${h} ${sz} ${sz}"
+    style="transform:${r};display:block;overflow:visible">
+    <path d="M0,-${h*.86} L${h*.78},${h*.38} L${h*.12},${h*.1} L${h*.12},${h*.76} L0,${h*.86} L-${h*.12},${h*.76} L-${h*.12},${h*.1} L-${h*.78},${h*.38} Z"
+      fill="${col}" opacity=".9" filter="drop-shadow(0 0 2px ${col}77)"/>
+  </svg>`;
+}
+
+function _svgShip(col, hdg, isMil, sz){
+  const h = sz/2, hy = sz*.55, r = `rotate(${hdg!=null?hdg:0}deg)`;
+  if(isMil){
+    return `<svg width="${sz}" height="${sz}" viewBox="-${h} -${hy} ${sz} ${sz}"
+      style="transform:${r};display:block;overflow:visible">
+      <path d="M0,-${hy*.95} L${h*.68},-${hy*.42} L${h*.68},${hy*.82} L0,${hy*.96} L-${h*.68},${hy*.82} L-${h*.68},-${hy*.42} Z"
+        fill="${col}" stroke="${col}44" stroke-width=".5" opacity=".9"
+        filter="drop-shadow(0 0 3px ${col}aa)"/>
+      <line x1="-${h*.6}" y1="${hy*.1}" x2="${h*.6}" y2="${hy*.1}" stroke="${col}" stroke-width=".8" opacity=".5"/>
+    </svg>`;
+  }
+  return `<svg width="${sz*.75}" height="${sz}" viewBox="-${h*.75} -${hy} ${sz*.75*2} ${sz}"
+    style="transform:${r};display:block;overflow:visible">
+    <ellipse rx="${h*.58}" ry="${hy*.9}" fill="${col}" opacity=".82"
+      filter="drop-shadow(0 0 2px ${col}66)"/>
+  </svg>`;
+}
+
+function _svgSat(sz){
+  const h = sz/2;
+  return `<svg width="${sz}" height="${sz}" viewBox="-${h} -${h} ${sz} ${sz}" style="display:block;overflow:visible">
+    <rect x="-${h*.34}" y="-${h*.34}" width="${sz*.68}" height="${sz*.68}" fill="#a855f7" rx="1" opacity=".88"
+      filter="drop-shadow(0 0 3px #a855f7aa)"/>
+    <rect x="-${h}" y="-${h*.12}" width="${h*.62}" height="${sz*.24}" fill="#a855f7" rx="1" opacity=".76"/>
+    <rect x="${h*.38}" y="-${h*.12}" width="${h*.62}" height="${sz*.24}" fill="#a855f7" rx="1" opacity=".76"/>
+  </svg>`;
+}
+
+function buildZoomIcon(d, zoom){
+  const isMil = parseInt(d.military_flag||0)===1;
+  const src   = (d.source||d._lk||'').toLowerCase();
+  const isAir  = src==='adsb'||src==='opensky'||src==='adsb_emergency';
+  const isShip = src==='ais';
+  const isSat  = src==='tle';
+
+  // Tier 1 — tiny dot
+  if(zoom < 5){
+    const col = isMil?'#ef4444':(LAYER_COLORS[src]||'#f59e0b');
+    const sz  = isMil?7:5;
+    return L.divIcon({html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};box-shadow:0 0 3px ${col}77"></div>`,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+  }
+
+  // Tier 2 — emoji (medium zoom)
+  if(zoom < 8){
+    const html=iconFor(src,isMil,d), sz=18;
+    return L.divIcon({html,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+  }
+
+  // Tier 3 — SVG directional for tracked assets
+  if(isAir||isShip||isSat){
+    const col = isMil
+      ? (isShip?'#fb923c':'#ff3b1e')
+      : (isShip?'#06b6d4':(isSat?'#a855f7':'#f59e0b'));
+    const hdg = d.heading_deg!=null?parseFloat(d.heading_deg):null;
+    const sz  = zoom>=11?30:24;
+
+    let svg='';
+    if(isAir)        svg=_svgAircraft(col,hdg,isMil,sz);
+    else if(isShip)  svg=_svgShip(col,hdg,isMil,sz);
+    else             svg=_svgSat(sz);
+
+    const lbl = zoom>=10 ? (d.callsign||'').substring(0,10) : '';
+    const lblHtml = lbl?`<div class="wdr-lbl">${esc(lbl)}</div>`:'';
+
+    const tag = zoom>=12&&(d.altitude_ft!=null||d.speed_kts!=null)
+      ? `<div style="position:absolute;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);font-size:5.5px;font-family:monospace;color:${col}99;white-space:nowrap;pointer-events:none">${d.altitude_ft!=null?Math.round(d.altitude_ft/100)+'FL':''}${d.speed_kts!=null?' '+Math.round(d.speed_kts)+'kt':''}</div>`
+      : '';
+
+    return L.divIcon({
+      html:`<div style="position:relative;width:${sz}px;height:${sz}px">${svg}${tag}${lblHtml}</div>`,
+      className:'',iconSize:[sz+16,sz+16],iconAnchor:[sz/2,sz/2]
+    });
+  }
+
+  // Events / other — emoji at standard size with no label
+  const html=iconFor(src,isMil,d), sz=zoom>=9?20:16;
+  return L.divIcon({html,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+}
+
+// ── Map brightness cycle ──────────────────────────────────────────────────────
+const _BRIGHT_VALS  = [1.0, 1.45, 1.85];
+const _BRIGHT_LBLS  = ['DIM', 'NORM', 'BRIGHT'];
+let   _brightIdx    = 0;
+function cycleBrightness(){
+  _brightIdx = (_brightIdx+1)%_BRIGHT_VALS.length;
+  const tp = document.querySelector('#leaflet-map .leaflet-tile-pane');
+  if(tp) tp.style.filter = `brightness(${_BRIGHT_VALS[_brightIdx]})`;
+  const btn = document.getElementById('bright-btn');
+  if(btn) btn.textContent = `☀ ${_BRIGHT_LBLS[_brightIdx]}`;
+}
+
+// ── Distance measurement tool ─────────────────────────────────────────────────
+let _measureOn  = false;
+let _measurePt  = null;
+let _measureLn  = null;
+let _measureMk  = null;
+function toggleMeasure(){
+  _measureOn = !_measureOn;
+  const btn = document.getElementById('measure-btn');
+  if(btn) btn.classList.toggle('active',_measureOn);
+  if(!_measureOn){ _clearMeasure(); }
+  else if(_map2d){
+    _map2d.getContainer().style.cursor='crosshair';
+  }
+}
+function _clearMeasure(){
+  if(!_map2d) return;
+  _map2d.getContainer().style.cursor='';
+  if(_measureLn){ _map2d.removeLayer(_measureLn); _measureLn=null; }
+  if(_measureMk){ _map2d.removeLayer(_measureMk); _measureMk=null; }
+  _measurePt=null;
+}
+
+// ── ISW frontlines in 2D ─────────────────────────────────────────────────────
+let _isw2dLayer = null;
+function _render2dIsw(){
+  if(!_map2d||!iswPolygons.length) return;
+  if(_isw2dLayer){ _map2d.removeLayer(_isw2dLayer); _isw2dLayer=null; }
+  const gjLayers=[];
+  iswPolygons.forEach(f=>{
+    if(!f.geometry) return;
+    const strokeCol = f._stroke||'#ef4444';
+    gjLayers.push(L.geoJSON({type:'Feature',geometry:f.geometry,properties:{}},{
+      style:{fillColor:strokeCol,fillOpacity:.1,color:strokeCol,weight:1.5,opacity:.65,dashArray:'4 5'}
+    }));
+  });
+  if(gjLayers.length){
+    _isw2dLayer = L.layerGroup(gjLayers);
+    _isw2dLayer.addTo(_map2d);
+  }
+}
+
 // ── Popup builders ────────────────────────────────────────────────────────────
 function fmtTs(ts){
   if(!ts) return '—';
@@ -2895,6 +3073,37 @@ function initMap2D(){
   }).addTo(_map2d);
   L.control.zoom({position:'topleft'}).addTo(_map2d);
 
+  // Zoom-based icon refresh — restyle tracked-asset markers at each zoom tier
+  _map2d.on('zoomend', ()=>{
+    const zoom = _map2d.getZoom();
+    Object.values(_markers2d).forEach(m => {
+      const d = m._wdata; if(!d) return;
+      const src=(d.source||d._lk||'').toLowerCase();
+      if(src==='adsb'||src==='opensky'||src==='ais'||src==='tle'||src==='adsb_emergency'){
+        m.setIcon(buildZoomIcon(d, zoom));
+      }
+    });
+  });
+
+  // Measure tool — click-on-map fallback (when not clicking a marker)
+  _map2d.on('click', e => {
+    if(!_measureOn) return;
+    if(!_measurePt){
+      _measurePt = e.latlng;
+      if(_measureMk) _map2d.removeLayer(_measureMk);
+      _measureMk = L.circleMarker(_measurePt,{radius:5,color:'#22c55e',fillColor:'#22c55e',fillOpacity:1,weight:1.5}).addTo(_map2d);
+    } else {
+      const dst = _map2d.distance(_measurePt, e.latlng);
+      if(_measureLn) _map2d.removeLayer(_measureLn);
+      _measureLn = L.polyline([_measurePt, e.latlng],{color:'#22c55e',weight:1.5,dashArray:'6 4',opacity:.85})
+        .addTo(_map2d)
+        .bindTooltip(`${(dst/1000).toFixed(0)} km · ${(dst/1852).toFixed(0)} nm`,
+          {permanent:true,className:'measure-tip',direction:'center'}).openTooltip();
+      _clearMeasure();
+      toggleMeasure();
+    }
+  });
+
   // Cluster group per layer key
   const _allLK = ['adsb','ais','tle','acled','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','alerts','pikud','wikipedia','adsb_emergency','polymarket',
@@ -2917,15 +3126,35 @@ function addMarker2D(key, d){
   if(!_map2d || d.lat==null || d.lon==null) return;
   const lk = sourceToLayerKey(d.source||d._lk||'');
   if(!_cluster2d[lk]) return;
-  const isMil = parseInt(d.military_flag||0)===1;
-  const iconHtml = iconFor(d.source||d._lk||'', isMil);
-  const lIcon = L.divIcon({html:iconHtml||makeIcon('●','#666',14), className:'', iconSize:[22,22], iconAnchor:[11,11]});
+  const zoom  = _map2d.getZoom();
+  const lIcon = buildZoomIcon(d, zoom);
 
   if(_markers2d[key]){
     _markers2d[key].setLatLng([d.lat, d.lon]);
+    _markers2d[key].setIcon(lIcon);
+    _markers2d[key]._wdata = d;
   } else {
     const m = L.marker([d.lat, d.lon], {icon:lIcon});
+    m._wdata = d;
     m.on('click', ()=>{
+      if(_measureOn){
+        // measure mode — handle click as measurement point
+        if(!_measurePt){
+          _measurePt = m.getLatLng();
+          if(_measureMk) _map2d.removeLayer(_measureMk);
+          _measureMk = L.circleMarker(_measurePt,{radius:4,color:'#22c55e',fillColor:'#22c55e',fillOpacity:1,weight:1}).addTo(_map2d);
+        } else {
+          const dst = _map2d.distance(_measurePt,m.getLatLng());
+          if(_measureLn) _map2d.removeLayer(_measureLn);
+          _measureLn = L.polyline([_measurePt,m.getLatLng()],{color:'#22c55e',weight:1.5,dashArray:'6 4',opacity:.8})
+            .addTo(_map2d)
+            .bindTooltip(`${(dst/1000).toFixed(0)} km · ${(dst/1852).toFixed(0)} nm`,
+              {permanent:true,className:'measure-tip',direction:'center'}).openTooltip();
+          _clearMeasure();
+          toggleMeasure();
+        }
+        return;
+      }
       _lastPopupData = d;
       const html = d._isComm ? buildCommunityPopup(d) : buildPopup(d);
       m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;max-width:280px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:300}).openPopup();
@@ -2997,7 +3226,7 @@ async function toggleMapMode(){
     if(milBtn)   milBtn.style.display   = 'none';
     const btn = document.getElementById('mapmode-btn');
     if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
-    if(_map2d) setTimeout(()=>_map2d.invalidateSize(), 50);
+    if(_map2d) setTimeout(()=>{ _map2d.invalidateSize(); _render2dIsw(); }, 80);
     _showImageryPanel(false);
   }
 }
@@ -3801,6 +4030,8 @@ async function loadIswLayers(){
       _scheduleRebuild();
     }
   }catch(e){}
+  // Render frontlines on 2D map (previously 3D-only)
+  if(_mapMode==='2d') _render2dIsw();
 }
 
 function toggleIswLayer(key,show){
