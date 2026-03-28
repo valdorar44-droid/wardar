@@ -206,9 +206,42 @@ body::after{
   position:absolute;left:0;top:0;bottom:0;
   width:0%;transition:width .6s ease;border-radius:0;
 }
+/* ── SEARCH BAR ── */
+#search-wrap{
+  position:relative;display:flex;align-items:center;gap:0;flex-shrink:0;
+  margin-left:auto;
+}
+#search-input{
+  background:var(--panel2);border:1px solid var(--border2);border-right:none;
+  color:var(--text);font-family:var(--font);font-size:.52rem;letter-spacing:.08em;
+  padding:.28rem .65rem;outline:none;width:190px;
+  transition:border-color .15s,width .2s;
+}
+#search-input::placeholder{color:var(--dim2)}
+#search-input:focus{border-color:var(--amber);width:230px}
+#search-btn{
+  background:var(--panel2);border:1px solid var(--border2);color:var(--dim2);
+  font-family:var(--font);font-size:.8rem;padding:.2rem .55rem;cursor:pointer;
+  line-height:1;transition:color .15s;flex-shrink:0;
+}
+#search-btn:hover{color:var(--amber);border-color:var(--amber)}
+#search-results{
+  position:absolute;top:calc(100% + 2px);left:0;z-index:9000;
+  background:var(--panel);border:1px solid var(--border2);
+  width:290px;max-height:220px;overflow-y:auto;
+  display:none;box-shadow:0 8px 24px rgba(0,0,0,.6);
+}
+.sr-item{
+  padding:.4rem .75rem;font-family:var(--font);font-size:.52rem;letter-spacing:.05em;
+  cursor:pointer;color:var(--text);border-bottom:1px solid var(--border);line-height:1.4;
+}
+.sr-item:last-child{border-bottom:none}
+.sr-item:hover{background:var(--panel2);color:var(--amber)}
+.sr-item-sub{font-size:.44rem;color:var(--dim2);margin-top:.1rem}
+
 #hdr-clock{
   font-size:.75rem;letter-spacing:.12em;color:var(--amber);
-  margin-left:auto;flex-shrink:0;
+  flex-shrink:0;
   text-shadow:0 0 12px var(--amber-glow);
 }
 .threat-badge{
@@ -654,7 +687,7 @@ body::after{
   background:rgba(4,4,6,.98);border-top:1px solid var(--border2);
   display:none;flex-direction:column;
   grid-column:1/-1;
-  max-height:220px;
+  height:215px;flex-shrink:0;
 }
 #videobar.open{display:flex}
 #video-bar-hd{
@@ -928,6 +961,13 @@ body::after{
     <div class="hdr-sub">GLOBAL SITUATIONAL AWARENESS</div>
     <div class="hdr-domains" id="hdr-domains">
       <!-- populated by JS -->
+    </div>
+    <div id="search-wrap">
+      <input id="search-input" type="text" placeholder="SEARCH LOCATION..."
+             autocomplete="off" spellcheck="false"
+             oninput="searchDebounce()" onkeydown="handleSearchKey(event)">
+      <button id="search-btn" onclick="doSearch()" title="Search">⌕</button>
+      <div id="search-results"></div>
     </div>
     <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only display" style="border-color:#ef4444;color:#ef4444;display:none">MIL ALL</button>
     <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">2D MAP</button>
@@ -1283,33 +1323,41 @@ body::after{
   <div id="videobar">
     <div id="video-bar-hd">
       <span>⬛ LIVE WAR NEWS STREAMS</span>
-      <button class="video-close-btn" onclick="closeVideoBar()">✕ CLOSE</button>
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <span style="font-size:.44rem;color:var(--dim2);letter-spacing:.08em">CLICK TO UNMUTE · SCROLL FOR MORE</span>
+        <button class="video-close-btn" onclick="closeVideoBar()">✕ CLOSE</button>
+      </div>
     </div>
     <div id="video-scroll">
-      <!-- Al Jazeera English -->
+      <!-- Al Jazeera English 24/7 live — stable ID -->
       <div class="video-card">
-        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=0" frameborder="0" allowfullscreen title="Al Jazeera English"></iframe>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/4V5LqIT8-NA?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Al Jazeera English"></iframe>
         <div class="video-card-label">AL JAZEERA ENGLISH</div>
       </div>
-      <!-- DW News -->
+      <!-- France 24 English 24/7 -->
       <div class="video-card">
-        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=0" frameborder="0" allowfullscreen title="DW News"></iframe>
-        <div class="video-card-label">DW NEWS</div>
-      </div>
-      <!-- France 24 -->
-      <div class="video-card">
-        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCQfwfsi5VrQ8yKZ-UWmAoBg&autoplay=0" frameborder="0" allowfullscreen title="France 24 English"></iframe>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/l8PMl7tUDIE?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="France 24 English"></iframe>
         <div class="video-card-label">FRANCE 24 ENGLISH</div>
       </div>
-      <!-- WION -->
+      <!-- DW News English 24/7 -->
       <div class="video-card">
-        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCPFrMM7ner_bDed6KKmNDvg&autoplay=0" frameborder="0" allowfullscreen title="WION"></iframe>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/t_nN4Dkf5U0?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="DW News"></iframe>
+        <div class="video-card-label">DW NEWS</div>
+      </div>
+      <!-- Sky News 24/7 -->
+      <div class="video-card">
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/9Auq9mYxFEE?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Sky News"></iframe>
+        <div class="video-card-label">SKY NEWS</div>
+      </div>
+      <!-- WION 24/7 -->
+      <div class="video-card">
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/_oGNHoEnZo8?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="WION"></iframe>
         <div class="video-card-label">WION</div>
       </div>
-      <!-- Sky News -->
+      <!-- ABC News 24/7 -->
       <div class="video-card">
-        <iframe width="280" height="157" src="https://www.youtube.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ&autoplay=0" frameborder="0" allowfullscreen title="Sky News"></iframe>
-        <div class="video-card-label">SKY NEWS</div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/w_Ma8oQLmSM?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="ABC News Live"></iframe>
+        <div class="video-card-label">ABC NEWS LIVE</div>
       </div>
     </div>
   </div>
@@ -3096,6 +3144,8 @@ function initMap(){
   // Set button state
   const btn = document.getElementById('mapmode-btn');
   if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
+  // Auto-open live video bar on load
+  openVideoBar();
 }
 
 /** Great-circle arc waypoints at constant altitude (for Cesium polylines) */
@@ -3797,6 +3847,101 @@ function openVideoBar(){
 function closeVideoBar(){
   document.getElementById('videobar').classList.remove('open');
 }
+
+// ── Location Search (Nominatim geocoding) ─────────────────────────────────────
+let _searchTimer = null;
+
+function searchDebounce(){
+  clearTimeout(_searchTimer);
+  const q = (document.getElementById('search-input').value || '').trim();
+  if(q.length < 2){
+    document.getElementById('search-results').style.display = 'none';
+    return;
+  }
+  _searchTimer = setTimeout(doSearch, 420);
+}
+
+function handleSearchKey(e){
+  if(e.key === 'Escape'){
+    document.getElementById('search-results').style.display = 'none';
+    document.getElementById('search-input').blur();
+  } else if(e.key === 'Enter'){
+    clearTimeout(_searchTimer);
+    doSearch();
+  }
+}
+
+async function doSearch(){
+  const q = (document.getElementById('search-input').value || '').trim();
+  if(!q) return;
+  const resEl = document.getElementById('search-results');
+  resEl.innerHTML = '<div class="sr-item" style="color:var(--dim2)">QUERYING OSM...</div>';
+  resEl.style.display = 'block';
+  try {
+    const data = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=7&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'Wardar-GSAR/1.0' } }
+    ).then(r => r.json());
+
+    if(!data.length){
+      resEl.innerHTML = '<div class="sr-item" style="color:var(--dim2)">NO RESULTS</div>';
+      return;
+    }
+    resEl.innerHTML = '';
+    data.forEach(item => {
+      const lat = parseFloat(item.lat);
+      const lon = parseFloat(item.lon);
+      const name = item.display_name.split(',')[0].trim();
+      const sub  = item.display_name.split(',').slice(1,3).join(',').trim();
+      const div  = document.createElement('div');
+      div.className = 'sr-item';
+      div.innerHTML = `<div>${esc(name)}</div><div class="sr-item-sub">${esc(sub)}</div>`;
+      div.onclick = () => {
+        document.getElementById('search-input').value = name;
+        resEl.style.display = 'none';
+        flyToSearch(lat, lon, item.boundingbox);
+      };
+      resEl.appendChild(div);
+    });
+  } catch(e) {
+    resEl.innerHTML = `<div class="sr-item" style="color:var(--red)">SEARCH ERROR: ${esc(String(e))}</div>`;
+  }
+}
+
+function flyToSearch(lat, lon, bbox){
+  if(_mapMode === '2d' && _map2d){
+    if(bbox && bbox.length === 4){
+      const s = parseFloat(bbox[0]), n = parseFloat(bbox[1]),
+            w = parseFloat(bbox[2]), e = parseFloat(bbox[3]);
+      _map2d.fitBounds([[s,w],[n,e]], {animate:true, duration:0.8, maxZoom:14});
+    } else {
+      _map2d.setView([lat, lon], 12, {animate:true, duration:0.8});
+    }
+  } else if(cesium){
+    // Estimate zoom altitude from bbox size
+    let altM = 150000;
+    if(bbox && bbox.length === 4){
+      const span = Math.max(
+        Math.abs(parseFloat(bbox[1]) - parseFloat(bbox[0])),
+        Math.abs(parseFloat(bbox[3]) - parseFloat(bbox[2]))
+      );
+      altM = Math.max(5000, Math.min(span * 111000 * 3, 5000000));
+    }
+    cesium.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, altM),
+      duration: 1.5,
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-60), roll: 0 }
+    });
+  }
+}
+
+// Close search results when clicking outside
+document.addEventListener('click', e => {
+  if(!e.target.closest('#search-wrap')){
+    const el = document.getElementById('search-results');
+    if(el) el.style.display = 'none';
+  }
+});
 
 // ── Fullscreen ────────────────────────────────────────────────────────────────
 function toggleFullscreen(){
