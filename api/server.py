@@ -1,6 +1,6 @@
 """Wardar — FastAPI server + WebSocket endpoint"""
 from __future__ import annotations
-import asyncio, json, os
+import asyncio, json, os, time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
@@ -21,6 +21,28 @@ from core.engine import (
     register_ws_client, unregister_ws_client,
     start as engine_start,
 )
+
+# ── Snapshot cache ────────────────────────────────────────────────────────────
+# Pre-computed snapshot served instantly to every new WebSocket client.
+# All users see the same data. Recomputed at most every 20s.
+_snap_cache: str | None = None
+_snap_ts: float = 0.0
+_SNAP_TTL = 20.0  # seconds
+
+def _get_snapshot_json() -> str:
+    global _snap_cache, _snap_ts
+    now = time.monotonic()
+    if _snap_cache is None or (now - _snap_ts) > _SNAP_TTL:
+        positions = get_released_positions_sampled(per_source=400, limit=2500)
+        events    = DB.get_released_events(limit=600)
+        _snap_cache = json.dumps({"type":"snapshot","positions":positions,"events":events})
+        _snap_ts = now
+    return _snap_cache
+
+def invalidate_snapshot():
+    """Call whenever new data is ingested so next client gets fresh data."""
+    global _snap_ts
+    _snap_ts = 0.0
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
@@ -59,13 +81,22 @@ if os.path.isdir(_DASH):
 # ── REST endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
-async def root():
-    """Serve the map SPA."""
+async def root(request: Request):
+    """Serve the map SPA with ETag caching."""
     html_path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "map.html")
-    if os.path.exists(html_path):
-        with open(html_path) as f:
-            return HTMLResponse(f.read())
-    return HTMLResponse("<h1>Wardar — map.html not found</h1>", status_code=404)
+    if not os.path.exists(html_path):
+        return HTMLResponse("<h1>Wardar — map.html not found</h1>", status_code=404)
+    stat = os.stat(html_path)
+    etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304)
+    with open(html_path) as f:
+        content = f.read()
+    return HTMLResponse(content, headers={
+        "ETag": etag,
+        "Cache-Control": "no-cache",  # revalidate but use cache if ETag matches
+        "Vary": "Accept-Encoding",
+    })
 
 @app.get("/api/health")
 async def health():
@@ -456,10 +487,8 @@ async def websocket_endpoint(ws: WebSocket):
     register_ws_client(_send)
 
     try:
-        # Send initial snapshot — sampled so AIS doesn't crowd out aircraft/satellites
-        positions = get_released_positions_sampled(per_source=400, limit=2000)
-        events    = DB.get_released_events(limit=500)
-        await ws.send_text(json.dumps({"type": "snapshot", "positions": positions, "events": events}))
+        # Send cached snapshot — same data for all clients, computed at most every 20s
+        await ws.send_text(_get_snapshot_json())
 
         async for raw in ws.iter_text():
             try:

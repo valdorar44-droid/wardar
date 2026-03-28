@@ -336,13 +336,20 @@ def _offset_ts(ts: str, delta_sec: int) -> str:
     return (dt + timedelta(seconds=delta_sec)).isoformat()
 
 def purge_old_positions() -> int:
-    """Delete positions older than POSITION_RETAIN_HOURS."""
-    cutoff = _utcnow_minus_hours(C.POSITION_RETAIN_HOURS)
+    """Delete positions older than POSITION_RETAIN_HOURS (AIS uses tighter cap)."""
+    cutoff_default = _utcnow_minus_hours(C.POSITION_RETAIN_HOURS)
+    cutoff_ais     = _utcnow_minus_hours(C.AIS_RETAIN_HOURS)
     with _lock:
         conn = get_conn()
-        cur = conn.execute("DELETE FROM positions WHERE raw_ts_utc < ?", (cutoff,))
+        # Tighter cap for AIS — it generates huge volume and cycles every few minutes
+        n1 = conn.execute(
+            "DELETE FROM positions WHERE source='ais' AND raw_ts_utc < ?", (cutoff_ais,)
+        ).rowcount
+        n2 = conn.execute(
+            "DELETE FROM positions WHERE source!='ais' AND raw_ts_utc < ?", (cutoff_default,)
+        ).rowcount
         conn.commit()
-        return cur.rowcount
+        return n1 + n2
 
 # ── Events ───────────────────────────────────────────────────────────────────
 

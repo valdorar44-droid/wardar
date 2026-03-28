@@ -76,6 +76,12 @@ async def _broadcast(msg: dict):
             dead.add(fn)
     for fn in dead:
         _ws_clients.discard(fn)
+    # Invalidate snapshot cache so next new client gets fresh data
+    try:
+        from api.server import invalidate_snapshot
+        invalidate_snapshot()
+    except Exception:
+        pass
 
 # ── Ingestor helpers ──────────────────────────────────────────────────────────
 
