@@ -707,14 +707,14 @@ body::after{
   background:none;border:none;color:var(--dim2);cursor:pointer;
   font-family:var(--font);font-size:.55rem;letter-spacing:.08em;
 }
-#video-scroll{
+.video-scroll{
   display:flex;gap:.75rem;padding:.5rem .75rem;overflow-x:auto;flex:1;
   scrollbar-width:thin;scrollbar-color:var(--border) transparent;
 }
-#video-scroll::-webkit-scrollbar{height:3px}
-#video-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.video-scroll::-webkit-scrollbar{height:3px}
+.video-scroll::-webkit-scrollbar-thumb{background:var(--border)}
 .video-card{
-  flex-shrink:0;display:flex;flex-direction:column;gap:.25rem;
+  flex-shrink:0;display:flex;flex-direction:column;gap:.25rem;position:relative;
 }
 .video-card iframe{
   border:1px solid var(--border2);display:block;
@@ -722,6 +722,19 @@ body::after{
 .video-card-label{
   font-size:.44rem;letter-spacing:.1em;color:var(--dim2);text-align:center;
 }
+.vc-live-dot{
+  position:absolute;top:.3rem;left:.3rem;z-index:2;
+  width:6px;height:6px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 4px var(--red);
+  animation:blink 1.4s infinite;
+}
+.vbar-tab{
+  background:none;border:1px solid var(--border);color:var(--dim2);
+  font-family:var(--font);font-size:.44rem;letter-spacing:.1em;
+  padding:.15rem .45rem;cursor:pointer;
+}
+.vbar-tab.active{background:rgba(245,158,11,.12);border-color:var(--amber);color:var(--amber)}
+.vbar-tab:hover:not(.active){border-color:var(--dim);color:var(--fg)}
 
 /* ── TIMELINE ── */
 #timeline{
@@ -1305,8 +1318,8 @@ body::after{
             <span id="news-breaking-text">0 BREAKING</span>
           </div>
           <div id="news-list"></div>
-          <button style="margin:.5rem .75rem;padding:.3rem .6rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);font-family:var(--font);font-size:.48rem;letter-spacing:.1em;cursor:pointer" onclick="openVideoBar()">
-            ▶ OPEN LIVE WAR NEWS STREAMS
+          <button style="margin:.5rem .75rem;padding:.3rem .6rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);font-family:var(--font);font-size:.48rem;letter-spacing:.1em;cursor:pointer" onclick="toggleVideoBar()">
+            ▶ LIVE STREAMS &amp; CAMERAS
           </button>
         </div>
         <!-- COMMUNITY pane -->
@@ -1368,42 +1381,115 @@ body::after{
   <!-- VIDEO BAR -->
   <div id="videobar">
     <div id="video-bar-hd">
-      <span>⬛ LIVE WAR NEWS STREAMS</span>
+      <div style="display:flex;align-items:center;gap:.7rem">
+        <span>⬛ LIVE STREAMS &amp; CAMERAS</span>
+        <div id="vbar-tabs" style="display:flex;gap:.3rem">
+          <button class="vbar-tab active" onclick="switchVbarTab('news')" id="vbt-news">NEWS</button>
+          <button class="vbar-tab" onclick="switchVbarTab('cams')" id="vbt-cams">CAMERAS</button>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:.6rem">
-        <span style="font-size:.44rem;color:var(--dim2);letter-spacing:.08em">CLICK TO UNMUTE · SCROLL FOR MORE</span>
+        <span id="vbar-hint" style="font-size:.44rem;color:var(--dim2);letter-spacing:.08em">ALL MUTED · CLICK TO UNMUTE · SCROLL FOR MORE</span>
         <button class="video-close-btn" onclick="closeVideoBar()">✕ CLOSE</button>
       </div>
     </div>
-    <div id="video-scroll">
-      <!-- Al Jazeera English 24/7 live — stable ID -->
+    <!-- NEWS TAB -->
+    <div id="vscroll-news" class="video-scroll">
       <div class="video-card">
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/4V5LqIT8-NA?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Al Jazeera English"></iframe>
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/4V5LqIT8-NA?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         <div class="video-card-label">AL JAZEERA ENGLISH</div>
       </div>
-      <!-- France 24 English 24/7 -->
       <div class="video-card">
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/l8PMl7tUDIE?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="France 24 English"></iframe>
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/l8PMl7tUDIE?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         <div class="video-card-label">FRANCE 24 ENGLISH</div>
       </div>
-      <!-- DW News English 24/7 -->
       <div class="video-card">
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/t_nN4Dkf5U0?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="DW News"></iframe>
-        <div class="video-card-label">DW NEWS</div>
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/MCHZMhUDndc?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">TRT WORLD</div>
       </div>
-      <!-- Sky News 24/7 -->
       <div class="video-card">
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/9Auq9mYxFEE?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="Sky News"></iframe>
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/9Auq9mYxFEE?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         <div class="video-card-label">SKY NEWS</div>
       </div>
-      <!-- WION 24/7 -->
       <div class="video-card">
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/_oGNHoEnZo8?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="WION"></iframe>
-        <div class="video-card-label">WION</div>
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/t_nN4Dkf5U0?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">DW NEWS</div>
       </div>
-      <!-- ABC News 24/7 -->
       <div class="video-card">
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/w_Ma8oQLmSM?autoplay=0&mute=0&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen title="ABC News Live"></iframe>
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/wJDKTM9mxZ0?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">EURONEWS</div>
+      </div>
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/gFJV9Sy3C1k?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">i24 NEWS · ISRAEL</div>
+      </div>
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/_oGNHoEnZo8?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">WION · INDIA</div>
+      </div>
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/w_Ma8oQLmSM?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         <div class="video-card-label">ABC NEWS LIVE</div>
+      </div>
+    </div>
+    <!-- CAMERAS TAB -->
+    <div id="vscroll-cams" class="video-scroll" style="display:none">
+      <!-- ISS NASA live HD feed -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/P9C25Un7xaM?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">ISS · NASA LIVE</div>
+      </div>
+      <!-- EarthCam NYC Times Square -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/NjVdGVCh_oU?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">TIMES SQUARE · NYC</div>
+      </div>
+      <!-- Windy.com global weather radar (iframe embed) -->
+      <div class="video-card" style="position:relative">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://embed.windy.com/embed2.html?lat=30&lon=35&zoom=4&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=30&detailLon=35&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
+        <div class="video-card-label">WINDY · MIDDLE EAST RADAR</div>
+      </div>
+      <!-- Windy Europe/Ukraine radar -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://embed.windy.com/embed2.html?lat=49&lon=32&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=49&detailLon=32&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
+        <div class="video-card-label">WINDY · UKRAINE RADAR</div>
+      </div>
+      <!-- Chicago O'Hare flight cam -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/KQfBWvpPO_4?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">O'HARE · ATC CAM LIVE</div>
+      </div>
+      <!-- Jerusalem old city live cam -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/7YFoEFUfyUo?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">JERUSALEM · OLD CITY CAM</div>
+      </div>
+      <!-- Flightradar24 YouTube stream -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/NSJZHyGGfGE?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">FLIGHTRADAR24 · LIVE</div>
+      </div>
+      <!-- Port of Rotterdam webcam -->
+      <div class="video-card">
+        <div class="vc-live-dot"></div>
+        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/yz7bOo7ABUU?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-card-label">PORT OF ROTTERDAM · CAM</div>
       </div>
     </div>
   </div>
@@ -4160,10 +4246,32 @@ function _showImageryPanel(show){
 
 // ── Video Bar ─────────────────────────────────────────────────────────────────
 function openVideoBar(){
-  document.getElementById('videobar').classList.add('open');
+  const vb = document.getElementById('videobar');
+  if(!vb) return;
+  vb.classList.add('open');
+  // Reload iframes so autoplay triggers fresh after bar was hidden
+  vb.querySelectorAll('iframe').forEach(f=>{
+    if(f.src && !f.dataset.loaded){
+      f.dataset.loaded='1';
+      const s=f.src; f.src=''; f.src=s;
+    }
+  });
 }
 function closeVideoBar(){
   document.getElementById('videobar').classList.remove('open');
+}
+function toggleVideoBar(){
+  const vb = document.getElementById('videobar');
+  if(!vb) return;
+  if(vb.classList.contains('open')) closeVideoBar();
+  else openVideoBar();
+}
+function switchVbarTab(tab){
+  document.getElementById('vscroll-news').style.display = tab==='news'?'flex':'none';
+  document.getElementById('vscroll-cams').style.display = tab==='cams'?'flex':'none';
+  document.querySelectorAll('.vbar-tab').forEach(b=>b.classList.remove('active'));
+  const bt = document.getElementById('vbt-'+tab);
+  if(bt) bt.classList.add('active');
 }
 
 // ── Location Search (Nominatim geocoding) ─────────────────────────────────────
