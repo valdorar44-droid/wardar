@@ -96,6 +96,50 @@ _MIL_BASES_OSM_QUERY = """
 out center qt 1000;
 """
 
+# Hardcoded major global military bases — guaranteed fallback when ArcGIS/OSM fail
+_MIL_BASES_FALLBACK = [
+    # USA
+    {"name":"Pentagon","lat":38.8719,"lon":-77.0563,"country":"USA","branch":"DoD HQ"},
+    {"name":"Naval Station Norfolk","lat":36.9376,"lon":-76.2988,"country":"USA","branch":"Navy"},
+    {"name":"Joint Base Pearl Harbor-Hickam","lat":21.3549,"lon":-157.9781,"country":"USA","branch":"Navy/Air Force"},
+    {"name":"Ramstein Air Base","lat":49.4369,"lon":7.6003,"country":"Germany","branch":"USAF"},
+    {"name":"Incirlik Air Base","lat":37.0021,"lon":35.4258,"country":"Turkey","branch":"USAF"},
+    {"name":"Diego Garcia","lat":-7.3133,"lon":72.4228,"country":"BIOT","branch":"USN/RAF"},
+    {"name":"Camp Humphreys","lat":36.9722,"lon":127.0289,"country":"South Korea","branch":"USA"},
+    {"name":"Kadena Air Base","lat":26.3556,"lon":127.7689,"country":"Japan","branch":"USAF"},
+    {"name":"Guantanamo Bay","lat":19.9062,"lon":-75.0988,"country":"Cuba (US lease)","branch":"USN"},
+    {"name":"Al Udeid Air Base","lat":25.1173,"lon":51.3148,"country":"Qatar","branch":"USAF"},
+    {"name":"Ali Al Salem Air Base","lat":29.3467,"lon":47.5208,"country":"Kuwait","branch":"USAF"},
+    {"name":"NSA Bahrain (5th Fleet)","lat":26.2285,"lon":50.5899,"country":"Bahrain","branch":"USN"},
+    {"name":"Andersen Air Force Base","lat":13.5838,"lon":144.9278,"country":"Guam","branch":"USAF"},
+    # Russia
+    {"name":"RVSN HQ (Vlasikha)","lat":55.7219,"lon":37.1536,"country":"Russia","branch":"Strategic Rocket Forces"},
+    {"name":"Severomorsk Naval Base","lat":69.0767,"lon":33.4194,"country":"Russia","branch":"Northern Fleet"},
+    {"name":"Tartus Naval Base","lat":34.9064,"lon":35.8869,"country":"Syria","branch":"Russia Navy"},
+    {"name":"Hmeimim Air Base","lat":35.4014,"lon":37.2356,"country":"Syria","branch":"Russia Air Force"},
+    {"name":"Engels Air Base","lat":51.5608,"lon":46.1756,"country":"Russia","branch":"Long-Range Aviation"},
+    {"name":"Kubinka Air Base","lat":55.6076,"lon":36.6561,"country":"Russia","branch":"Russia Air Force"},
+    # China
+    {"name":"Sanya Naval Base (Yulin)","lat":18.2292,"lon":109.5664,"country":"China","branch":"PLAN South Sea Fleet"},
+    {"name":"Djibouti Military Base","lat":11.5567,"lon":43.1592,"country":"Djibouti","branch":"PLA Navy"},
+    {"name":"Ream Naval Base (Cambodia)","lat":10.5247,"lon":103.6731,"country":"Cambodia","branch":"PLA Navy"},
+    {"name":"Zhanjiang Naval Base","lat":21.1899,"lon":110.3908,"country":"China","branch":"PLAN"},
+    # NATO / Europe
+    {"name":"RAF Brize Norton","lat":51.7501,"lon":-1.5836,"country":"UK","branch":"RAF"},
+    {"name":"SHAPE (NATO HQ)","lat":50.5097,"lon":4.4806,"country":"Belgium","branch":"NATO"},
+    {"name":"Aviano Air Base","lat":46.0319,"lon":12.5961,"country":"Italy","branch":"USAF/NATO"},
+    {"name":"Mihail Kogalniceanu AB","lat":44.3619,"lon":28.4881,"country":"Romania","branch":"NATO"},
+    # Middle East
+    {"name":"Nevatim Air Base","lat":31.2083,"lon":34.9928,"country":"Israel","branch":"IAF"},
+    {"name":"Tel Nof Air Base","lat":31.8394,"lon":34.8219,"country":"Israel","branch":"IAF"},
+    {"name":"Hatzerim Air Base","lat":31.2331,"lon":34.6642,"country":"Israel","branch":"IAF"},
+    {"name":"Al-Tanf Garrison","lat":33.5086,"lon":38.6831,"country":"Syria","branch":"US Army"},
+    {"name":"King Faisal Air Base","lat":17.1442,"lon":42.6564,"country":"Saudi Arabia","branch":"RSAF"},
+    # North Korea
+    {"name":"Sunchon Air Base","lat":39.4322,"lon":125.9072,"country":"North Korea","branch":"KPAF"},
+    {"name":"Wonsan-Kalma Airport (military)","lat":39.1667,"lon":127.4864,"country":"North Korea","branch":"KPAF"},
+]
+
 # Major pipelines — OpenStreetMap Overpass (international oil/gas lines)
 _PIPELINE_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 _PIPELINE_QUERY = """
@@ -226,7 +270,21 @@ async def _fetch_mil_bases() -> dict:
     except Exception as exc:
         log_warn(f"mil_bases: OSM fallback error: {exc}")
 
-    return {"type": "FeatureCollection", "features": []}
+    # Hardcoded fallback — guaranteed coverage for key global military installations
+    log("mil_bases: using hardcoded fallback list")
+    features = []
+    for b in _MIL_BASES_FALLBACK:
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [b["lon"], b["lat"]]},
+            "properties": {
+                "name":    b["name"],
+                "country": b["country"],
+                "military": "base",
+                "operator": b.get("branch", ""),
+            },
+        })
+    return {"type": "FeatureCollection", "features": features}
 
 
 async def _fetch_pipelines() -> dict:
@@ -283,13 +341,18 @@ async def _fetch_isw_ukraine() -> dict:
                 if r.status_code != 200:
                     continue
                 data = r.json()
-                # DeepState returns {"state": {...}} or direct GeoJSON
+                # DeepStateMap API returns {"id":..., "map": {FeatureCollection}}
+                if "map" in data and isinstance(data["map"], dict):
+                    fc = data["map"]
+                    if fc.get("features"):
+                        log(f"isw_ukraine: {len(fc['features'])} features (DeepStateMap)")
+                        return fc
+                # Direct GeoJSON FeatureCollection
                 if "features" in data:
                     log(f"isw_ukraine: {len(data['features'])} features")
                     return data
                 # DeepState wrapped format
                 if "ua" in data or "ru" in data or "state" in data:
-                    # Wrap in FeatureCollection
                     features = []
                     for key, geom in data.items():
                         if isinstance(geom, dict) and geom.get("type") in ("Polygon","MultiPolygon","LineString","MultiLineString","GeometryCollection"):

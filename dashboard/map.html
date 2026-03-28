@@ -3672,14 +3672,17 @@ function toggleAutoRotate(){
 
 // ── REST initial load ─────────────────────────────────────────────────────────
 async function loadInitialData(){
-  // Phase 1: critical data — positions + recent events (fast, small)
+  // Phase 1: critical data — positions + events (fast, small)
   try{
-    const [posRes, evtRes]=await Promise.all([
+    const [posRes, evtRes, mapEvtRes]=await Promise.all([
       fetch('/api/positions?limit=2000').then(r=>r.json()),
       fetch('/api/events?limit=300').then(r=>r.json()),
+      // Fetch map-relevant event sources separately — they get buried under news in default sort
+      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket&limit=500').then(r=>r.json()),
     ]);
     (posRes.data||[]).forEach(p=>updatePosition(p,false));
     (evtRes.data||[]).forEach(e=>updateEvent(e,false));
+    (mapEvtRes.data||[]).forEach(e=>updateEvent(e,false));
     [...(evtRes.data||[])].slice(0,30).reverse().forEach(e=>{
       if(e.title) pushFeed(e);
     });

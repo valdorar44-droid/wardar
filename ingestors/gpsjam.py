@@ -51,7 +51,7 @@ async def fetch() -> list[dict]:
     rows: list[dict] = []
     fetched_date = ""
 
-    for day_offset in range(3):  # try today, yesterday, day before
+    for day_offset in range(5):  # try today and up to 4 days back (gpsjam has ~2-day lag)
         date_str  = _date_str(day_offset)
         url       = f"{_BASE_URL}/{date_str}-h3_{_H3_RES}.csv"
         try:

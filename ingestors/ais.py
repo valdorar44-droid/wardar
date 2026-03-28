@@ -31,24 +31,24 @@ _SHIP_TYPES = {
 # Drops ~95% of AIS traffic (fishing, cargo, pleasure craft, ferries).
 # Tankers = critical infrastructure. Military MMSI = warships. Gov = coast guard.
 _PRIORITY_TYPES = frozenset([
-    *range(80, 90),   # tankers: oil, chemical, LNG, LPG — all variants
-    *range(40, 50),   # high-speed craft: patrol boats, interceptors
-    50, 51, 52, 55,   # pilot, SAR, tug (military support), law enforcement
-    35,               # diving operations (submarines surfaced / EOD)
+    *range(70, 90),   # cargo (70-79) + tankers (80-89): oil, chemical, LNG, LPG, bulk
+    *range(40, 60),   # high-speed craft (40-49) + special (50-59): patrol, SAR, law enforcement
+    35,               # diving ops / submarines surfaced
+    0,                # unknown type — include, don't silently drop
 ])
 
+# Ship types that indicate actual military/government vessels
+_MIL_SHIP_TYPES = frozenset([50, 51, 52, 53, 55, 35])  # law enforcement, SAR, diving
+
 def _is_priority(ship_type: int | None, mmsi: str) -> tuple[bool, int]:
-    """Returns (is_priority, military_flag)."""
-    st = ship_type or 0
-    # Military MMSI prefix: warships use 100–109xxxxxxx
-    mmsi_prefix = (mmsi or "")[:3]
-    if mmsi_prefix in {"100","101","102","103","104","105","106","107","108","109"}:
-        return True, 1
-    # MMSI starting with 0 = maritime mobile service (often government)
-    if mmsi and mmsi.startswith("0") and len(mmsi) == 9:
-        return True, 1
+    """Returns (is_priority, military_flag).
+    Military flag is set ONLY based on ship_type, not MMSI.
+    Over-broad MMSI-based detection incorrectly delayed civilian tankers 24h.
+    Real warships rarely broadcast AIS; rely on type codes instead.
+    """
+    st = ship_type if ship_type is not None else 0
     if st in _PRIORITY_TYPES:
-        is_mil = 1 if st in {50, 51, 55, 35} else 0
+        is_mil = 1 if st in _MIL_SHIP_TYPES else 0
         return True, is_mil
     return False, 0
 
