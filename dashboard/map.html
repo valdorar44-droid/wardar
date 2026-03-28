@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script>window.CESIUM_BASE_URL='https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/';</script>
 <!-- Cesium loaded lazily on demand — keeps initial page load instant -->
 <style>
@@ -978,6 +980,19 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 .dlg-btn.primary{border-color:var(--green);color:var(--green)}
 .dlg-btn.primary:hover{background:var(--green-dim)}
 
+/* ── Quick-jump bookmarks ── */
+#quickjump{display:flex;flex-wrap:wrap;gap:3px;padding:.35rem .5rem;border-bottom:1px solid var(--border)}
+.qj-btn{background:none;border:1px solid var(--border);color:var(--dim2);font-family:var(--font);font-size:.48rem;letter-spacing:.07em;padding:.18rem .4rem;cursor:pointer;transition:all .12s;flex-shrink:0}
+.qj-btn:hover{border-color:var(--amber);color:var(--amber)}
+/* ── Tile layer switcher ── */
+#tile-sw{display:flex;gap:2px;padding:.25rem .5rem;border-bottom:1px solid var(--border)}
+.ts-btn{background:none;border:1px solid var(--border);color:var(--dim2);font-family:var(--font);font-size:.46rem;letter-spacing:.06em;padding:.15rem .35rem;cursor:pointer;flex:1;transition:all .12s}
+.ts-btn.active,.ts-btn:hover{border-color:var(--green);color:var(--green)}
+/* ── Temporal filter ── */
+#time-filter{display:flex;gap:2px;padding:.2rem .75rem .3rem}
+.tf-btn{background:none;border:1px solid var(--border);color:var(--dim2);font-family:var(--font);font-size:.48rem;letter-spacing:.06em;padding:.15rem .4rem;cursor:pointer;flex:1;text-align:center;transition:all .12s}
+.tf-btn.active{background:rgba(245,158,11,.12);border-color:var(--amber);color:var(--amber)}
+.tf-btn:hover:not(.active){border-color:var(--dim);color:var(--fg)}
 /* ── Zoom-aware icon labels ── */
 .wdr-lbl{
   position:absolute;top:calc(100% + 2px);left:50%;
@@ -1112,6 +1127,26 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         <div class="panel-sub">DOMAIN LAYER CONTROL</div>
         <button class="panel-collapse-btn" onclick="togglePanelCollapse()" title="Collapse panel">◀</button>
       </div>
+      <!-- Quick-jump region bookmarks -->
+      <div id="quickjump">
+        <button class="qj-btn" onclick="jumpTo(47.5,35,6)"   title="Ukraine front">🇺🇦 UA</button>
+        <button class="qj-btn" onclick="jumpTo(31.5,34.5,11)" title="Gaza Strip">GAZA</button>
+        <button class="qj-btn" onclick="jumpTo(24,120,7)"    title="Taiwan Strait">⚑ TWN</button>
+        <button class="qj-btn" onclick="jumpTo(27,55,7)"     title="Persian Gulf / Hormuz">⛽ GULF</button>
+        <button class="qj-btn" onclick="jumpTo(13,44,8)"     title="Red Sea / Bab-el-Mandeb">RED SEA</button>
+        <button class="qj-btn" onclick="jumpTo(37.5,127,7)"  title="Korean Peninsula">KOREA</button>
+        <button class="qj-btn" onclick="jumpTo(35.5,38,7)"   title="Syria">SYR</button>
+        <button class="qj-btn" onclick="jumpTo(13,5,5)"      title="Sahel region">SAHEL</button>
+        <button class="qj-btn" onclick="jumpTo(57,20,6)"     title="Baltic Sea">BALTIC</button>
+        <button class="qj-btn" onclick="jumpTo(25,30,3)"     title="Global view">GLOBAL</button>
+      </div>
+      <!-- Tile layer switcher -->
+      <div id="tile-sw">
+        <button class="ts-btn active" id="ts-dark"     onclick="setTileLayer('dark')">DARK</button>
+        <button class="ts-btn"        id="ts-terrain"  onclick="setTileLayer('terrain')">TERRAIN</button>
+        <button class="ts-btn"        id="ts-sat"      onclick="setTileLayer('sat')">SAT</button>
+        <button class="ts-btn"        id="ts-tactical" onclick="setTileLayer('tactical')">TACTICAL</button>
+      </div>
       <div class="layer-list">
 
         <!-- ── LIVE TRACKING ── -->
@@ -1236,6 +1271,50 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-icon" style="color:var(--orange)">🗺</span>
               <span class="layer-name">ME ZONES</span>
               <span class="layer-count" id="cnt-isw-me" style="background:var(--orange)">—</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── TACTICAL OVERLAYS ── -->
+        <div class="layer-group" id="grp-tactical">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:var(--red)"></span>
+            <span class="grp-label">TACTICAL</span>
+            <span class="grp-badge" id="grp-tactical-badge">—</span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-choke" checked style="color:var(--cyan)" onchange="toggleChokePoints(this.checked)">
+              <span class="layer-icon" style="color:var(--cyan)">⊕</span>
+              <span class="layer-name">CHOKE POINTS</span>
+            </label>
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-lanes" checked style="color:var(--green)" onchange="toggleShippingLanes(this.checked)">
+              <span class="layer-icon" style="color:var(--green)">⌇</span>
+              <span class="layer-name">SHIPPING LANES</span>
+            </label>
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-threats" style="color:var(--red)" onchange="toggleThreatRings(this.checked)">
+              <span class="layer-icon" style="color:var(--red)">◎</span>
+              <span class="layer-name">THREAT RINGS</span>
+              <span style="font-size:.42rem;color:var(--dim2);margin-left:auto">OSINT</span>
+            </label>
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-sam" style="color:#e879f9" onchange="toggleSamCoverage(this.checked)">
+              <span class="layer-icon" style="color:#e879f9">▲</span>
+              <span class="layer-name">SAM COVERAGE</span>
+              <span style="font-size:.42rem;color:var(--dim2);margin-left:auto">OSINT</span>
+            </label>
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-trails2d" checked style="color:var(--amber)" onchange="setTrails2D(this.checked)">
+              <span class="layer-icon" style="color:var(--amber)">⊷</span>
+              <span class="layer-name">MOVEMENT TRAILS</span>
+            </label>
+            <label class="layer-item" style="cursor:pointer" onclick="toggleDrawTools()">
+              <input type="checkbox" class="layer-cb" id="cb-draw" style="color:var(--green)">
+              <span class="layer-icon" style="color:var(--green)">✏</span>
+              <span class="layer-name">DRAW / ANNOTATE</span>
             </label>
           </div>
         </div>
@@ -1369,6 +1448,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         <div class="rp-pane active" id="pane-feed">
           <div class="rp-head">
             LIVE EVENTS <span id="feed-count">0</span> IN BUFFER
+          </div>
+          <!-- Temporal event filter -->
+          <div id="time-filter">
+            <button class="tf-btn active" id="tf-all"  onclick="setTimeFilter('all')">ALL</button>
+            <button class="tf-btn"        id="tf-1h"   onclick="setTimeFilter('1h')">1H</button>
+            <button class="tf-btn"        id="tf-6h"   onclick="setTimeFilter('6h')">6H</button>
+            <button class="tf-btn"        id="tf-24h"  onclick="setTimeFilter('24h')">24H</button>
+            <button class="tf-btn"        id="tf-7d"   onclick="setTimeFilter('7d')">7D</button>
           </div>
           <div id="feed-list"></div>
         </div>
@@ -3068,7 +3155,7 @@ function initMap2D(){
     preferCanvas:true,
   });
   window._leafletMap = _map2d; // expose for cinema mode resize
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  _tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
     attribution:'© CartoDB',maxZoom:19,
   }).addTo(_map2d);
   L.control.zoom({position:'topleft'}).addTo(_map2d);
@@ -3452,6 +3539,7 @@ function updatePosition(p, isNew){
       _trails[cs].push({lat:p.lat,lon:p.lon});
       if(_trails[cs].length>_TRAIL_MAX) _trails[cs].shift();
     }
+    if(_mapMode==='2d') _updateTrail2D(cs, _trails[cs], LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b');
   }
   if(isNew&&(p.title||p.callsign)) pushFeed({...p,source:p.source});
   if(isNew&&Math.random()<0.12) spawnPulse(p.lat,p.lon,LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b');
@@ -3972,6 +4060,275 @@ function toggleAutoRotate(){
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ── TACTICAL OVERLAY DATA (public OSINT — FAS/CSIS/Jane's open sources) ───────
+// ══════════════════════════════════════════════════════════════════════════════
+
+const CHOKE_POINTS = [
+  {n:"Strait of Hormuz",    lat:26.56,lon:56.25, info:"~20% global oil transit · Houthi threat",        threat:"CRITICAL"},
+  {n:"Bab-el-Mandeb",       lat:12.58,lon:43.44, info:"Red Sea gateway · active Houthi ASM/UAV ops",    threat:"CRITICAL"},
+  {n:"Taiwan Strait",       lat:24.12,lon:119.85,info:"PRC flashpoint · ~1,500 vessels/month",          threat:"CRITICAL"},
+  {n:"Suez Canal",          lat:30.42,lon:32.35, info:"~12% global trade · Egyptian control",           threat:"HIGH"},
+  {n:"Bosphorus / Dardanelles",lat:41.12,lon:29.08,info:"Black Sea gateway · Montreux Convention",      threat:"HIGH"},
+  {n:"GIUK Gap",            lat:62.5, lon:-10.5, info:"NATO ASW chokepoint · Russian submarine route",  threat:"HIGH"},
+  {n:"Luzon Strait",        lat:20.0, lon:121.5, info:"Philippine Sea gateway · PLA Navy transit",      threat:"HIGH"},
+  {n:"Strait of Malacca",   lat:1.26, lon:103.83,info:"~$5T annual trade · world's busiest waterway",  threat:"MODERATE"},
+  {n:"Strait of Gibraltar",  lat:35.97,lon:-5.74,info:"Atlantic-Mediterranean gateway · NATO anchor",   threat:"MODERATE"},
+  {n:"Lombok Strait",       lat:-8.72,lon:115.73,info:"South China Sea bypass · PLA Navy transit",      threat:"MODERATE"},
+  {n:"Panama Canal",        lat:9.08, lon:-79.68,info:"Pacific↔Atlantic shortcut · water level issues", threat:"LOW"},
+  {n:"Suez (Northern Entry)",lat:31.26,lon:32.31,info:"Mediterranean entrance to Suez",                 threat:"MODERATE"},
+];
+
+const SHIPPING_LANES = [
+  {n:"Trans-Pacific",      pts:[[34,129],[40,150],[50,-175],[47,-125],[33,-118]], col:"#22c55e", status:"OPEN"},
+  {n:"Trans-Atlantic",     pts:[[51,-1],[48,-18],[43,-38],[35,-60],[25,-75]],     col:"#22c55e", status:"OPEN"},
+  {n:"Europe↔Asia (Suez)", pts:[[51,1],[36,14],[30,32],[13,43],[8,77],[1,104],[22,114],[25,55],[27,57]], col:"#f59e0b", status:"CONTESTED"},
+  {n:"Cape Route (alternate)",pts:[[51,1],[0,0],[-35,18],[-38,145]],             col:"#22c55e", status:"OPEN"},
+  {n:"Persian Gulf↔Asia",  pts:[[27,56],[13,43],[8,77],[1,104],[22,114]],         col:"#ef4444", status:"HIGH THREAT"},
+  {n:"Pacific (Northern)", pts:[[34,140],[52,165],[60,-172],[57,-155],[47,-123]], col:"#22c55e", status:"OPEN"},
+];
+
+// Public OSINT sources: FAS, CSIS Missile Threat, KCNA Watch, IISS
+const THREAT_RINGS = [
+  {n:"Iran — Shahab-3/Kheibar-Shekan MRBM",lat:35.7, lon:51.4,  r:2000, col:"#ef4444"},
+  {n:"Iran — Houthi proxy UAV/cruise",       lat:15.5, lon:44.2,  r:2500, col:"#f97316"},
+  {n:"Russia — Iskander-M SRBM (Kaliningrad)",lat:54.7,lon:20.5,  r:500,  col:"#ff3b1e"},
+  {n:"Russia — Iskander-M SRBM (Belarus)",   lat:53.9, lon:27.6,  r:500,  col:"#ff3b1e"},
+  {n:"Russia — Kinzhal hypersonic (Kola)",   lat:68.6, lon:33.4,  r:2000, col:"#ff3b1e"},
+  {n:"DPRK — Hwasong-15 ICBM (est.)",        lat:39.0, lon:125.7, r:8500, col:"#a855f7"},
+  {n:"DPRK — Nodong-1 MRBM",                lat:39.0, lon:125.7, r:1300, col:"#a855f7"},
+  {n:"China — DF-21D ASBM (anti-ship)",      lat:31.2, lon:121.5, r:1500, col:"#3b82f6"},
+  {n:"China — DF-26 IRBM",                   lat:35.0, lon:108.0, r:4000, col:"#3b82f6"},
+];
+
+// Public OSINT: FAS, IISS, Open Source Centre
+const SAM_SITES = [
+  {n:"S-400 Triumph (Kaliningrad)",   lat:54.7, lon:20.5,  r:400,  cn:"Russia",  sys:"S-400"},
+  {n:"S-400 Triumph (Crimea)",        lat:45.3, lon:34.9,  r:400,  cn:"Russia",  sys:"S-400"},
+  {n:"S-400 Triumph (Belarus)",       lat:52.5, lon:28.5,  r:400,  cn:"Russia",  sys:"S-400"},
+  {n:"S-300V4 (Syria — Tartus area)", lat:35.0, lon:36.2,  r:300,  cn:"Russia",  sys:"S-300V4"},
+  {n:"Patriot PAC-3 (Poland)",        lat:52.4, lon:16.9,  r:160,  cn:"NATO",    sys:"PAC-3"},
+  {n:"Patriot PAC-3 (Romania)",       lat:44.1, lon:26.1,  r:160,  cn:"NATO",    sys:"PAC-3"},
+  {n:"THAAD (South Korea — Seongju)", lat:35.9, lon:128.5, r:200,  cn:"USA/ROK", sys:"THAAD"},
+  {n:"Patriot (Kadena, Japan)",       lat:26.4, lon:127.8, r:160,  cn:"USA",     sys:"PAC-3"},
+  {n:"HQ-9B (Fujian — Taiwan strait)",lat:26.5, lon:119.5, r:200,  cn:"China",   sys:"HQ-9B"},
+  {n:"S-300PMU-2 (Iran — Tehran)",    lat:35.7, lon:51.4,  r:200,  cn:"Iran",    sys:"S-300PMU-2"},
+  {n:"Iron Dome battery (Israel)",    lat:31.8, lon:35.2,  r:70,   cn:"Israel",  sys:"Iron Dome"},
+  {n:"Patriot (Riyadh)",              lat:24.7, lon:46.7,  r:160,  cn:"Saudi",   sys:"PAC-3"},
+  {n:"Patriot PAC-3 (Kuwait)",        lat:29.4, lon:47.7,  r:160,  cn:"Kuwait",  sys:"PAC-3"},
+];
+
+// ── Leaflet layer refs ──
+let _chokeLayer    = null;
+let _lanesLayer    = null;
+let _threatLayer   = null;
+let _samLayer      = null;
+let _drawLayer     = null;
+let _drawControl   = null;
+let _drawOn        = false;
+let _trails2dOn    = true;
+let _trails2dLines = {}; // callsign → L.polyline
+let _tileLayer     = null;
+let _timeFilter    = 'all'; // all|1h|6h|24h|7d
+
+// ── Tile layers ───────────────────────────────────────────────────────────────
+const TILE_SOURCES = {
+  dark:    {url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',    attr:'© CartoDB'},
+  terrain: {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',attr:'© Esri'},
+  sat:     {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attr:'© Esri'},
+  tactical:{url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',attr:'© CartoDB'},
+};
+function setTileLayer(name){
+  if(!_map2d) return;
+  if(_tileLayer) _map2d.removeLayer(_tileLayer);
+  const src = TILE_SOURCES[name]||TILE_SOURCES.dark;
+  _tileLayer = L.tileLayer(src.url,{attribution:src.attr,maxZoom:19}).addTo(_map2d);
+  _tileLayer.bringToBack();
+  document.querySelectorAll('.ts-btn').forEach(b=>b.classList.remove('active'));
+  const btn = document.getElementById(`ts-${name}`);
+  if(btn) btn.classList.add('active');
+}
+
+// ── Quick-jump regions ────────────────────────────────────────────────────────
+function jumpTo(lat,lon,zoom){
+  if(_mapMode==='2d'&&_map2d){ _map2d.setView([lat,lon],zoom,{animate:true}); return; }
+  if(_mapMode==='3d'&&cesium){
+    cesium.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(lon,lat,zoom<=5?8000000:zoom<=7?3000000:zoom<=9?1000000:300000)});
+  }
+}
+
+// ── Temporal event filter ─────────────────────────────────────────────────────
+function setTimeFilter(f){
+  _timeFilter = f;
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  const btn = document.getElementById(`tf-${f}`); if(btn) btn.classList.add('active');
+  // Re-apply filter to the feed list items
+  const cutoff = _tfCutoff();
+  document.querySelectorAll('#feed-list .feed-item').forEach(el=>{
+    const ts = el.dataset.ts ? new Date(el.dataset.ts) : null;
+    el.style.display = (!ts||!cutoff||ts>=cutoff) ? '' : 'none';
+  });
+  // Re-apply to map markers (events)
+  Object.entries(_markers2d).forEach(([k,m])=>{
+    const d = m._wdata; if(!d) return;
+    const isEvent = !!(d.title);
+    if(!isEvent) return;
+    const ts = d.raw_ts_utc ? new Date(d.raw_ts_utc) : null;
+    const show = !ts||!cutoff||(ts>=cutoff);
+    const lk = sourceToLayerKey(d.source||d._lk||'');
+    const cl = _cluster2d[lk];
+    if(show && cl && !cl.hasLayer(m)) cl.addLayer(m);
+    else if(!show && cl && cl.hasLayer(m)) cl.removeLayer(m);
+  });
+}
+function _tfCutoff(){
+  const now = Date.now();
+  if(_timeFilter==='1h')  return new Date(now - 3600000);
+  if(_timeFilter==='6h')  return new Date(now - 21600000);
+  if(_timeFilter==='24h') return new Date(now - 86400000);
+  if(_timeFilter==='7d')  return new Date(now - 604800000);
+  return null;
+}
+
+// ── Choke points ──────────────────────────────────────────────────────────────
+const _THREAT_COLS = {CRITICAL:'#ef4444',HIGH:'#f97316',MODERATE:'#eab308',LOW:'#22c55e'};
+function _initChokeLayer(){
+  if(_chokeLayer||!_map2d) return;
+  _chokeLayer = L.layerGroup();
+  CHOKE_POINTS.forEach(cp=>{
+    const col = _THREAT_COLS[cp.threat]||'#06b6d4';
+    const ico = L.divIcon({
+      html:`<div style="position:relative;text-align:center">
+        <div style="font-size:14px;line-height:1;color:${col};text-shadow:0 0 6px ${col}88;filter:drop-shadow(0 0 3px ${col})">⊕</div>
+        <div style="font-size:5.5px;font-family:monospace;color:${col};white-space:nowrap;letter-spacing:.05em;margin-top:1px">${cp.n}</div>
+      </div>`,
+      className:'', iconSize:[90,28], iconAnchor:[45,14]
+    });
+    const m = L.marker([cp.lat,cp.lon],{icon:ico});
+    m.bindPopup(`<div style="font-family:monospace;font-size:11px;background:#08080c;color:#b8bcc8;padding:.5rem .7rem;border:1px solid #1e1e2a;max-width:240px">
+      <div style="color:${col};font-weight:700;letter-spacing:.1em;margin-bottom:.35rem">⊕ ${esc(cp.n)}</div>
+      <div style="font-size:.6rem;color:var(--dim2);margin-bottom:.2rem">${esc(cp.info)}</div>
+      <div style="font-size:.55rem">THREAT LEVEL: <span style="color:${col};font-weight:700">${cp.threat}</span></div>
+    </div>`,{className:'wardar-popup',maxWidth:260});
+    _chokeLayer.addLayer(m);
+  });
+  _chokeLayer.addTo(_map2d);
+}
+function toggleChokePoints(show){
+  if(!_map2d) return;
+  if(show){ _initChokeLayer(); if(_chokeLayer&&!_map2d.hasLayer(_chokeLayer)) _chokeLayer.addTo(_map2d); }
+  else if(_chokeLayer) _map2d.removeLayer(_chokeLayer);
+}
+
+// ── Shipping lanes ────────────────────────────────────────────────────────────
+function _initLanesLayer(){
+  if(_lanesLayer||!_map2d) return;
+  _lanesLayer = L.layerGroup();
+  const STATUS_COLS = {'OPEN':'#22c55e','CONTESTED':'#f59e0b','HIGH THREAT':'#ef4444'};
+  SHIPPING_LANES.forEach(ln=>{
+    const col = STATUS_COLS[ln.status]||ln.col||'#22c55e';
+    const polyline = L.polyline(ln.pts,{color:col,weight:1.5,opacity:.55,dashArray:'6 8'})
+      .bindTooltip(`${ln.n} — ${ln.status}`,{className:'measure-tip',sticky:true});
+    _lanesLayer.addLayer(polyline);
+  });
+  _lanesLayer.addTo(_map2d);
+}
+function toggleShippingLanes(show){
+  if(!_map2d) return;
+  if(show){ _initLanesLayer(); if(_lanesLayer&&!_map2d.hasLayer(_lanesLayer)) _lanesLayer.addTo(_map2d); }
+  else if(_lanesLayer) _map2d.removeLayer(_lanesLayer);
+}
+
+// ── Threat rings ──────────────────────────────────────────────────────────────
+function _initThreatLayer(){
+  if(_threatLayer||!_map2d) return;
+  _threatLayer = L.layerGroup();
+  THREAT_RINGS.forEach(t=>{
+    const ring = L.circle([t.lat,t.lon],{
+      radius:t.r*1000, color:t.col, weight:1, opacity:.65,
+      fillColor:t.col, fillOpacity:.04, dashArray:'5 8'
+    }).bindTooltip(`${t.n}<br>${t.r.toLocaleString()} km`,{className:'measure-tip',sticky:true});
+    _threatLayer.addLayer(ring);
+    // Label at ring edge
+    const lblPt = _map2d.layerPointToLatLng(_map2d.latLngToLayerPoint([t.lat,t.lon]).add([t.r*0.5,0]));
+    _threatLayer.addLayer(L.marker([t.lat,t.lon+t.r*0.009],{
+      icon:L.divIcon({html:`<div style="font-size:5.5px;font-family:monospace;color:${t.col}88;white-space:nowrap">${t.n.split('—')[0].trim()}</div>`,className:'',iconSize:[120,12],iconAnchor:[0,6]})
+    }));
+  });
+}
+function toggleThreatRings(show){
+  if(!_map2d) return;
+  if(show){ _initThreatLayer(); if(_threatLayer&&!_map2d.hasLayer(_threatLayer)) _threatLayer.addTo(_map2d); }
+  else if(_threatLayer) _map2d.removeLayer(_threatLayer);
+}
+
+// ── SAM coverage ──────────────────────────────────────────────────────────────
+const _SAM_NATION_COLS = {Russia:'#ff3b1e',NATO:'#3b82f6',USA:'#3b82f6',China:'#a855f7',Iran:'#f97316',Israel:'#22c55e',Saudi:'#f59e0b',Kuwait:'#f59e0b','USA/ROK':'#3b82f6'};
+function _initSamLayer(){
+  if(_samLayer||!_map2d) return;
+  _samLayer = L.layerGroup();
+  SAM_SITES.forEach(s=>{
+    const col = _SAM_NATION_COLS[s.cn]||'#e879f9';
+    L.circle([s.lat,s.lon],{
+      radius:s.r*1000, color:col, weight:1.2, opacity:.7,
+      fillColor:col, fillOpacity:.06, dashArray:'3 6'
+    }).bindTooltip(`${s.n}<br>${s.sys} — ${s.r}km range`,{className:'measure-tip',sticky:true})
+      .addTo(_samLayer);
+    L.marker([s.lat,s.lon],{
+      icon:L.divIcon({html:`<div style="font-size:11px;color:${col};filter:drop-shadow(0 0 3px ${col})">▲</div>`,className:'',iconSize:[14,14],iconAnchor:[7,7]})
+    }).bindTooltip(s.n,{className:'measure-tip',sticky:true}).addTo(_samLayer);
+  });
+}
+function toggleSamCoverage(show){
+  if(!_map2d) return;
+  if(show){ _initSamLayer(); if(_samLayer&&!_map2d.hasLayer(_samLayer)) _samLayer.addTo(_map2d); }
+  else if(_samLayer) _map2d.removeLayer(_samLayer);
+}
+
+// ── Draw / annotate tools ─────────────────────────────────────────────────────
+function toggleDrawTools(){
+  const cb = document.getElementById('cb-draw');
+  _drawOn = !_drawOn;
+  if(cb) cb.checked = _drawOn;
+  if(!_map2d||typeof L.Draw==='undefined') return;
+  if(_drawOn){
+    if(!_drawLayer){
+      _drawLayer = new L.FeatureGroup().addTo(_map2d);
+      _drawControl = new L.Control.Draw({
+        position:'topright',
+        edit:{featureGroup:_drawLayer,remove:true},
+        draw:{
+          polygon:{shapeOptions:{color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.1}},
+          polyline:{shapeOptions:{color:'#22c55e',weight:2}},
+          circle:{shapeOptions:{color:'#ef4444',fillColor:'#ef4444',fillOpacity:.06}},
+          rectangle:{shapeOptions:{color:'#3b82f6',fillOpacity:.06}},
+          marker:false, circlemarker:false
+        }
+      });
+      _map2d.addControl(_drawControl);
+      _map2d.on(L.Draw.Event.CREATED, e=>{ _drawLayer.addLayer(e.layer); });
+    }
+  } else {
+    if(_drawControl){ _map2d.removeControl(_drawControl); _drawControl=null; }
+    if(_drawLayer){ _map2d.removeLayer(_drawLayer); _drawLayer=null; }
+  }
+}
+
+// ── Movement trails in 2D ─────────────────────────────────────────────────────
+function setTrails2D(on){ _trails2dOn = on; if(!on) _clearTrails2D(); }
+function _clearTrails2D(){
+  Object.values(_trails2dLines).forEach(l=>{ if(_map2d) _map2d.removeLayer(l); });
+  _trails2dLines = {};
+}
+function _updateTrail2D(callsign, pts, color){
+  if(!_map2d||!_trails2dOn||pts.length<2) return;
+  if(_trails2dLines[callsign]) _map2d.removeLayer(_trails2dLines[callsign]);
+  _trails2dLines[callsign] = L.polyline(
+    pts.map(p=>[p.lat,p.lon]),
+    {color,weight:1.5,opacity:.45,dashArray:'3 6'}
+  ).addTo(_map2d);
+}
+
 // ── REST initial load ─────────────────────────────────────────────────────────
 async function loadInitialData(){
   // Phase 1: critical data — positions + events (fast, small)
@@ -4001,6 +4358,8 @@ async function loadInitialData(){
 
   // Phase 3: heavy static layers — defer 2s after map is interactive
   setTimeout(()=> loadStaticLayers(), 2000);
+  // Phase 3b: tactical overlays — auto-init default-checked layers
+  setTimeout(()=>{ _initChokeLayer(); _initLanesLayer(); }, 1500);
   // Phase 4: frontline overlays — defer 3s (large GeoJSON)
   setTimeout(()=> loadIswLayers(), 3000);
 }
