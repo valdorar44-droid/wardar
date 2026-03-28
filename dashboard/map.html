@@ -951,7 +951,7 @@ body::after{
       <button class="img-src-btn"        id="ib-s2"      onclick="switchImagery('s2')">SENTINEL‑2 2024</button>
       <button class="img-src-btn"        id="ib-modis"   onclick="switchImagery('modis')">MODIS DAILY</button>
       <button class="img-src-btn"        id="ib-viirs"   onclick="switchImagery('viirs')">VIIRS DAILY</button>
-      <button class="img-src-btn"        id="ib-sh"      onclick="switchImagery('sh')" style="display:none">SENTINEL HUB</button>
+      <button class="img-src-btn"        id="ib-sh"      onclick="switchImagery('sh')" style="display:none">PLANET DAILY</button>
     </div>
     <div style="display:flex;align-items:center;gap:.5rem;padding:.15rem 0">
       <span id="img-res-label"    style="color:var(--dim2)">RES</span>
@@ -4108,7 +4108,7 @@ async function _applyImageryLayer(mode, dateStr) {
         break;
       }
       case 'sh': {
-        // Sentinel Hub near-real-time (5-day, 10m) — requires SENTINEL_HUB_ID env var
+        // Planet PlanetScope near-real-time via Sentinel Hub OGC — requires SENTINEL_HUB_ID env var
         if(!SENTINEL_HUB_ID){
           const st = document.getElementById('img-status');
           if(st) st.textContent = 'SET SENTINEL_HUB_INSTANCE_ID ENV VAR ON RAILWAY';
@@ -4116,18 +4116,17 @@ async function _applyImageryLayer(mode, dateStr) {
           return;
         }
         const endDate = dateStr || _todayStr();
-        // Window back 30 days to find a cloud-free image
-        const startDate = new Date(new Date(endDate).getTime() - 30*24*3600*1000).toISOString().split('T')[0];
-        cesium.imageryLayers.addImageryProvider(new C.WebMapServiceImageryProvider({
-          url:`https://services.sentinel-hub.com/ogc/wms/${SENTINEL_HUB_ID}`,
-          layers:'TRUE-COLOR-S2L2A',
-          parameters:{
-            transparent:false,
-            format:'image/jpeg',
-            time:`${startDate}/${endDate}`,
-            maxcc:30
-          },
-          credit:'Sentinel-2 L2A · Sentinel Hub'
+        const startDate = new Date(new Date(endDate).getTime() - 14*24*3600*1000).toISOString().split('T')[0];
+        // Use WMTS for Cesium — PlanetScope True color layer
+        cesium.imageryLayers.addImageryProvider(new C.UrlTemplateImageryProvider({
+          url: `https://services.sentinel-hub.com/ogc/wmts/${SENTINEL_HUB_ID}` +
+               `?layer=TRUE_COLOR&tilematrixset=PopularWebMercator256` +
+               `&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fjpeg` +
+               `&time=${startDate}%2F${endDate}` +
+               `&TileMatrix={z}&TileCol={x}&TileRow={y}`,
+          minimumLevel: 0,
+          maximumLevel: 18,
+          credit: 'PlanetScope · Planet / Sentinel Hub'
         }));
         break;
       }
