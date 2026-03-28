@@ -4395,8 +4395,13 @@ async function loadIswLayers(){
 
 function toggleIswLayer(key,show){
   const type=key==='ukraine'?'ukraine':'me';
-  if(!show){ iswPolygons=iswPolygons.filter(p=>p._isw!==type); _scheduleRebuild(); }
-  else loadIswLayers();
+  if(!show){
+    iswPolygons=iswPolygons.filter(p=>p._isw!==type);
+    _scheduleRebuild();
+    if(_mapMode==='2d') _render2dIsw();
+  } else {
+    loadIswLayers();
+  }
 }
 
 // ── Static Infrastructure GeoJSON Layers ────────────────────────────────────
