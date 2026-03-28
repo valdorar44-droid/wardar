@@ -27,29 +27,49 @@ _SHIP_TYPES = {
 }
 
 # ── PRIORITY FILTER ────────────────────────────────────────────────────────────
-# Only ingest vessels with strategic/military significance.
-# Drops ~95% of AIS traffic (fishing, cargo, pleasure craft, ferries).
-# Tankers = critical infrastructure. Military MMSI = warships. Gov = coast guard.
-_PRIORITY_TYPES = frozenset([
-    *range(70, 90),   # cargo (70-79) + tankers (80-89): oil, chemical, LNG, LPG, bulk
-    *range(40, 60),   # high-speed craft (40-49) + special (50-59): patrol, SAR, law enforcement
-    35,               # diving ops / submarines surfaced
-    0,                # unknown type — include, don't silently drop
+# Two-tier strategy:
+#   1. Military/government vessels  → tracked everywhere worldwide
+#   2. Oil/chemical/LNG tankers     → tracked only inside active conflict zones
+# Everything else (cargo, fishing, passenger, pleasure) → dropped.
+
+# Military/government ship type codes — always tracked, always flagged
+_MIL_SHIP_TYPES = frozenset([
+    35,               # military operations / diving ops
+    *range(50, 60),   # pilot, SAR, tug, port tender, law enforcement, coast guard
 ])
 
-# Ship types that indicate actual military/government vessels
-_MIL_SHIP_TYPES = frozenset([50, 51, 52, 53, 55, 35])  # law enforcement, SAR, diving
+# Tanker type codes — tracked only in conflict zones
+_TANKER_TYPES = frozenset(range(80, 90))  # oil, chemical, LNG, LPG, bulk liquid
 
-def _is_priority(ship_type: int | None, mmsi: str) -> tuple[bool, int]:
+# Conflict / area-of-interest bounding boxes: (min_lat, max_lat, min_lon, max_lon)
+# Tankers are only ingested when their position falls inside one of these regions.
+_CONFLICT_ZONES: list[tuple[float, float, float, float]] = [
+    ( 22,  28,  48,  60),   # Persian Gulf / Strait of Hormuz
+    (  8,  22,  38,  58),   # Red Sea / Gulf of Aden / Bab-el-Mandeb
+    ( 40,  48,  27,  42),   # Black Sea / Ukraine coast
+    ( 30,  38,  24,  40),   # Eastern Mediterranean
+    (  3,  26, 103, 125),   # South China Sea / Taiwan Strait
+    ( -6,  11,  -6,  16),   # Gulf of Guinea (West Africa)
+    ( 55,  70,  13,  32),   # Baltic Sea (Russia-adjacent shipping)
+    ( 50,  62,  -6,  12),   # North Sea / English Channel
+]
+
+def _in_conflict_zone(lat: float, lon: float) -> bool:
+    for min_lat, max_lat, min_lon, max_lon in _CONFLICT_ZONES:
+        if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
+            return True
+    return False
+
+def _is_priority(ship_type: int | None, lat: float, lon: float) -> tuple[bool, int]:
     """Returns (is_priority, military_flag).
-    Military flag is set ONLY based on ship_type, not MMSI.
-    Over-broad MMSI-based detection incorrectly delayed civilian tankers 24h.
-    Real warships rarely broadcast AIS; rely on type codes instead.
+    Military vessels: always priority, always flagged.
+    Tankers: priority only when inside a conflict zone.
     """
-    st = ship_type if ship_type is not None else 0
-    if st in _PRIORITY_TYPES:
-        is_mil = 1 if st in _MIL_SHIP_TYPES else 0
-        return True, is_mil
+    st = ship_type if ship_type is not None else -1
+    if st in _MIL_SHIP_TYPES:
+        return True, 1
+    if st in _TANKER_TYPES:
+        return _in_conflict_zone(lat, lon), 0
     return False, 0
 
 def _ship_label(type_code: int | None) -> str:
@@ -83,8 +103,8 @@ def _norm_ais(msg: dict) -> dict | None:
         hdg      = pos.get("Cog") or pos.get("TrueHeading")
         ship_type = meta.get("ShipType")
 
-        # ── Priority filter: drop civilian bulk traffic ─────────────────────
-        priority, mil_flag = _is_priority(ship_type, mmsi)
+        # ── Priority filter: military everywhere, tankers in conflict zones ──
+        priority, mil_flag = _is_priority(ship_type, float(lat), float(lon))
         if not priority:
             return None   # drop fishing, cargo, passenger, pleasure craft
 
