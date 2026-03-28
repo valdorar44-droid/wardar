@@ -692,12 +692,19 @@ body::after{
 
 /* ── VIDEO BAR ── */
 #videobar{
+  position:fixed;bottom:44px;left:0;right:0;
+  height:215px;z-index:510;
   background:rgba(4,4,6,.98);border-top:1px solid var(--border2);
   display:none;flex-direction:column;
-  grid-column:1/-1;
-  height:215px;flex-shrink:0;
+  transform:translateY(100%);
+  transition:transform .2s ease;
 }
-#videobar.open{display:flex}
+#videobar.open{display:flex;transform:translateY(0)}
+/* Shift timeline up when video bar is open */
+#videobar.open ~ * {}
+body.vbar-open #timeline{bottom:calc(44px + 215px)}
+body.vbar-open #panel{bottom:calc(44px + 215px)}
+body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 #video-bar-hd{
   display:flex;align-items:center;justify-content:space-between;
   padding:.3rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0;
@@ -4249,6 +4256,7 @@ function openVideoBar(){
   const vb = document.getElementById('videobar');
   if(!vb) return;
   vb.classList.add('open');
+  document.body.classList.add('vbar-open');
   // Reload iframes so autoplay triggers fresh after bar was hidden
   vb.querySelectorAll('iframe').forEach(f=>{
     if(f.src && !f.dataset.loaded){
@@ -4258,7 +4266,9 @@ function openVideoBar(){
   });
 }
 function closeVideoBar(){
-  document.getElementById('videobar').classList.remove('open');
+  const vb = document.getElementById('videobar');
+  if(vb) vb.classList.remove('open');
+  document.body.classList.remove('vbar-open');
 }
 function toggleVideoBar(){
   const vb = document.getElementById('videobar');
