@@ -192,6 +192,14 @@ body::after{
   transition:color .15s,border-color .15s;
 }
 .mapmode-btn:hover,.mapmode-btn.active{border-color:var(--amber);color:var(--amber);}
+.img-src-btn{
+  background:none;border:1px solid var(--border2);color:var(--dim2);
+  font-family:var(--font);font-size:.44rem;letter-spacing:.09em;
+  padding:.18rem .45rem;cursor:pointer;white-space:nowrap;
+  transition:color .12s,border-color .12s,background .12s;
+}
+.img-src-btn:hover{border-color:var(--amber);color:var(--amber);}
+.img-src-btn.active{border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,.12);}
 .panel-collapse-btn{
   position:absolute;top:.45rem;right:.6rem;
   background:none;border:none;color:var(--dim2);cursor:pointer;
@@ -929,6 +937,44 @@ body::after{
 
 <div id="globe-container"></div>
 <div id="cursor-readout"></div>
+
+<!-- ── Imagery Switcher (3D globe only) ──────────────────────────────────── -->
+<div id="imagery-panel" style="display:none;position:fixed;bottom:56px;right:12px;z-index:600;
+  background:rgba(6,6,10,.94);border:1px solid var(--border);
+  font-family:var(--font);font-size:.5rem;letter-spacing:.1em;min-width:210px">
+  <div style="padding:.35rem .7rem .25rem;color:var(--amber);font-size:.48rem;letter-spacing:.14em;border-bottom:1px solid var(--border)">
+    ◈ IMAGERY SOURCE
+  </div>
+  <div style="padding:.4rem .6rem;display:flex;flex-direction:column;gap:.3rem">
+    <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+      <button class="img-src-btn active" id="ib-bing"    onclick="switchImagery('bing')">BING SAT</button>
+      <button class="img-src-btn"        id="ib-s2"      onclick="switchImagery('s2')">SENTINEL‑2 2024</button>
+      <button class="img-src-btn"        id="ib-modis"   onclick="switchImagery('modis')">MODIS DAILY</button>
+      <button class="img-src-btn"        id="ib-viirs"   onclick="switchImagery('viirs')">VIIRS DAILY</button>
+      <button class="img-src-btn"        id="ib-sh"      onclick="switchImagery('sh')" style="display:none">SENTINEL HUB</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.15rem 0">
+      <span id="img-res-label"    style="color:var(--dim2)">RES</span>
+      <span id="img-res-val"      style="color:var(--text)">30cm</span>
+      <span style="color:var(--border2)">·</span>
+      <span id="img-update-label" style="color:var(--dim2)">UPDATE</span>
+      <span id="img-update-val"   style="color:var(--text)">1-3yr</span>
+    </div>
+    <!-- Date picker — visible for time-series sources -->
+    <div id="img-date-row" style="display:none;align-items:center;gap:.4rem">
+      <span style="color:var(--dim2)">DATE</span>
+      <input type="date" id="img-date-input"
+        style="background:rgba(0,0,0,.5);border:1px solid var(--border2);color:var(--text);
+               font-family:var(--font);font-size:.48rem;letter-spacing:.06em;padding:.15rem .3rem;
+               width:110px;outline:none">
+      <button onclick="applyImageryDate()"
+        style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);
+               color:var(--amber);font-family:var(--font);font-size:.44rem;letter-spacing:.1em;
+               padding:.15rem .4rem;cursor:pointer">GO</button>
+    </div>
+    <div id="img-status" style="color:var(--dim2);font-size:.43rem;letter-spacing:.06em"></div>
+  </div>
+</div>
 <div id="leaflet-map"></div>
 
 
@@ -2029,8 +2075,8 @@ function buildNewsFilters(){
 }
 
 // ── Runtime config injected by server ─────────────────────────────
-// Blank string = no Ion token, uses CartoDB fallback. Set CESIUM_ION_TOKEN env var on Railway.
-const CESIUM_ION_TOKEN = '__CESIUM_ION_TOKEN__';
+const CESIUM_ION_TOKEN    = '__CESIUM_ION_TOKEN__';
+const SENTINEL_HUB_ID     = '__SENTINEL_HUB_ID__';  // optional — 5-day 10m Sentinel Hub imagery
 
 // ── CesiumJS instance ─────────────────────────────────────────────
 let cesium; // CesiumJS Viewer instance
@@ -2765,7 +2811,6 @@ async function toggleMapMode(){
         await _loadCesium();
       } catch(e) {
         console.error('WARDAR: Cesium CDN failed:', e);
-        // Fall back to 2D — don't leave user stuck on blank globe
         _mapMode = '2d';
         _globeInited = false;
         globeEl.style.display = 'none';
@@ -2777,6 +2822,7 @@ async function toggleMapMode(){
       await initGlobe();
     }
     else { _scheduleRebuild(); if(cesium) cesium.scene.requestRender(); }
+    _showImageryPanel(true);
   } else {
     _mapMode = '2d';
     globeEl.style.display   = 'none';
@@ -2786,6 +2832,7 @@ async function toggleMapMode(){
     const btn = document.getElementById('mapmode-btn');
     if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
     if(_map2d) setTimeout(()=>_map2d.invalidateSize(), 50);
+    _showImageryPanel(false);
   }
 }
 
@@ -3969,6 +4016,147 @@ const SEV_CSS = ['','#22c55e','#84cc16','#eab308','#f97316','#ef4444'];
 // toggleGlobe — focus on world view
 function toggleGlobe(){
   globeFocusRegion('world');
+}
+
+// ── Globe Imagery Switcher ────────────────────────────────────────────────────
+let _imgMode = 'bing';
+const _IMG_META = {
+  bing:  { res:'30cm',  update:'1-3yr',  label:'Bing Aerial (Ion)',             timeSeries:false },
+  s2:    { res:'10m',   update:'2024',   label:'Sentinel-2 Cloudless 2024',      timeSeries:false },
+  modis: { res:'250m',  update:'daily',  label:'MODIS Terra True Color',         timeSeries:true  },
+  viirs: { res:'375m',  update:'daily',  label:'VIIRS NOAA True Color',          timeSeries:true  },
+  sh:    { res:'10m',   update:'5-day',  label:'Sentinel Hub Near-Real-Time',    timeSeries:true  },
+};
+
+function _todayStr(){ return new Date().toISOString().split('T')[0]; }
+
+async function switchImagery(mode){
+  if(!cesium || !window.Cesium) return;
+  _imgMode = mode;
+
+  // Update button states
+  document.querySelectorAll('.img-src-btn').forEach(b=>b.classList.remove('active'));
+  const ab = document.getElementById('ib-'+mode);
+  if(ab) ab.classList.add('active');
+
+  // Show/hide date picker
+  const meta = _IMG_META[mode] || _IMG_META.bing;
+  const dr = document.getElementById('img-date-row');
+  if(dr) dr.style.display = meta.timeSeries ? 'flex' : 'none';
+
+  // Update info labels
+  const rv = document.getElementById('img-res-val');
+  const uv = document.getElementById('img-update-val');
+  const st = document.getElementById('img-status');
+  if(rv) rv.textContent = meta.res;
+  if(uv) uv.textContent = meta.update;
+  if(st) st.textContent = 'LOADING ' + meta.label.toUpperCase() + '...';
+
+  const date = document.getElementById('img-date-input')?.value || _todayStr();
+  await _applyImageryLayer(mode, date);
+
+  if(st) st.textContent = meta.label.toUpperCase();
+}
+
+async function _applyImageryLayer(mode, dateStr) {
+  if(!cesium || !window.Cesium) return;
+  const C = Cesium;
+
+  cesium.imageryLayers.removeAll();
+
+  try {
+    switch(mode) {
+      case 'bing': {
+        if(CESIUM_ION_TOKEN){
+          const p = await C.IonImageryProvider.fromAssetId(2); // Bing Aerial with Labels
+          cesium.imageryLayers.addImageryProvider(p);
+        } else {
+          cesium.imageryLayers.addImageryProvider(new C.UrlTemplateImageryProvider({
+            url:'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+            minimumLevel:0,maximumLevel:19
+          }));
+        }
+        break;
+      }
+      case 's2': {
+        // EOX Sentinel-2 cloudless 2024 — free, no API key, 10m global
+        cesium.imageryLayers.addImageryProvider(new C.UrlTemplateImageryProvider({
+          url:'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg',
+          minimumLevel:0, maximumLevel:14,
+          credit:'Sentinel-2 cloudless 2024 © ESA, EOX IT Services'
+        }));
+        break;
+      }
+      case 'modis': {
+        // NASA GIBS MODIS Terra — daily, 250m, no API key
+        const d = dateStr || _todayStr();
+        cesium.imageryLayers.addImageryProvider(new C.UrlTemplateImageryProvider({
+          url:`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${d}/250m/{z}/{y}/{x}.jpg`,
+          minimumLevel:0, maximumLevel:9,
+          credit:'MODIS Terra · NASA GIBS · ' + d
+        }));
+        break;
+      }
+      case 'viirs': {
+        // NASA GIBS VIIRS NOAA-20 — daily, 375m, updated faster than MODIS, no API key
+        const d = dateStr || _todayStr();
+        cesium.imageryLayers.addImageryProvider(new C.UrlTemplateImageryProvider({
+          url:`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_NOAA20_CorrectedReflectance_TrueColor/default/${d}/250m/{z}/{y}/{x}.jpg`,
+          minimumLevel:0, maximumLevel:9,
+          credit:'VIIRS NOAA-20 · NASA GIBS · ' + d
+        }));
+        break;
+      }
+      case 'sh': {
+        // Sentinel Hub near-real-time (5-day, 10m) — requires SENTINEL_HUB_ID env var
+        if(!SENTINEL_HUB_ID){
+          const st = document.getElementById('img-status');
+          if(st) st.textContent = 'SET SENTINEL_HUB_INSTANCE_ID ENV VAR ON RAILWAY';
+          await _applyImageryLayer('s2', dateStr);
+          return;
+        }
+        const endDate = dateStr || _todayStr();
+        // Window back 30 days to find a cloud-free image
+        const startDate = new Date(new Date(endDate).getTime() - 30*24*3600*1000).toISOString().split('T')[0];
+        cesium.imageryLayers.addImageryProvider(new C.WebMapServiceImageryProvider({
+          url:`https://services.sentinel-hub.com/ogc/wms/${SENTINEL_HUB_ID}`,
+          layers:'TRUE-COLOR-S2L2A',
+          parameters:{
+            transparent:false,
+            format:'image/jpeg',
+            time:`${startDate}/${endDate}`,
+            maxcc:30
+          },
+          credit:'Sentinel-2 L2A · Sentinel Hub'
+        }));
+        break;
+      }
+    }
+  } catch(e) {
+    console.warn('WARDAR: imagery switch failed:', e);
+    const st = document.getElementById('img-status');
+    if(st) st.textContent = 'ERROR: ' + e.message;
+  }
+  cesium.scene.requestRender();
+}
+
+function applyImageryDate(){
+  const date = document.getElementById('img-date-input')?.value;
+  if(date) _applyImageryLayer(_imgMode, date);
+}
+
+// Show/hide imagery panel with globe mode
+function _showImageryPanel(show){
+  const p = document.getElementById('imagery-panel');
+  if(!p) return;
+  p.style.display = show ? 'block' : 'none';
+  if(show && SENTINEL_HUB_ID){
+    const shb = document.getElementById('ib-sh');
+    if(shb) shb.style.display = '';
+  }
+  // Pre-fill date picker to today
+  const di = document.getElementById('img-date-input');
+  if(di && !di.value) di.value = _todayStr();
 }
 
 // ── Video Bar ─────────────────────────────────────────────────────────────────

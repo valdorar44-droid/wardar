@@ -97,6 +97,7 @@ async def root(request: Request):
         content = f.read()
     # Inject runtime config into the HTML template placeholder
     content = content.replace("__CESIUM_ION_TOKEN__", C.CESIUM_ION_TOKEN or "")
+    content = content.replace("__SENTINEL_HUB_ID__", C.SENTINEL_HUB_INSTANCE_ID or "")
     return HTMLResponse(content, headers={
         "ETag": etag,
         "Cache-Control": "no-cache",

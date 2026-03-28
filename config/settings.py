@@ -100,6 +100,11 @@ AI_MODEL          = _s("AI_MODEL", "claude-haiku-4-5-20251001")  # fast + cheap 
 # Without this token the globe uses CartoDB dark tiles + flat terrain (still functional)
 CESIUM_ION_TOKEN  = _s("CESIUM_ION_TOKEN", "")
 
+# ── Sentinel Hub (optional — 5-day 10m near-real-time imagery) ─────────────
+# Free trial or paid plan: https://www.sentinel-hub.com/
+# Create a WMTS configuration instance, paste the Instance ID below.
+SENTINEL_HUB_INSTANCE_ID = _s("SENTINEL_HUB_INSTANCE_ID", "")
+
 # ── Static Infrastructure Layers ──────────────────────
 ENABLE_NUCLEAR      = _b("ENABLE_NUCLEAR",      True)
 ENABLE_SUBCABLES    = _b("ENABLE_SUBCABLES",     True)
