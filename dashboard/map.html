@@ -1158,20 +1158,20 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-tracking-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item" onclick="toggleLayer('adsb')">
-              <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)" onchange="toggleLayer('adsb')">
               <span class="layer-icon" style="color:#ff3b1e">✈</span>
               <span class="layer-name">AIRCRAFT <span style="font-size:.42rem;color:#ff3b1e">MIL</span>/<span style="font-size:.42rem;color:var(--amber)">CIV</span></span>
               <span class="layer-count" id="cnt-adsb" style="background:var(--amber)">0</span>
             </label>
-            <label class="layer-item" onclick="toggleLayer('ais')">
-              <input type="checkbox" class="layer-cb" id="cb-ais" checked style="color:var(--cyan)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-ais" checked style="color:var(--cyan)" onchange="toggleLayer('ais')">
               <span class="layer-icon" style="color:var(--cyan)">⛵</span>
               <span class="layer-name">MARITIME</span>
               <span class="layer-count" id="cnt-ais" style="background:var(--cyan)">0</span>
             </label>
-            <label class="layer-item" onclick="toggleLayer('tle')">
-              <input type="checkbox" class="layer-cb" id="cb-tle" checked style="color:var(--purple)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-tle" checked style="color:var(--purple)" onchange="toggleLayer('tle')">
               <span class="layer-icon" style="color:var(--purple)">◎</span>
               <span class="layer-name">SATELLITE</span>
               <span class="layer-count" id="cnt-tle" style="background:var(--purple)">0</span>
@@ -1188,26 +1188,26 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-conflict-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item" onclick="toggleLayer('acled')">
-              <input type="checkbox" class="layer-cb" id="cb-acled" checked style="color:var(--red)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-acled" checked style="color:var(--red)" onchange="toggleLayer('acled')">
               <span class="layer-icon" style="color:var(--red)">💥</span>
               <span class="layer-name">CONFLICT EVENTS</span>
               <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
             </label>
-            <label class="layer-item" onclick="toggleLayer('notam')">
-              <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)" onchange="toggleLayer('notam')">
               <span class="layer-icon" style="color:var(--yellow)">⚠</span>
               <span class="layer-name">NOTAM</span>
               <span class="layer-count" id="cnt-notam" style="background:var(--yellow)">0</span>
             </label>
-            <label class="layer-item" onclick="toggleLayer('fire')">
-              <input type="checkbox" class="layer-cb" id="cb-fire" checked style="color:var(--orange)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-fire" checked style="color:var(--orange)" onchange="toggleLayer('fire')">
               <span class="layer-icon" style="color:var(--orange)">🔥</span>
               <span class="layer-name">THERMAL</span>
               <span class="layer-count" id="cnt-fire" style="background:var(--orange)">0</span>
             </label>
-            <label class="layer-item" onclick="toggleLayer('seismic')">
-              <input type="checkbox" class="layer-cb" id="cb-seismic" checked style="color:var(--lime)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-seismic" checked style="color:var(--lime)" onchange="toggleLayer('seismic')">
               <span class="layer-icon" style="color:var(--lime)">◉</span>
               <span class="layer-name">SEISMIC</span>
               <span class="layer-count" id="cnt-seismic" style="background:var(--lime)">0</span>
@@ -1224,8 +1224,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-intel-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item" onclick="toggleLayer('osint')">
-              <input type="checkbox" class="layer-cb" id="cb-osint" checked style="color:var(--blue)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-osint" checked style="color:var(--blue)" onchange="toggleLayer('osint')">
               <span class="layer-icon" style="color:var(--blue)">📡</span>
               <span class="layer-name">OSINT NEWS</span>
               <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
@@ -1352,8 +1352,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">OIL/GAS PIPELINES</span>
               <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
             </label>
-            <label class="layer-item" onclick="toggleLayer('ew')">
-              <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)" onchange="toggleLayer('ew')">
               <span class="layer-icon" style="color:var(--fuchsia)">⚡</span>
               <span class="layer-name">GPS JAM</span>
               <span class="layer-count" id="cnt-ew" style="background:var(--fuchsia)">0</span>
@@ -1370,8 +1370,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-human-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item" onclick="toggleLayer('community')">
-              <input type="checkbox" class="layer-cb" id="cb-community" checked style="color:var(--green)">
+            <label class="layer-item">
+              <input type="checkbox" class="layer-cb" id="cb-community" checked style="color:var(--green)" onchange="toggleLayer('community')">
               <span class="layer-icon" style="color:var(--green)">◈</span>
               <span class="layer-name">COMMUNITY INTEL</span>
               <span class="layer-count" id="cnt-community" style="background:var(--green)">0</span>
@@ -4121,6 +4121,8 @@ const SAM_SITES = [
 // ── Leaflet layer refs ──
 let _chokeLayer    = null;
 let _lanesLayer    = null;
+let _cableLayer2d    = null;
+let _pipelineLayer2d = null;
 let _threatLayer   = null;
 let _samLayer      = null;
 let _drawLayer     = null;
@@ -4465,6 +4467,21 @@ async function loadCables(){
   try{
     const res=await fetch('/api/layers/cables').then(r=>r.json());
     cableArcs=[];
+    // 2D — render as Leaflet GeoJSON polylines
+    if(_map2d){
+      if(_cableLayer2d){ _map2d.removeLayer(_cableLayer2d); _cableLayer2d=null; }
+      if(visible.cables!==false && res.features?.length){
+        _cableLayer2d = L.geoJSON({type:'FeatureCollection',features:res.features},{
+          style:{color:'#06b6d4',weight:1,opacity:.4,dashArray:'3 7'},
+          onEachFeature:(f,layer)=>{
+            const name=f.properties?.name||f.properties?.NAME||'Submarine Cable';
+            layer.bindTooltip(`⌇ ${esc(name)}`,{className:'measure-tip',sticky:true});
+          }
+        }).addTo(_map2d);
+        _cableLayer2d.bringToBack();
+      }
+    }
+    // 3D — build arc data
     res.features?.forEach(f=>{
       const coords=f.geometry?.coordinates||[];
       const arr=f.geometry?.type==='LineString'?[coords]:coords;
@@ -4487,6 +4504,21 @@ async function loadPipelines(){
   try{
     const res=await fetch('/api/layers/pipelines').then(r=>r.json());
     pipelineArcs=[];
+    // 2D — render as Leaflet GeoJSON polylines
+    if(_map2d){
+      if(_pipelineLayer2d){ _map2d.removeLayer(_pipelineLayer2d); _pipelineLayer2d=null; }
+      if(visible.pipelines!==false && res.features?.length){
+        _pipelineLayer2d = L.geoJSON({type:'FeatureCollection',features:res.features},{
+          style:{color:'#f97316',weight:1,opacity:.4,dashArray:'4 5'},
+          onEachFeature:(f,layer)=>{
+            const name=f.properties?.name||f.properties?.NAME||f.properties?.operator||'Pipeline';
+            layer.bindTooltip(`⊸ ${esc(name)}`,{className:'measure-tip',sticky:true});
+          }
+        }).addTo(_map2d);
+        _pipelineLayer2d.bringToBack();
+      }
+    }
+    // 3D — build arc data
     res.features?.forEach(f=>{
       const coords=f.geometry?.coordinates||[];
       const arr=f.geometry?.type==='LineString'?[coords]:coords;
@@ -4506,11 +4538,21 @@ async function loadPipelines(){
 
 function toggleCableLayer(on){
   visible.cables=on;
-  if(on) loadCables(); else { cableArcs=[]; _scheduleRebuild(); }
+  if(on){ loadCables(); }
+  else {
+    cableArcs=[];
+    if(_cableLayer2d&&_map2d){ _map2d.removeLayer(_cableLayer2d); _cableLayer2d=null; }
+    _scheduleRebuild();
+  }
 }
 function togglePipelineLayer(on){
   visible.pipelines=on;
-  if(on) loadPipelines(); else { pipelineArcs=[]; _scheduleRebuild(); }
+  if(on){ loadPipelines(); }
+  else {
+    pipelineArcs=[];
+    if(_pipelineLayer2d&&_map2d){ _map2d.removeLayer(_pipelineLayer2d); _pipelineLayer2d=null; }
+    _scheduleRebuild();
+  }
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
