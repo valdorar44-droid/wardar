@@ -9,11 +9,10 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/Widgets/widgets.css">
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
 <script>window.CESIUM_BASE_URL='https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/';</script>
-<script src="https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/Cesium.js"></script>
+<!-- Cesium loaded lazily on demand — keeps initial page load instant -->
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2539,7 +2538,29 @@ function addMarker2D(key, d){
   }
 }
 
-function toggleMapMode(){
+// Lazy-load CesiumJS + widgets CSS only when globe mode is first requested.
+// Avoids blocking the initial 2D map load with a 14MB script.
+let _cesiumLoading = null;
+function _loadCesium(){
+  if(window.Cesium) return Promise.resolve();
+  if(_cesiumLoading) return _cesiumLoading;
+  _cesiumLoading = new Promise((resolve, reject) => {
+    // inject widgets CSS
+    const lnk = document.createElement('link');
+    lnk.rel = 'stylesheet';
+    lnk.href = 'https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/Widgets/widgets.css';
+    document.head.appendChild(lnk);
+    // inject Cesium.js
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/Cesium.js';
+    s.onload  = resolve;
+    s.onerror = () => reject(new Error('Cesium CDN failed to load'));
+    document.head.appendChild(s);
+  });
+  return _cesiumLoading;
+}
+
+async function toggleMapMode(){
   const focusBar  = document.getElementById('focus-bar');
   const milBtn    = document.getElementById('milonly-btn');
   const globeEl   = document.getElementById('globe-container');
@@ -2553,7 +2574,11 @@ function toggleMapMode(){
     if(milBtn)   milBtn.style.display   = 'inline-block';
     const btn = document.getElementById('mapmode-btn');
     if(btn){ btn.textContent='2D MAP'; btn.classList.add('active'); }
-    if(!_globeInited){ _globeInited=true; initGlobe(); }
+    if(!_globeInited){
+      _globeInited = true;
+      try { await _loadCesium(); } catch(e) { console.error('Cesium load failed:', e); }
+      initGlobe();
+    }
     else { _scheduleRebuild(); if(cesium) cesium.scene.requestRender(); }
   } else {
     _mapMode = '2d';
