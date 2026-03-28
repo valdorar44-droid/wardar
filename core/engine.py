@@ -148,9 +148,12 @@ async def _tick_adsb():
         from ingestors import adsb
         positions = await adsb.fetch()
         n = _save_positions(positions)
-        if n:
-            released = DB.get_released_positions(sources=["adsb", "opensky", "adsb_emergency"], limit=2000)
-            await _broadcast({"type": "positions", "sources": ["adsb", "opensky", "adsb_emergency"], "data": released})
+        if positions:
+            # Delta broadcast: send only current-tick positions (non-military).
+            # Clients already have full state from snapshot; we just push updates.
+            delta = [p for p in positions if not p.get("military_flag", 0)]
+            if delta:
+                await _broadcast({"type": "positions", "sources": ["adsb", "opensky", "adsb_emergency"], "data": delta})
     except Exception as exc:
         log_err(f"tick_adsb: {exc}")
 
@@ -159,9 +162,10 @@ async def _tick_ais():
         from ingestors import ais
         positions = await ais.fetch()
         n = _save_positions(positions)
-        if n:
-            released = DB.get_released_positions(sources=["ais"], limit=2000)
-            await _broadcast({"type": "positions", "sources": ["ais"], "data": released})
+        if positions:
+            delta = [p for p in positions if not p.get("military_flag", 0)]
+            if delta:
+                await _broadcast({"type": "positions", "sources": ["ais"], "data": delta})
     except Exception as exc:
         log_err(f"tick_ais: {exc}")
 
@@ -170,9 +174,10 @@ async def _tick_tle():
         from ingestors import tle
         positions = await tle.fetch()
         n = _save_positions(positions)
-        if n:
-            released = DB.get_released_positions(sources=["tle"], limit=1000)
-            await _broadcast({"type": "positions", "sources": ["tle"], "data": released})
+        if positions:
+            delta = [p for p in positions if not p.get("military_flag", 0)]
+            if delta:
+                await _broadcast({"type": "positions", "sources": ["tle"], "data": delta})
     except Exception as exc:
         log_err(f"tick_tle: {exc}")
 
@@ -454,7 +459,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_firms,  C.FIRMS_INTERVAL_SEC,     "firms")),
         asyncio.create_task(_run_every(_tick_usgs,   C.USGS_INTERVAL_SEC,      "usgs")),
         asyncio.create_task(_run_every(_tick_gpsjam, C.GPSJAM_INTERVAL_SEC,    "gpsjam")),
-        asyncio.create_task(_run_every(_tick_purge,  3600,                     "purge")),
+        asyncio.create_task(_run_every(_tick_purge,  300,                      "purge")),
         asyncio.create_task(_run_every(_tick_static_layers,    C.STATIC_REFRESH_SEC,      "static_layers")),
         asyncio.create_task(_run_every(_tick_osint_geo,       C.OSINT_GEO_INTERVAL_SEC,  "osint_geo")),
         asyncio.create_task(_run_every(_tick_unhcr,           C.UNHCR_INTERVAL_SEC,      "unhcr")),

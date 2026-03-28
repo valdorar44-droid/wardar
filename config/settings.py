@@ -75,8 +75,8 @@ ACLED_INTERVAL_SEC  = _i("ACLED_INTERVAL_SEC",  3600) # conflict events hourly
 GDELT_INTERVAL_SEC  = _i("GDELT_INTERVAL_SEC",  900)  # GDELT every 15 min
 
 # ── Data Retention ────────────────────────────────────
-POSITION_RETAIN_HOURS = _i("POSITION_RETAIN_HOURS", 72)   # keep 72h of positions
-AIS_RETAIN_HOURS      = _i("AIS_RETAIN_HOURS",       4)   # AIS cycles fast — 4h cap keeps DB lean
+POSITION_RETAIN_HOURS = _i("POSITION_RETAIN_HOURS", 6)    # 6h — with upsert, stale rows = gone entities
+AIS_RETAIN_HOURS      = _i("AIS_RETAIN_HOURS",       2)   # AIS upserts per-MMSI; 2h removes gone ships
 EVENT_RETAIN_DAYS     = _i("EVENT_RETAIN_DAYS",     30)    # keep 30d of events
 
 # ── Fire / Thermal (NASA FIRMS) ───────────────────────

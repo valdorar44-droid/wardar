@@ -24,17 +24,17 @@ from core.engine import (
 
 # ── Snapshot cache ────────────────────────────────────────────────────────────
 # Pre-computed snapshot served instantly to every new WebSocket client.
-# All users see the same data. Recomputed at most every 20s.
+# With upsert, the positions table stays tiny so this is always fast and small.
 _snap_cache: str | None = None
 _snap_ts: float = 0.0
-_SNAP_TTL = 20.0  # seconds
+_SNAP_TTL = 60.0  # rebuild at most once per minute
 
 def _get_snapshot_json() -> str:
     global _snap_cache, _snap_ts
     now = time.monotonic()
     if _snap_cache is None or (now - _snap_ts) > _SNAP_TTL:
-        positions = get_released_positions_sampled(per_source=400, limit=2500)
-        events    = DB.get_released_events(limit=600)
+        positions = get_released_positions_sampled(per_source=150, limit=1000)
+        events    = DB.get_released_events(limit=400)
         _snap_cache = json.dumps({"type":"snapshot","positions":positions,"events":events})
         _snap_ts = now
     return _snap_cache

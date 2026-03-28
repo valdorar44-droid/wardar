@@ -110,6 +110,14 @@ _MIGRATIONS: list[str] = [
     # Regular index on release_ts_utc for fast released-position queries
     """CREATE INDEX IF NOT EXISTS idx_pos_released ON positions(release_ts_utc, source, raw_ts_utc DESC)""",
 
+    # v8 — true upsert: one row per live entity (source, callsign)
+    # Deduplicate first (safe even if column already unique)
+    """DELETE FROM positions WHERE id NOT IN (
+        SELECT MAX(id) FROM positions GROUP BY source, callsign
+    )""",
+    # Unique constraint enables INSERT OR REPLACE upsert → DB stays at ~3-5k rows not millions
+    """CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_upsert ON positions(source, callsign)""",
+
     # v7 — AI intelligence briefs (SITREP)
     """CREATE TABLE IF NOT EXISTS intel_briefs (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,9 +138,9 @@ def get_conn() -> sqlite3.Connection:
         _conn.execute("PRAGMA journal_mode=WAL")
         _conn.execute("PRAGMA synchronous=NORMAL")
         _conn.execute("PRAGMA foreign_keys=ON")
-        _conn.execute("PRAGMA cache_size=-32000")   # 32 MB page cache
+        _conn.execute("PRAGMA cache_size=-8000")    # 8 MB page cache (DB is small with upsert)
         _conn.execute("PRAGMA temp_store=MEMORY")   # temp tables in RAM
-        _conn.execute("PRAGMA mmap_size=268435456") # 256 MB memory-mapped I/O
+        _conn.execute("PRAGMA mmap_size=33554432")  # 32 MB mmap (DB stays lean)
         _conn.execute("PRAGMA optimize")
         _run_migrations(_conn)
     return _conn
@@ -151,11 +159,11 @@ def _run_migrations(conn: sqlite3.Connection):
 # ── Positions ────────────────────────────────────────────────────────────────
 
 def upsert_position(p: dict) -> None:
-    """Insert or replace a position record."""
+    """True upsert — one live row per (source, callsign). Keeps DB tiny."""
     with _lock:
         conn = get_conn()
         conn.execute("""
-            INSERT INTO positions
+            INSERT OR REPLACE INTO positions
               (source, callsign, type, lat, lon, altitude_ft, speed_kts,
                heading_deg, country, military_flag, raw_ts_utc, release_ts_utc, extra)
             VALUES
@@ -336,12 +344,11 @@ def _offset_ts(ts: str, delta_sec: int) -> str:
     return (dt + timedelta(seconds=delta_sec)).isoformat()
 
 def purge_old_positions() -> int:
-    """Delete positions older than POSITION_RETAIN_HOURS (AIS uses tighter cap)."""
+    """Remove stale positions and VACUUM to reclaim memory. With upsert, table stays tiny."""
     cutoff_default = _utcnow_minus_hours(C.POSITION_RETAIN_HOURS)
     cutoff_ais     = _utcnow_minus_hours(C.AIS_RETAIN_HOURS)
     with _lock:
         conn = get_conn()
-        # Tighter cap for AIS — it generates huge volume and cycles every few minutes
         n1 = conn.execute(
             "DELETE FROM positions WHERE source='ais' AND raw_ts_utc < ?", (cutoff_ais,)
         ).rowcount
@@ -349,6 +356,8 @@ def purge_old_positions() -> int:
             "DELETE FROM positions WHERE source!='ais' AND raw_ts_utc < ?", (cutoff_default,)
         ).rowcount
         conn.commit()
+        # Reclaim freed pages on each purge (fast with WAL + small DB)
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
         return n1 + n2
 
 # ── Events ───────────────────────────────────────────────────────────────────
