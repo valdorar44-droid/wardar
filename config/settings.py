@@ -51,8 +51,11 @@ TLE_BASE_URL    = _s("TLE_BASE_URL", "https://celestrak.org/SOCRATES/")
 ENABLE_SATELLITE = _b("ENABLE_SATELLITE", True)
 
 # ── NOTAM / Airspace ──────────────────────────────────
-FAA_NOTAM_URL   = _s("FAA_NOTAM_URL", "https://external-api.faa.gov/notamapi/v1/notams")
-FAA_CLIENT_ID   = _s("FAA_CLIENT_ID", "")
+# Primary source: CheckWX (https://checkwxapi.com) — simple API key, free 100 calls/day
+CHECKWX_API_KEY = _s("CHECKWX_API_KEY", "")
+# Fallback: FAA Digital NOTAM API (OAuth2 — portal currently broken for public signups)
+FAA_NOTAM_URL     = _s("FAA_NOTAM_URL", "https://external-api.faa.gov/notamapi/v1/notams")
+FAA_CLIENT_ID     = _s("FAA_CLIENT_ID", "")
 FAA_CLIENT_SECRET = _s("FAA_CLIENT_SECRET", "")
 ENABLE_NOTAM    = _b("ENABLE_NOTAM", True)
 
@@ -70,7 +73,7 @@ ENABLE_DEFENSE_FEEDS = _b("ENABLE_DEFENSE_FEEDS", True)
 ADSB_INTERVAL_SEC   = _i("ADSB_INTERVAL_SEC",   10)   # pull aviation every 10s
 AIS_RECONNECT_SEC   = _i("AIS_RECONNECT_SEC",   30)   # AIS WebSocket reconnect
 SATELLITE_INTERVAL_SEC = _i("SATELLITE_INTERVAL_SEC", 3600)  # TLE refresh hourly
-NOTAM_INTERVAL_SEC  = _i("NOTAM_INTERVAL_SEC",  900)  # NOTAMs every 15 min
+NOTAM_INTERVAL_SEC  = _i("NOTAM_INTERVAL_SEC",  21600) # NOTAMs every 6h (CheckWX free tier: 100 calls/day, 24 airports × 4 polls = 96)
 ACLED_INTERVAL_SEC  = _i("ACLED_INTERVAL_SEC",  3600) # conflict events hourly
 GDELT_INTERVAL_SEC  = _i("GDELT_INTERVAL_SEC",  900)  # GDELT every 15 min
 
