@@ -2007,12 +2007,19 @@ let _globeInited = false;
 const _TRAIL_MAX = 5;
 let _autoRotate = false;
 let _rebuildScheduled = false;
+let _lastRebuildMs = 0;
+const _REBUILD_THROTTLE_MS = 500; // max one full rebuild per 500ms in 3D
 
 function _scheduleRebuild(){
-  if(!_rebuildScheduled){
-    _rebuildScheduled=true;
-    requestAnimationFrame(()=>{ _rebuildScheduled=false; _rebuildGlobe(); });
-  }
+  if(_rebuildScheduled) return;
+  _rebuildScheduled = true;
+  const now = performance.now();
+  const wait = Math.max(0, _REBUILD_THROTTLE_MS - (now - _lastRebuildMs));
+  setTimeout(()=>{
+    _rebuildScheduled = false;
+    _lastRebuildMs = performance.now();
+    _rebuildGlobe();
+  }, wait);
 }
 
 // Per-source caps for globe performance (priority items bypass caps)
@@ -2643,8 +2650,15 @@ const THREAT_COLORS = {LOW:'#22c55e',MODERATE:'#f59e0b',HIGH:'#f97316',CRITICAL:
 
 async function predictPath(d){
   // d = position object from positionStore
-  const popup = document.getElementById('globe-popup');
-  const inner = popup.querySelector('.popup-inner');
+  // Find the active popup container — works in both 2D (Leaflet) and 3D (Cesium overlay)
+  let inner = null;
+  if(_mapMode === '2d'){
+    inner = document.querySelector('.leaflet-popup-content .popup-inner')
+         || document.querySelector('.leaflet-popup-content');
+  } else {
+    const popup = document.getElementById('globe-popup');
+    inner = popup ? popup.querySelector('.popup-inner') : null;
+  }
   if(inner){
     const el = inner.querySelector('.predict-section');
     if(el) el.remove();
@@ -2681,28 +2695,64 @@ async function predictPath(d){
     result = {error: String(e)};
   }
 
-  // Render predicted path arcs on globe
-  _predictArcs = [];
-  if(result.path && result.path.length >= 2){
-    const pts = result.path;
-    const tColor = THREAT_COLORS[result.threat_level] || '#f59e0b';
-    // Draw arc from current position through predicted waypoints
-    const allPts = [{lat:d.lat,lon:d.lon}, ...pts];
-    for(let i=0;i<allPts.length-1;i++){
-      const alpha = 0.85 - (i * 0.12);
-      _predictArcs.push({
-        sLat:allPts[i].lat, sLng:allPts[i].lon,
-        eLat:allPts[i+1].lat, eLng:allPts[i+1].lon,
-        _color:[`rgba(0,0,0,0)`, `${tColor}${Math.round(Math.max(alpha,0.15)*255).toString(16).padStart(2,'0')}`],
-        _alt: 0.02, _predict:true,
-      });
+  const tColor = result.threat_level ? (THREAT_COLORS[result.threat_level] || '#f59e0b') : '#f59e0b';
+
+  // ── Render predicted path ────────────────────────────────────────────────────
+  if(result.path && result.path.length >= 2 && !result.error){
+    const allPts = [{lat:d.lat,lon:d.lon}, ...result.path];
+
+    if(_mapMode === '3d'){
+      // 3D: Cesium polyline arcs
+      _predictArcs = [];
+      for(let i=0;i<allPts.length-1;i++){
+        const alpha = 0.85 - (i * 0.12);
+        const hexA = Math.round(Math.max(alpha,0.15)*255).toString(16).padStart(2,'0');
+        _predictArcs.push({
+          sLat:allPts[i].lat, sLng:allPts[i].lon,
+          eLat:allPts[i+1].lat, eLng:allPts[i+1].lon,
+          _color:[`rgba(0,0,0,0)`, `${tColor}${hexA}`],
+          _alt:0.02, _predict:true,
+        });
+      }
+      _scheduleRebuild();
+      if(cesium) cesium.scene.requestRender();
+    } else if(_map2d){
+      // 2D: Leaflet polyline + dashed predict line
+      // Clear previous predict polylines
+      if(window._predictPolylines){
+        window._predictPolylines.forEach(pl => _map2d.removeLayer(pl));
+      }
+      window._predictPolylines = [];
+      const latlngs = allPts.map(p => [p.lat, p.lon]);
+      const pl = L.polyline(latlngs, {
+        color: tColor, weight: 2.5, opacity: 0.85,
+        dashArray: '8,5', className: 'predict-line',
+      }).addTo(_map2d);
+      window._predictPolylines.push(pl);
+      // Fit map to show the path
+      _map2d.fitBounds(pl.getBounds(), {padding:[40,40], maxZoom:7});
     }
-    _scheduleRebuild();
+
     // Auto-clear after 5 minutes
-    setTimeout(()=>{ _predictArcs=[]; _scheduleRebuild(); }, 300000);
+    setTimeout(()=>{
+      _predictArcs=[];
+      if(_mapMode==='3d'){ _scheduleRebuild(); if(cesium) cesium.scene.requestRender(); }
+      else if(_map2d && window._predictPolylines){
+        window._predictPolylines.forEach(pl => _map2d.removeLayer(pl));
+        window._predictPolylines = [];
+      }
+    }, 300000);
   }
 
-  // Update popup with prediction result
+  // ── Update popup with prediction result ──────────────────────────────────────
+  // Re-acquire inner in case popup changed during async API call
+  if(_mapMode === '2d'){
+    inner = document.querySelector('.leaflet-popup-content .popup-inner')
+         || document.querySelector('.leaflet-popup-content');
+  } else {
+    const popup = document.getElementById('globe-popup');
+    inner = popup ? popup.querySelector('.popup-inner') : null;
+  }
   if(inner){
     const old = inner.querySelector('.predict-section');
     if(old) old.remove();
@@ -2710,16 +2760,18 @@ async function predictPath(d){
     sec.className = 'predict-section';
     sec.style.cssText = 'margin-top:.5rem;border-top:1px solid #333;padding-top:.4rem;font-size:.6rem';
     if(result.error){
-      sec.innerHTML = `<div style="color:#ef4444">PREDICT ERROR: ${esc(result.error)}</div>`;
+      sec.innerHTML = `<div style="color:#ef4444">PREDICT ERROR: ${esc(String(result.error))}</div>`;
     } else {
-      const tColor = THREAT_COLORS[result.threat_level] || '#f59e0b';
+      const arcNote = _mapMode==='3d'
+        ? `PATH ARC ON GLOBE — ${result.path?.length||0} WAYPOINTS`
+        : `PATH LINE ON MAP — ${result.path?.length||0} WAYPOINTS`;
       sec.innerHTML = `
         <div style="color:var(--amber);letter-spacing:.1em;margin-bottom:.3rem">◈ AI PREDICTION</div>
         ${result.asset_id?`<div class="popup-row"><span class="popup-label">PLATFORM</span><span class="popup-val" style="color:var(--cyan)">${esc(result.asset_id)}</span></div>`:''}
         <div class="popup-row"><span class="popup-label">THREAT</span><span class="popup-val" style="color:${tColor};font-weight:700">${esc(result.threat_level||'—')}</span></div>
-        ${result.destination?`<div class="popup-row"><span class="popup-label">DESTINATION</span><span class="popup-val" style="color:var(--dim2)">${esc(result.destination)}</span></div>`:''}
-        <div style="color:var(--dim2);margin-top:.3rem;line-height:1.4">${esc(result.assessment||'')}</div>
-        ${result.path?`<div style="color:#666;margin-top:.2rem;font-size:.55rem">PATH ARC PROJECTED ON GLOBE — ${result.path.length} WAYPOINTS</div>`:''}
+        ${result.destination?`<div class="popup-row"><span class="popup-label">DEST</span><span class="popup-val" style="color:var(--dim2)">${esc(result.destination)}</span></div>`:''}
+        <div style="color:var(--dim2);margin-top:.3rem;line-height:1.5">${esc(result.assessment||'')}</div>
+        ${result.path?`<div style="color:#555;margin-top:.3rem;font-size:.5rem;letter-spacing:.06em">${arcNote}</div>`:''}
       `;
     }
     inner.appendChild(sec);
@@ -3095,7 +3147,8 @@ async function initGlobe(){
     sceneModePicker: false, navigationHelpButton: false,
     animation: false, timeline: false, fullscreenButton: false,
     infoBox: false, selectionIndicator: false,
-    requestRenderMode: false,
+    requestRenderMode: true,   // only re-render on change — major perf win
+    maximumRenderTimeChange: Infinity,
     creditContainer: hiddenCredit,
   });
 
@@ -3143,6 +3196,7 @@ async function initGlobe(){
         requestWaterMask: true,
       });
       cesium.scene.terrainProvider = wt;
+      cesium.scene.requestRender();
     } catch(e) { console.warn('WARDAR: Ion terrain failed:', e); }
 
     // Upgrade 2: Bing Aerial with Labels (Ion asset 2, 30cm satellite imagery)
@@ -3151,6 +3205,7 @@ async function initGlobe(){
       const bingProvider = await Cesium.IonImageryProvider.fromAssetId(2);
       cesium.imageryLayers.removeAll();
       cesium.imageryLayers.addImageryProvider(bingProvider);
+      cesium.scene.requestRender();
     } catch(e) { console.warn('WARDAR: Ion imagery failed:', e); }
 
     // Upgrade 3: OSM 3D Buildings (photogrammetry for major cities)
@@ -3158,6 +3213,7 @@ async function initGlobe(){
     try {
       const buildings = await Cesium.createOsmBuildingsAsync();
       cesium.scene.primitives.add(buildings);
+      cesium.scene.requestRender();
     } catch(e) { console.warn('WARDAR: OSM buildings failed:', e); }
   }
 
@@ -3283,11 +3339,10 @@ function toggleAutoRotate(){
   if(btn){ btn.style.color=_autoRotate?'var(--green)':'var(--dim2)';
     btn.style.borderColor=_autoRotate?'var(--green)':'var(--border2)'; }
   if(_autoRotate && cesium){
-    // Simple auto-rotate via camera heading animation
     function _spin(){
       if(!_autoRotate||_mapMode!=='3d') return;
-      const cam=cesium.camera;
-      cam.rotate(Cesium.Cartesian3.UNIT_Z,-0.001);
+      cesium.camera.rotate(Cesium.Cartesian3.UNIT_Z, -0.001);
+      cesium.scene.requestRender();
       requestAnimationFrame(_spin);
     }
     requestAnimationFrame(_spin);
