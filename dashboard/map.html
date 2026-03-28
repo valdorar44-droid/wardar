@@ -114,7 +114,7 @@ body::after{
   position:fixed;left:0;top:52px;bottom:44px;width:260px;
   z-index:500;background:rgba(8,8,12,.92);border-right:1px solid var(--border);
   display:flex;flex-direction:column;overflow:hidden;
-  transition:transform .2s ease;
+  transition:transform .25s ease, opacity .25s ease;
 }
 #panel.collapsed{transform:translateX(-260px)}
 #panel-tab{
@@ -124,6 +124,7 @@ body::after{
   font-size:.6rem;letter-spacing:.06em;color:var(--amber);
   writing-mode:vertical-rl;text-orientation:mixed;
   display:none;user-select:none;
+  transition:opacity .25s ease;
 }
 #panel-tab:hover{color:var(--text)}
 #panel.collapsed ~ #panel-tab, .panel-collapsed #panel-tab{display:block}
@@ -131,16 +132,47 @@ body::after{
   position:fixed;right:0;top:52px;bottom:44px;width:280px;
   z-index:500;background:rgba(8,8,12,.96);border-left:1px solid var(--border);
   display:flex;flex-direction:column;
+  transition:transform .25s ease, opacity .25s ease;
 }
 #timeline{
   position:fixed;bottom:44px;left:260px;right:280px;
   z-index:500;background:rgba(8,8,12,.88);
-  transition:left .2s ease;
+  transition:left .2s ease, transform .25s ease, opacity .25s ease;
 }
 #statusbar{
   position:fixed;bottom:0;left:0;right:0;height:44px;
   z-index:600;
+  transition:opacity .25s ease;
 }
+#header{
+  transition:opacity .25s ease, transform .25s ease;
+}
+
+/* ── CINEMA MODE — map only ── */
+body.cinema #header   { opacity:0; pointer-events:none; transform:translateY(-100%); }
+body.cinema #panel    { opacity:0; pointer-events:none; transform:translateX(-260px); }
+body.cinema #panel-tab{ opacity:0; pointer-events:none; }
+body.cinema #rpanel   { opacity:0; pointer-events:none; transform:translateX(280px); }
+body.cinema #timeline { opacity:0; pointer-events:none; transform:translateY(60px); }
+body.cinema #statusbar{ opacity:0; pointer-events:none; }
+body.cinema #videobar { opacity:0; pointer-events:none; transform:translateY(100%); }
+body.cinema #cinema-exit { opacity:1; pointer-events:all; }
+
+/* ── TIMELINE HIDDEN ── */
+body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(60px); }
+
+/* ── CINEMA EXIT BUTTON ── */
+#cinema-exit{
+  position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+  z-index:9999;
+  background:rgba(8,8,12,.88);border:1px solid var(--amber);
+  color:var(--amber);font-family:var(--font);font-size:.52rem;
+  letter-spacing:.14em;padding:.4rem 1.2rem;cursor:pointer;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+  white-space:nowrap;
+}
+#cinema-exit:hover{background:rgba(245,158,11,.1)}
 #globe-container{
   position:fixed;inset:0;z-index:1;background:#040406;display:none;
 }
@@ -162,6 +194,7 @@ body::after{
   border-bottom:1px solid var(--border2);
   padding:0 1.2rem;
   z-index:700;
+  /* transition defined above with cinema mode */
 }
 #header::after{
   content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
@@ -1021,6 +1054,9 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
   <div id="panel-tab" onclick="togglePanelCollapse()">SENSORS</div>
   <!-- HEADER BAR -->
+  <!-- Cinema mode exit button — floats over map, visible only in cinema mode -->
+  <div id="cinema-exit" onclick="toggleCinema()" title="Exit map-only mode">⊞ EXIT MAP MODE &nbsp;[ESC]</div>
+
   <div id="header">
     <div class="hdr-logo">WARDAR</div>
     <div class="hdr-sep">│</div>
@@ -1036,7 +1072,10 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <div id="search-results"></div>
     </div>
     <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only display" style="border-color:#ef4444;color:#ef4444;display:none">MIL ALL</button>
-    <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">2D MAP</button>
+    <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">3D GLOBE</button>
+    <button id="timeline-btn" class="mapmode-btn" onclick="toggleTimeline()" title="Show/hide timeline">⏱ TL</button>
+    <button id="cinema-btn"   class="mapmode-btn" onclick="toggleCinema()"   title="Map-only mode — hide all panels">⊞ MAP</button>
+    <button id="fullscreen-toggle" class="mapmode-btn" onclick="toggleFullscreen()" title="Browser fullscreen">⛶ FULL</button>
     <div id="hdr-clock">--:--:-- UTC</div>
     <div class="threat-badge" id="threat-badge">
       <div class="threat-dot" id="threat-dot" style="background:var(--green)"></div>
@@ -2817,6 +2856,7 @@ function initMap2D(){
     zoomControl:false, attributionControl:false,
     preferCanvas:true,
   });
+  window._leafletMap = _map2d; // expose for cinema mode resize
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
     attribution:'© CartoDB',maxZoom:19,
   }).addTo(_map2d);
@@ -4382,9 +4422,38 @@ document.addEventListener('click', e => {
   }
 });
 
+// ── Cinema Mode (map-only) ─────────────────────────────────────────────────────
+let _cinemaOn = false;
+function toggleCinema(){
+  _cinemaOn = !_cinemaOn;
+  document.body.classList.toggle('cinema', _cinemaOn);
+  const btn = document.getElementById('cinema-btn');
+  if(btn){
+    btn.textContent = _cinemaOn ? '⊞ EXIT MAP' : '⊞ MAP';
+    btn.classList.toggle('active', _cinemaOn);
+  }
+  if(_cinemaOn && document.getElementById('videobar')?.classList.contains('open')){
+    closeVideoBar();
+  }
+  // In cinema mode the Leaflet map needs a resize event so tiles fill the viewport
+  setTimeout(()=>{ if(window._leafletMap) window._leafletMap.invalidateSize(); }, 300);
+}
+// Escape exits cinema mode
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && _cinemaOn) toggleCinema();
+});
+
+// ── Timeline Toggle ───────────────────────────────────────────────────────────
+let _tlHidden = false;
+function toggleTimeline(){
+  _tlHidden = !_tlHidden;
+  document.body.classList.toggle('tl-hidden', _tlHidden);
+  const btn = document.getElementById('timeline-btn');
+  if(btn) btn.classList.toggle('active', _tlHidden);
+}
+
 // ── Fullscreen ────────────────────────────────────────────────────────────────
 function toggleFullscreen(){
-  const btn = document.getElementById('fullscreen-toggle');
   if(!document.fullscreenElement){
     document.documentElement.requestFullscreen().catch(()=>{});
   } else {
@@ -4393,11 +4462,12 @@ function toggleFullscreen(){
 }
 document.addEventListener('fullscreenchange', ()=>{
   const btn = document.getElementById('fullscreen-toggle');
+  if(!btn) return;
   if(document.fullscreenElement){
     btn.textContent='⛶ EXIT FULL';
     btn.classList.add('active');
   } else {
-    btn.textContent='⛶ FULLSCREEN';
+    btn.textContent='⛶ FULL';
     btn.classList.remove('active');
   }
 });
