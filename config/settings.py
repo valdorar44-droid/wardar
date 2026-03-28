@@ -95,6 +95,11 @@ GPSJAM_INTERVAL_SEC = _i("GPSJAM_INTERVAL_SEC", 3600)  # hourly
 ANTHROPIC_API_KEY = _s("ANTHROPIC_API_KEY", "")
 AI_MODEL          = _s("AI_MODEL", "claude-haiku-4-5-20251001")  # fast + cheap for summaries
 
+# ── Cesium Ion (enables real terrain + satellite imagery + 3D buildings) ──
+# Free tier at https://ion.cesium.com → Account → Access Tokens → Default Token
+# Without this token the globe uses CartoDB dark tiles + flat terrain (still functional)
+CESIUM_ION_TOKEN  = _s("CESIUM_ION_TOKEN", "")
+
 # ── Static Infrastructure Layers ──────────────────────
 ENABLE_NUCLEAR      = _b("ENABLE_NUCLEAR",      True)
 ENABLE_SUBCABLES    = _b("ENABLE_SUBCABLES",     True)

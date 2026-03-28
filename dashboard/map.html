@@ -96,6 +96,7 @@ body::after{
   animation:blink .6s step-end infinite;
 }
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes alertPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}
 
 /* ══════════════════════════════════════════════════════════════
@@ -619,11 +620,12 @@ body::after{
 
 /* ── CURSOR READOUT ── */
 #cursor-readout{
-  position:absolute;pointer-events:none;z-index:700;
-  background:rgba(4,4,6,.85);border:1px solid var(--border2);
-  padding:.15rem .45rem;font-size:.55rem;letter-spacing:.08em;
+  position:fixed;pointer-events:none;z-index:700;
+  background:rgba(4,4,6,.92);border:1px solid var(--border2);
+  padding:.18rem .5rem;font-size:.52rem;letter-spacing:.1em;
   color:var(--amber);white-space:nowrap;
-  display:none;transform:translate(12px,-100%);
+  display:none;transform:translate(14px,-120%);
+  font-family:var(--font);
 }
 
 /* ── MAP OVERLAY BUTTONS ── */
@@ -893,6 +895,7 @@ body::after{
 </div>
 
 <div id="globe-container"></div>
+<div id="cursor-readout"></div>
 <div id="leaflet-map"></div>
 
 
@@ -1643,10 +1646,23 @@ function updateDomainBars(){
 
 // ── Threat level ──────────────────────────────────────────────────────────────
 function updateThreatLevel(){
-  const evCount = Object.keys(markers.acled||{}).length;
+  // Multi-source threat assessment: ACLED + phase-3 alerts + nuclear threats
+  const acledCount   = Object.values(positionStore).filter(p=>p.source==='acled').length;
+  const alertCount   = alertBuffer.length;
+  const nuclearCount = Object.values(positionStore).filter(p=>p.source==='nuclear_threat').length;
+  const darkVessel   = Object.values(positionStore).filter(p=>p.source==='dark_vessel').length;
+
+  let score = 0;
+  score += Math.min(acledCount / 50, 4);   // max 4 pts from ACLED
+  score += alertCount * 0.5;               // 0.5 pts per active alert
+  score += nuclearCount * 2;               // 2 pts per nuclear threat
+  score += Math.min(darkVessel / 5, 1);    // max 1 pt from dark vessels
+
   let level='NOMINAL', color='var(--green)';
-  if(evCount > 200){ level='SEVERE';   color='var(--red)'; }
-  else if(evCount > 50){ level='ELEVATED'; color='var(--amber)'; }
+  if(score >= 6 || nuclearCount > 0){ level='CRITICAL'; color='var(--red)'; }
+  else if(score >= 3)                { level='SEVERE';   color='var(--red)'; }
+  else if(score >= 1.5)              { level='ELEVATED'; color='var(--amber)'; }
+
   document.getElementById('threat-dot').style.background = color;
   document.getElementById('threat-text').style.color = color;
   document.getElementById('threat-text').textContent = level;
@@ -1963,6 +1979,10 @@ function buildNewsFilters(){
     container.appendChild(btn);
   });
 }
+
+// ── Runtime config injected by server ─────────────────────────────
+// Blank string = no Ion token, uses CartoDB fallback. Set CESIUM_ION_TOKEN env var on Railway.
+const CESIUM_ION_TOKEN = '__CESIUM_ION_TOKEN__';
 
 // ── CesiumJS instance ─────────────────────────────────────────────
 let cesium; // CesiumJS Viewer instance
@@ -2576,8 +2596,20 @@ async function toggleMapMode(){
     if(btn){ btn.textContent='2D MAP'; btn.classList.add('active'); }
     if(!_globeInited){
       _globeInited = true;
-      try { await _loadCesium(); } catch(e) { console.error('Cesium load failed:', e); }
-      initGlobe();
+      try {
+        await _loadCesium();
+      } catch(e) {
+        console.error('WARDAR: Cesium CDN failed:', e);
+        // Fall back to 2D — don't leave user stuck on blank globe
+        _mapMode = '2d';
+        _globeInited = false;
+        globeEl.style.display = 'none';
+        leafletEl.style.display = 'block';
+        const btn2 = document.getElementById('mapmode-btn');
+        if(btn2){ btn2.textContent='3D GLOBE'; btn2.classList.remove('active'); }
+        return;
+      }
+      await initGlobe();
     }
     else { _scheduleRebuild(); if(cesium) cesium.scene.requestRender(); }
   } else {
@@ -3027,84 +3059,153 @@ function _gcArc(lat1,lon1,lat2,lon2,altM,n=10){
   return pts;
 }
 
-function initGlobe(){
-  // Suppress Cesium Ion token requirement — we use external CartoDB tiles only
-  Cesium.Ion.defaultAccessToken='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.Et9HFtf9R3FAGFIQFJ7Hx6HbuS4UsYWBLj8UGKhRBi4';
+async function initGlobe(){
+  if(!window.Cesium){ console.error('WARDAR: Cesium not loaded'); return; }
 
-  const cartoTiles=new Cesium.UrlTemplateImageryProvider({
-    url:'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png',
-    subdomains:['a','b','c','d'],
-    maximumLevel:19,
-    credit:'© CartoDB, © OpenStreetMap contributors',
+  // ── Loading overlay ─────────────────────────────────────────────────────────
+  const glEl = document.getElementById('globe-container');
+  const loadDiv = document.createElement('div');
+  loadDiv.id = 'globe-loading';
+  loadDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#040406;z-index:20;gap:.9rem;pointer-events:none';
+  loadDiv.innerHTML = `
+    <div style="width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--amber);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+    <div id="globe-load-status" style="font-family:var(--font);color:var(--amber);font-size:.6rem;letter-spacing:.15em">INITIALIZING ENGINE...</div>
+    ${CESIUM_ION_TOKEN ? '<div style="font-family:var(--font);color:var(--dim2);font-size:.48rem;letter-spacing:.1em">CESIUM ION — REAL TERRAIN + SATELLITE</div>' : '<div style="font-family:var(--font);color:var(--dim2);font-size:.48rem;letter-spacing:.1em">SET CESIUM_ION_TOKEN FOR REAL TERRAIN</div>'}
+  `;
+  glEl.appendChild(loadDiv);
+  const setLoadStatus = s => { const el=document.getElementById('globe-load-status'); if(el) el.textContent=s; };
+
+  // ── Ion token ───────────────────────────────────────────────────────────────
+  Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN ||
+    // Minimal unsigned JWT — suppresses Ion nag without making Ion requests
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.Et9HFtf9R3FAGFIQFJ7Hx6HbuS4UsYWBLj8UGKhRBi4';
+
+  const hiddenCredit = (() => { const d=document.createElement('div'); d.style.display='none'; return d; })();
+
+  // ── Create viewer — CartoDB dark tiles + flat terrain (instant, no Ion needed) ─
+  cesium = new Cesium.Viewer('globe-container', {
+    imageryProvider: new Cesium.UrlTemplateImageryProvider({
+      url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      subdomains: 'abcd',
+      maximumLevel: 19,
+      credit: '© CartoDB © OpenStreetMap',
+    }),
+    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+    baseLayerPicker: false, geocoder: false, homeButton: false,
+    sceneModePicker: false, navigationHelpButton: false,
+    animation: false, timeline: false, fullscreenButton: false,
+    infoBox: false, selectionIndicator: false,
+    requestRenderMode: false,
+    creditContainer: hiddenCredit,
   });
 
-  cesium=new Cesium.Viewer('globe-container',{
-    imageryProvider:cartoTiles,
-    terrainProvider:new Cesium.EllipsoidTerrainProvider(),
-    baseLayerPicker:false, geocoder:false, homeButton:false,
-    sceneModePicker:false, navigationHelpButton:false,
-    animation:false, timeline:false, fullscreenButton:false,
-    infoBox:false, selectionIndicator:false,
-    requestRenderMode:false,
-    creditContainer: (() => { const d=document.createElement('div'); d.style.display='none'; return d; })(),
-  });
+  // ── Visual settings — dark military ─────────────────────────────────────────
+  cesium.scene.globe.enableLighting = true;
+  cesium.scene.globe.atmosphereLightIntensity = 2.5;
+  cesium.scene.skyAtmosphere.show = true;
+  cesium.scene.skyAtmosphere.atmosphereLightIntensity = 3.0;
+  cesium.scene.backgroundColor = Cesium.Color.fromCssColorString('#040406');
+  cesium.scene.globe.baseColor = Cesium.Color.fromCssColorString('#050a10');
+  cesium.scene.globe.showGroundAtmosphere = true;
+  cesium.scene.fog.enabled = true;
+  cesium.scene.fog.density = 0.00015;
+  try { cesium.scene.postProcessStages.fxaa.enabled = true; } catch(e) {}
 
-  // Visual settings — dark military aesthetic
-  cesium.scene.globe.enableLighting=true;
-  cesium.scene.globe.atmosphereLightIntensity=2.5;
-  cesium.scene.skyAtmosphere.show=true;
-  cesium.scene.skyAtmosphere.atmosphereLightIntensity=3.0;
-  cesium.scene.backgroundColor=Cesium.Color.fromCssColorString('#040406');
-  cesium.scene.globe.baseColor=Cesium.Color.fromCssColorString('#050a10');
-  cesium.scene.globe.showGroundAtmosphere=true;
-  cesium.scene.fog.enabled=true;
-  cesium.scene.fog.density=0.00015;
-  cesium.scene.postProcessStages.fxaa.enabled=true;
+  // ── Camera controls — Google Earth smoothness ────────────────────────────────
+  const ctrl = cesium.scene.screenSpaceCameraController;
+  ctrl.minimumZoomDistance = 150;       // 150m — street level
+  ctrl.maximumZoomDistance = 25000000;  // 25,000 km — high orbit
+  ctrl.inertiaZoom = 0.85;
+  ctrl.inertiaSpin = 0.6;
+  ctrl.inertiaTranslate = 0.7;
+  ctrl.enableTilt = true;
+  ctrl.enableRotate = true;
+  ctrl.enableZoom = true;
+  try { ctrl._zoomFactor = 5.0; } catch(e) {}
 
-  // Camera controls — smooth, Google Earth-like
-  const ctrl=cesium.scene.screenSpaceCameraController;
-  ctrl.minimumZoomDistance=150;        // 150m — almost ground level
-  ctrl.maximumZoomDistance=25000000;   // 25,000km — high orbit
-  ctrl.inertiaZoom=0.85;              // high inertia = smooth deceleration
-  ctrl.inertiaSpin=0.6;
-  ctrl.inertiaTranslate=0.7;
-  ctrl.enableTilt=true;
-  ctrl.enableRotate=true;
-  ctrl.enableZoom=true;
-  // Faster scroll response
-  ctrl._zoomFactor=5.0;
-
-  // Initial camera: global view
+  // ── Initial camera: global view ──────────────────────────────────────────────
   cesium.camera.setView({
-    destination:Cesium.Cartesian3.fromDegrees(45,25,18000000),
-    orientation:{heading:0,pitch:Cesium.Math.toRadians(-90),roll:0}
+    destination: Cesium.Cartesian3.fromDegrees(45, 25, 18000000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 }
   });
 
-  // Primitive collections — GPU-instanced, handles 1000+ points smoothly
-  _cesiumPts=cesium.scene.primitives.add(new Cesium.PointPrimitiveCollection());
-  _cesiumLines=cesium.scene.primitives.add(new Cesium.PolylineCollection());
+  // ── GPU-instanced primitives ─────────────────────────────────────────────────
+  _cesiumPts = cesium.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+  _cesiumLines = cesium.scene.primitives.add(new Cesium.PolylineCollection());
 
-  // Click handler — picks point primitive, shows popup
-  const handler=new Cesium.ScreenSpaceEventHandler(cesium.scene.canvas);
-  handler.setInputAction(e=>{
-    const picked=cesium.scene.pick(e.position);
-    if(Cesium.defined(picked)&&picked.id&&picked.id.lat!=null){
-      _lastPopupData=picked.id;
-      showGlobePopup(picked.id,{clientX:e.position.x,clientY:e.position.y});
-      loadCommunityNear(picked.id.lat,picked.id.lon);
+  // ── Async Ion upgrades — globe is already visible, this happens in background ─
+  if(CESIUM_ION_TOKEN){
+    // Upgrade 1: Cesium World Terrain (30m global, 1m where available)
+    setLoadStatus('LOADING TERRAIN DATA...');
+    try {
+      const wt = await Cesium.createWorldTerrainAsync({
+        requestVertexNormals: true,
+        requestWaterMask: true,
+      });
+      cesium.scene.terrainProvider = wt;
+    } catch(e) { console.warn('WARDAR: Ion terrain failed:', e); }
+
+    // Upgrade 2: Bing Aerial with Labels (Ion asset 2, 30cm satellite imagery)
+    setLoadStatus('LOADING SATELLITE IMAGERY...');
+    try {
+      const bingProvider = await Cesium.IonImageryProvider.fromAssetId(2);
+      cesium.imageryLayers.removeAll();
+      cesium.imageryLayers.addImageryProvider(bingProvider);
+    } catch(e) { console.warn('WARDAR: Ion imagery failed:', e); }
+
+    // Upgrade 3: OSM 3D Buildings (photogrammetry for major cities)
+    setLoadStatus('LOADING 3D BUILDINGS...');
+    try {
+      const buildings = await Cesium.createOsmBuildingsAsync();
+      cesium.scene.primitives.add(buildings);
+    } catch(e) { console.warn('WARDAR: OSM buildings failed:', e); }
+  }
+
+  // ── Remove loading overlay ───────────────────────────────────────────────────
+  const loadEl = document.getElementById('globe-loading');
+  if(loadEl) loadEl.remove();
+
+  // ── Event handlers ───────────────────────────────────────────────────────────
+  const handler = new Cesium.ScreenSpaceEventHandler(cesium.scene.canvas);
+
+  // Click → pick point → show popup
+  handler.setInputAction(e => {
+    const picked = cesium.scene.pick(e.position);
+    if(Cesium.defined(picked) && picked.id && picked.id.lat != null){
+      _lastPopupData = picked.id;
+      showGlobePopup(picked.id, { clientX: e.position.x, clientY: e.position.y });
+      loadCommunityNear(picked.id.lat, picked.id.lon);
     } else {
       closeGlobePopup();
     }
-  },Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-  // Hover cursor
-  handler.setInputAction(e=>{
-    const picked=cesium.scene.pick(e.endPosition);
-    cesium.scene.canvas.style.cursor=(Cesium.defined(picked)&&picked.id&&picked.id.lat!=null)?'pointer':'default';
-  },Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+  // Hover → cursor style + lat/lon readout
+  const crEl = document.getElementById('cursor-readout');
+  handler.setInputAction(e => {
+    const picked = cesium.scene.pick(e.endPosition);
+    const isPickable = Cesium.defined(picked) && picked.id && picked.id.lat != null;
+    cesium.scene.canvas.style.cursor = isPickable ? 'pointer' : 'default';
+    if(crEl){
+      try {
+        const cart = cesium.camera.pickEllipsoid(e.endPosition, cesium.scene.globe.ellipsoid);
+        if(cart){
+          const carto = Cesium.Cartographic.fromCartesian(cart);
+          const lat = Cesium.Math.toDegrees(carto.latitude);
+          const lon = Cesium.Math.toDegrees(carto.longitude);
+          crEl.textContent = `${lat>=0?'+':''}${lat.toFixed(4)}°  ${lon>=0?'+':''}${lon.toFixed(4)}°`;
+          crEl.style.display = 'block';
+          crEl.style.left = e.endPosition.x + 'px';
+          crEl.style.top  = e.endPosition.y + 'px';
+        } else {
+          crEl.style.display = 'none';
+        }
+      } catch(err) { crEl.style.display = 'none'; }
+    }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-  // Resize handler
-  window.addEventListener('resize',()=>{ if(cesium)cesium.resize(); });
+  // Resize
+  window.addEventListener('resize', () => { if(cesium) cesium.resize(); });
 
   _scheduleRebuild();
 }
@@ -3425,8 +3526,10 @@ function connectWS(){
 
 function scheduleReconnect(){
   clearTimeout(wsTimer);
-  wsTimer=setTimeout(connectWS, wsRetry);
-  wsRetry=Math.min(wsRetry*1.5, 30000);
+  // Jitter prevents thundering herd if server restarts with many clients
+  const jitter = Math.random() * Math.min(wsRetry * 0.3, 2000);
+  wsTimer = setTimeout(connectWS, wsRetry + jitter);
+  wsRetry = Math.min(wsRetry * 1.5, 30000);
 }
 
 setInterval(()=>{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 30000);

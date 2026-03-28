@@ -82,19 +82,24 @@ if os.path.isdir(_DASH):
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """Serve the map SPA with ETag caching."""
+    """Serve the map SPA with ETag caching. Injects runtime config as JS constants."""
+    import hashlib
     html_path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "map.html")
     if not os.path.exists(html_path):
         return HTMLResponse("<h1>Wardar — map.html not found</h1>", status_code=404)
     stat = os.stat(html_path)
-    etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
+    # ETag includes token hash so cache busts if Ion token changes
+    tok_hash = hashlib.md5((C.CESIUM_ION_TOKEN or "").encode()).hexdigest()[:8]
+    etag = f'"{int(stat.st_mtime)}-{stat.st_size}-{tok_hash}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304)
     with open(html_path) as f:
         content = f.read()
+    # Inject runtime config into the HTML template placeholder
+    content = content.replace("__CESIUM_ION_TOKEN__", C.CESIUM_ION_TOKEN or "")
     return HTMLResponse(content, headers={
         "ETag": etag,
-        "Cache-Control": "no-cache",  # revalidate but use cache if ETag matches
+        "Cache-Control": "no-cache",
         "Vary": "Accept-Encoding",
     })
 
