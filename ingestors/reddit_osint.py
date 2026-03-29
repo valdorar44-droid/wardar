@@ -7,10 +7,15 @@ Focuses on: Iran, Middle East, Ukraine, Gaza, Yemen, Sudan, Myanmar + global con
 """
 from __future__ import annotations
 import asyncio
+import html as _html
 import json
+import re
+import xml.etree.ElementTree as _ET
 from datetime import datetime, timezone
 
 import httpx
+
+_ATOM = "http://www.w3.org/2005/Atom"
 
 from config import settings as C
 
@@ -304,50 +309,149 @@ async def fetch() -> list[dict]:
 
     raw: list[dict] = []
 
+    blocked_subs = 0
     async with httpx.AsyncClient(
-        timeout=15,
-        headers={"User-Agent": "Wardar/0.1 conflict-intelligence-aggregator"},
+        timeout=20,
+        headers={
+            # RSS endpoint is less aggressively rate-limited from cloud IPs than JSON
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/rss+xml, application/atom+xml, text/xml, */*",
+        },
         follow_redirects=True,
     ) as client:
         for sub in _SUBREDDITS:
             try:
                 r = await client.get(
-                    f"https://www.reddit.com/r/{sub}/new.json",
-                    params={"limit": 25, "raw_json": 1},
+                    f"https://www.reddit.com/r/{sub}/new.rss",
+                    params={"limit": 25},
                 )
                 if r.status_code == 429:
-                    log_warn(f"reddit_osint: r/{sub} rate-limited")
-                    await asyncio.sleep(5)
+                    log_warn(f"reddit_osint: r/{sub} rate-limited (429) — sleeping 15s")
+                    await asyncio.sleep(15)
+                    continue
+                if r.status_code == 403:
+                    log_warn(f"reddit_osint: r/{sub} RSS blocked (403)")
+                    blocked_subs += 1
                     continue
                 if r.status_code != 200:
+                    log_warn(f"reddit_osint: r/{sub} HTTP {r.status_code}")
                     continue
-                children = r.json().get("data", {}).get("children", [])
-                for child in children:
-                    p = child.get("data", {})
-                    url = f"https://reddit.com{p.get('permalink', '')}"
+
+                # Parse Atom/RSS XML
+                try:
+                    root = _ET.fromstring(r.content)
+                except Exception as xe:
+                    log_warn(f"reddit_osint: r/{sub} XML parse error: {xe}")
+                    blocked_subs += 1
+                    continue
+
+                # Support both Atom (<feed>) and RSS 2.0 (<rss><channel><item>)
+                entries = root.findall(f"{{{_ATOM}}}entry")
+                if not entries:
+                    # RSS 2.0 fallback
+                    entries = root.findall(".//item")
+                if not entries:
+                    log_warn(f"reddit_osint: r/{sub} RSS returned 0 entries (soft-blocked?)")
+                    blocked_subs += 1
+                    continue
+
+                for entry in entries:
+                    # ── Title ──────────────────────────────────────────────────
+                    t_el = entry.find(f"{{{_ATOM}}}title") or entry.find("title")
+                    title = (t_el.text or "") if t_el is not None else ""
+                    if not title:
+                        continue
+
+                    # ── URL ────────────────────────────────────────────────────
+                    l_el = entry.find(f"{{{_ATOM}}}link") or entry.find("link")
+                    if l_el is not None:
+                        url = l_el.get("href") or l_el.text or ""
+                    else:
+                        url = ""
+                    if not url:
+                        continue
+                    # Normalize to https://reddit.com/...
+                    url = url.replace("https://www.reddit.com", "https://reddit.com")
                     if url in _SEEN_URLS:
                         continue
-                    title_lower = (p.get("title") or "").lower()
+
+                    # ── Keyword pre-filter ─────────────────────────────────────
+                    title_lower = title.lower()
                     if not any(kw in title_lower for kw in _KEYWORDS):
                         continue
-                    if (p.get("score") or 0) < 3:
-                        continue
+
+                    # ── Timestamp ──────────────────────────────────────────────
+                    ts_el = (entry.find(f"{{{_ATOM}}}updated")
+                             or entry.find(f"{{{_ATOM}}}published")
+                             or entry.find("pubDate"))
+                    created = 0.0
+                    if ts_el is not None and ts_el.text:
+                        try:
+                            created = datetime.fromisoformat(
+                                ts_el.text.replace("Z", "+00:00")
+                            ).timestamp()
+                        except Exception:
+                            pass
+
+                    # ── Content HTML (for image + selftext extraction) ──────────
+                    c_el = entry.find(f"{{{_ATOM}}}content") or entry.find("description")
+                    content_raw = (c_el.text or "") if c_el is not None else ""
+                    # Atom content is HTML-entity-encoded; decode it
+                    content_html = _html.unescape(content_raw)
+
+                    # Extract selftext (strip HTML tags)
+                    selftext = re.sub(r"<[^>]+>", " ", content_html).strip()
+                    selftext = re.sub(r"\s+", " ", selftext)[:300]
+
+                    # Extract thumbnail / preview image from content HTML
+                    preview_url = ""
+                    img_m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', content_html, re.I)
+                    if img_m:
+                        preview_url = img_m.group(1)
+                        if preview_url.startswith("//"):
+                            preview_url = "https:" + preview_url
+
+                    # Extract linked URL (first href inside content)
+                    linked_url = ""
+                    href_m = re.search(r'href=["\']([^"\']+)["\']', content_html, re.I)
+                    if href_m:
+                        linked_url = href_m.group(1)
+
+                    # Media classification
+                    is_video   = "v.redd.it" in linked_url or "video" in title_lower
+                    is_gallery = "gallery" in (linked_url or "") or "gallery" in title_lower
+                    media_url  = ""
+                    if not is_video and linked_url:
+                        if any(linked_url.lower().endswith(ext) for ext in (".jpg",".jpeg",".png",".gif",".webp")):
+                            media_url = linked_url
+                        elif "i.redd.it" in linked_url or "i.imgur.com" in linked_url:
+                            media_url = linked_url
+
                     raw.append({
-                        "title":    p.get("title", "")[:300],
-                        "selftext": (p.get("selftext") or "")[:200],
-                        "url":      url,
-                        "score":    p.get("score", 0),
-                        "sub":      sub,
-                        "created":  p.get("created_utc", 0),
+                        "title":       title[:300],
+                        "selftext":    selftext,
+                        "url":         url,
+                        "score":       50,   # RSS has no score; use placeholder so AI filter sees it
+                        "sub":         sub,
+                        "created":     created,
+                        "is_video":    is_video,
+                        "is_gallery":  is_gallery,
+                        "media_url":   media_url,
+                        "preview_url": preview_url,
+                        "video_thumb": preview_url if is_video else "",
+                        "linked_url":  linked_url,
                     })
             except Exception as exc:
                 log_warn(f"reddit_osint: r/{sub}: {exc}")
-            # Respect Reddit rate limit (~1 req/sec)
+            # Respect Reddit rate limit
             await asyncio.sleep(1.5)
 
+    if blocked_subs:
+        log_warn(f"reddit_osint: {blocked_subs}/{len(_SUBREDDITS)} subs blocked/unreachable — Railway IP may be banned by Reddit")
     if not raw:
-        log("reddit_osint: 0 posts passed keyword pre-filter")
+        log_warn(f"reddit_osint: 0 posts passed keyword pre-filter (blocked_subs={blocked_subs})")
         return []
+    log(f"reddit_osint: {len(raw)} posts passed keyword filter from {len(_SUBREDDITS)-blocked_subs} accessible subs")
 
     # AI classify in batches of 12 (keeps prompt concise)
     BATCH = 12
@@ -388,11 +492,7 @@ async def fetch() -> list[dict]:
         events.append({
             "source":      "reddit_osint",
             "title":       f"[r/{post['sub']}] {post['title'][:180]}",
-            "description": (
-                f"AI-verified: {ev_type.replace('_',' ').upper()} | "
-                f"Confidence: {confidence.upper()} | "
-                f"{post.get('score', 0):,} upvotes"
-            ),
+            "description": post.get("selftext", ""),
             "lat":         lat,
             "lon":         lon,
             "country":     country_name,
@@ -400,11 +500,17 @@ async def fetch() -> list[dict]:
             "raw_ts_utc":  ts,
             "url":         post["url"],
             "extra":       json.dumps({
-                "event_type": ev_type,
-                "confidence": confidence,
-                "subreddit":  post["sub"],
-                "score":      post.get("score", 0),
+                "event_type":  ev_type,
+                "confidence":  confidence,
+                "subreddit":   post["sub"],
+                "score":       post.get("score", 0),
                 "ai_location": ai.get("location"),
+                "is_video":    post.get("is_video", False),
+                "is_gallery":  post.get("is_gallery", False),
+                "media_url":   post.get("media_url", ""),
+                "preview_url": post.get("preview_url", ""),
+                "video_thumb": post.get("video_thumb", ""),
+                "linked_url":  post.get("linked_url", ""),
             }),
         })
 

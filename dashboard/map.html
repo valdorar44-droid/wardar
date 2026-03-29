@@ -3404,6 +3404,77 @@ function buildCommunityPopup(r){
   </div>`;
 }
 
+// ── Reddit OSINT Popup ────────────────────────────────────────────────────────
+function buildRedditPopup(d){
+  let ex={};
+  try{ ex=JSON.parse(d.extra||d._extra||'{}'); }catch(e){}
+  const sub      = esc(ex.subreddit||'reddit');
+  const evType   = esc((ex.event_type||d.event_type||'REPORT').toUpperCase());
+  const conf     = ex.confidence||0;
+  const confPct  = Math.round(conf*100);
+  const confColor= conf>=0.8?'var(--green)':conf>=0.5?'var(--amber)':'var(--dim2)';
+  const score    = ex.score||0;
+  const aiLoc    = esc(ex.ai_location||d.location_name||'');
+  const isVideo  = ex.is_video||false;
+  const isGallery= ex.is_gallery||false;
+  const previewUrl = (ex.preview_url||'').replace(/&amp;/g,'&');
+  const mediaUrl   = (ex.media_url||'').replace(/&amp;/g,'&');
+  const videoThumb = (ex.video_thumb||'').replace(/&amp;/g,'&');
+  const linkedUrl  = ex.linked_url||'';
+  const postUrl    = d.source_url||d.url||'';
+
+  // Best image to show
+  const imgSrc = previewUrl || mediaUrl || videoThumb || '';
+
+  // Delay badge
+  const delayBadge = `<span style="background:#b45309;color:#fff;font-size:.5rem;padding:.1rem .35rem;border-radius:2px;letter-spacing:.05em">DELAYED 1H</span>`;
+
+  // Image block
+  let mediaBlock = '';
+  if(imgSrc){
+    mediaBlock = `<div style="margin:.5rem 0;position:relative;cursor:pointer" onclick="window.open('${esc(postUrl||imgSrc)}','_blank')">
+      <img src="${esc(imgSrc)}" alt="post media" onerror="this.style.display='none'"
+        style="width:100%;max-height:160px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
+      ${isVideo?`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.65);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:1rem">▶</div>`:''}
+    </div>`;
+  } else if(isVideo){
+    mediaBlock = `<div style="margin:.5rem 0;background:#0d0d14;border:1px solid #1e1e2a;padding:.5rem;text-align:center;color:var(--dim2);font-size:.6rem">▶ VIDEO — CLICK BELOW TO WATCH</div>`;
+  }
+
+  // Body excerpt
+  const body = d.description||'';
+  const bodySnip = body.length>250 ? esc(body.substring(0,250))+'…' : esc(body);
+  const bodyBlock = bodySnip ? `<div style="margin:.4rem 0;color:var(--dim2);font-size:.6rem;line-height:1.5;border-left:2px solid #ff6314;padding-left:.4rem">${bodySnip}</div>` : '';
+
+  return `<div style="min-width:220px">
+  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem;flex-wrap:wrap">
+    <span style="background:#ff6314;color:#000;font-size:.5rem;padding:.1rem .35rem;font-weight:700;border-radius:2px;letter-spacing:.05em">r/${sub}</span>
+    <span style="background:#1a1a28;color:#ff6314;font-size:.5rem;padding:.1rem .35rem;border-radius:2px;border:1px solid #ff6314">${evType}</span>
+    <span style="color:${confColor};font-size:.5rem;padding:.1rem .35rem">AI ${confPct}%</span>
+    ${delayBadge}
+  </div>
+  <div style="font-weight:700;font-size:.7rem;color:#e8eaf0;line-height:1.3;margin-bottom:.4rem">${esc(d.title||d.summary||'Reddit OSINT Report')}</div>
+  ${mediaBlock}
+  ${bodyBlock}
+  <div style="display:flex;flex-direction:column;gap:.2rem;margin:.4rem 0">
+    ${aiLoc?`<div class="popup-row"><span class="popup-label">LOCATION</span><span class="popup-val">${aiLoc}</span></div>`:''}
+    <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(d.country||'—')}</span></div>
+    <div class="popup-row"><span class="popup-label">UPVOTES</span><span class="popup-val" style="color:var(--amber)">▲ ${score.toLocaleString()}</span></div>
+    <div class="popup-row"><span class="popup-label">REPORTED</span><span class="popup-val">${fmtTs(d.created_at)}</span></div>
+    ${isGallery?`<div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val" style="color:var(--cyan)">GALLERY</span></div>`:''}
+  </div>
+  <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem">
+    ${postUrl?`<a href="${esc(postUrl)}" target="_blank" rel="noopener"
+      style="display:block;text-align:center;padding:.3rem;background:#ff6314;color:#000;font-size:.6rem;font-weight:700;text-decoration:none;border-radius:2px;letter-spacing:.05em">
+      ${isVideo?'▶ WATCH ON REDDIT':'OPEN REDDIT POST ↗'}</a>`:''}
+    ${linkedUrl&&linkedUrl!==postUrl?`<a href="${esc(linkedUrl)}" target="_blank" rel="noopener"
+      style="display:block;text-align:center;padding:.3rem;background:#1a1a28;color:var(--cyan);font-size:.55rem;text-decoration:none;border-radius:2px;border:1px solid #1e2a30;letter-spacing:.05em">
+      EXTERNAL SOURCE ↗</a>`:''}
+    ${d.country?`<button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI INTEL BRIEF</button>`:''}
+  </div>
+</div>`;
+}
+
 // ── 2D Leaflet Map ────────────────────────────────────────────────────────────
 function initMap2D(){
   if(_map2d) return;
@@ -3512,7 +3583,8 @@ function addMarker2D(key, d){
         return;
       }
       _lastPopupData = d;
-      const html = d._isComm ? buildCommunityPopup(d) : buildPopup(d);
+      const _psrc = (d.source||d._lk||'').toLowerCase();
+      const html = d._isComm ? buildCommunityPopup(d) : _psrc==='reddit_osint' ? buildRedditPopup(d) : buildPopup(d);
       m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;max-width:280px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:300}).openPopup();
       // Load equipment image asynchronously after popup renders
       if(_pendingEqImg){
@@ -4348,7 +4420,8 @@ let _lastPopupData = null;  // used by predictPath() button
 
 function showGlobePopup(d,ev){
   _lastPopupData = d;
-  const html=d._isComm?buildCommunityPopup(d):buildPopup(d);
+  const _gsrc=(d.source||d._lk||'').toLowerCase();
+  const html=d._isComm?buildCommunityPopup(d):_gsrc==='reddit_osint'?buildRedditPopup(d):buildPopup(d);
   showGlobePopupRaw(html,ev);
   if(_pendingEqImg){
     const eq=_pendingEqImg; _pendingEqImg=null;
