@@ -71,10 +71,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve frontend + uploads
+# Serve frontend + local uploads (local storage fallback)
 _DASH = os.path.join(os.path.dirname(__file__), "..", "dashboard")
-_UPLOADS_DIR = os.path.join(_DASH, "uploads")
-os.makedirs(_UPLOADS_DIR, exist_ok=True)
 if os.path.isdir(_DASH):
     app.mount("/static", StaticFiles(directory=_DASH), name="static")
 
@@ -274,6 +272,7 @@ _VIDEO_EXTS = {"mp4","webm","mov","avi","mkv"}
 
 @app.post("/api/community/upload")
 async def upload_media(file: UploadFile = File(...)):
+    from core.storage import save as storage_save, backend_name as storage_backend
     ct = (file.content_type or "").lower().split(";")[0].strip()
     if ct not in _ALLOWED_TYPES:
         raise HTTPException(
@@ -293,14 +292,16 @@ async def upload_media(file: UploadFile = File(...)):
     if ext not in allowed_exts:
         ext = "mp4" if is_video else "jpg"
 
-    fname = f"{uuid.uuid4().hex}.{ext}"
-    dest  = os.path.join(_UPLOADS_DIR, fname)
-    with open(dest, "wb") as fh:
-        fh.write(data)
+    try:
+        url = await storage_save(data, ext, ct)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Storage error: {exc}")
+
     return JSONResponse({
-        "url":      f"/static/uploads/{fname}",
+        "url":      url,
         "is_video": is_video,
         "size_kb":  len(data) // 1024,
+        "backend":  storage_backend(),
     })
 
 # ── Static Infrastructure Layers ─────────────────────────────────────────────

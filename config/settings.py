@@ -192,6 +192,16 @@ UCDP_TOKEN            = _s("UCDP_TOKEN",            "")     # free token via ema
 ENABLE_UCDP           = _b("ENABLE_UCDP",           True)   # enable if token set
 UCDP_INTERVAL_SEC     = _i("UCDP_INTERVAL_SEC",     3600)   # hourly
 
+# ── Media Storage (S3-compatible: Cloudflare R2 / AWS S3 / Backblaze B2) ──────
+# Leave all blank to use local filesystem (uploads lost on redeploy).
+# See core/storage.py for full setup instructions.
+S3_ENDPOINT_URL      = _s("S3_ENDPOINT_URL",      "")   # e.g. https://<id>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID     = _s("S3_ACCESS_KEY_ID",     "")
+S3_SECRET_ACCESS_KEY = _s("S3_SECRET_ACCESS_KEY", "")
+S3_BUCKET_NAME       = _s("S3_BUCKET_NAME",       "")
+S3_PUBLIC_URL        = _s("S3_PUBLIC_URL",        "")   # e.g. https://pub-xxx.r2.dev
+S3_REGION            = _s("S3_REGION",            "auto")
+
 # ── Reddit OSINT — DISABLED (Railway datacenter IPs are hard-blocked by Reddit)
 ENABLE_REDDIT_OSINT       = _b("ENABLE_REDDIT_OSINT",       False)  # blocked from cloud IPs
 REDDIT_OSINT_INTERVAL_SEC = _i("REDDIT_OSINT_INTERVAL_SEC", 900)

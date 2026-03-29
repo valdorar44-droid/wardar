@@ -7,3 +7,4 @@ python-multipart==0.0.19
 h3==4.1.0
 osint-geo-extractor==0.0.12
 anthropic>=0.40.0
+boto3>=1.35.0
