@@ -1158,19 +1158,19 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-tracking-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item">
+            <label class="layer-item" title="Live aircraft positions — ADS-B Exchange + Airplanes.live. Military aircraft in red (24h delayed). MIL ONLY mode filters to military/dark flights only.">
               <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)" onchange="toggleLayer('adsb')">
               <span class="layer-icon" style="color:#ff3b1e">✈</span>
               <span class="layer-name">AIRCRAFT <span style="font-size:.42rem;color:#ff3b1e">MIL</span>/<span style="font-size:.42rem;color:var(--amber)">CIV</span></span>
               <span class="layer-count" id="cnt-adsb" style="background:var(--amber)">0</span>
             </label>
-            <label class="layer-item">
+            <label class="layer-item" title="Live vessel positions — AIS (Automatic Identification System). Military ships shown in orange. Dark vessels (AIS off) shown separately.">
               <input type="checkbox" class="layer-cb" id="cb-ais" checked style="color:var(--cyan)" onchange="toggleLayer('ais')">
               <span class="layer-icon" style="color:var(--cyan)">⛵</span>
               <span class="layer-name">MARITIME</span>
               <span class="layer-count" id="cnt-ais" style="background:var(--cyan)">0</span>
             </label>
-            <label class="layer-item">
+            <label class="layer-item" title="Satellite orbital positions from TLE (Two-Line Element) data — SpaceX, military recon, ISS, and other tracked objects.">
               <input type="checkbox" class="layer-cb" id="cb-tle" style="color:var(--purple)" onchange="toggleLayer('tle')">
               <span class="layer-icon" style="color:var(--purple)">◎</span>
               <span class="layer-name">SATELLITE</span>
@@ -1188,25 +1188,25 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-conflict-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item">
+            <label class="layer-item" title="Armed conflict events from ACLED (Armed Conflict Location & Event Data) + UCDP/WarSpotting — battles, explosions, violence against civilians.">
               <input type="checkbox" class="layer-cb" id="cb-acled" checked style="color:var(--red)" onchange="toggleLayer('acled')">
               <span class="layer-icon" style="color:var(--red)">💥</span>
               <span class="layer-name">CONFLICT EVENTS</span>
               <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
             </label>
-            <label class="layer-item">
+            <label class="layer-item" title="NOTAMs (Notice to Airmen) — active airspace restrictions, temporary flight restrictions, military exercise zones via CheckWX/FAA.">
               <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)" onchange="toggleLayer('notam')">
               <span class="layer-icon" style="color:var(--yellow)">⚠</span>
               <span class="layer-name">NOTAM</span>
               <span class="layer-count" id="cnt-notam" style="background:var(--yellow)">0</span>
             </label>
-            <label class="layer-item">
+            <label class="layer-item" title="Thermal hotspots — NASA FIRMS satellite fire/heat detection. Can indicate burning infrastructure, vehicle concentrations, or wildfires.">
               <input type="checkbox" class="layer-cb" id="cb-fire" style="color:var(--orange)" onchange="toggleLayer('fire')">
               <span class="layer-icon" style="color:var(--orange)">🔥</span>
               <span class="layer-name">THERMAL</span>
               <span class="layer-count" id="cnt-fire" style="background:var(--orange)">0</span>
             </label>
-            <label class="layer-item">
+            <label class="layer-item" title="Seismic events from USGS + Safecast radiation monitoring. Unusual seismic activity near conflict zones can indicate underground explosions.">
               <input type="checkbox" class="layer-cb" id="cb-seismic" style="color:var(--lime)" onchange="toggleLayer('seismic')">
               <span class="layer-icon" style="color:var(--lime)">◉</span>
               <span class="layer-name">SEISMIC</span>
@@ -1224,25 +1224,25 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-intel-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item">
+            <label class="layer-item" title="OSINT news articles — GDELT, Bellingcat, TWZ, USNI, Defense News, Crisis Group, Pentagon, AFRICOM and other open-source intelligence.">
               <input type="checkbox" class="layer-cb" id="cb-osint" style="color:var(--blue)" onchange="toggleLayer('osint')">
               <span class="layer-icon" style="color:var(--blue)">📡</span>
               <span class="layer-name">OSINT NEWS</span>
               <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
             </label>
-            <label class="layer-item" id="lr-osintgeo">
+            <label class="layer-item" id="lr-osintgeo" title="Geolocated OSINT — GeoConfirmed, Defmon, CEN INFO RES, Texty. Verified battlefield imagery with confirmed map coordinates.">
               <input type="checkbox" class="layer-cb" id="cb-osint_geo" checked style="color:var(--orange)" onchange="toggleLayer('osint_geo')">
               <span class="layer-icon" style="color:var(--orange)">◈</span>
               <span class="layer-name">OSINT VERIFIED</span>
               <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
             </label>
-            <label class="layer-item" id="lr-polymarket">
+            <label class="layer-item" id="lr-polymarket" title="Polymarket prediction market odds for geopolitical conflict events — crowd-sourced probability forecasts.">
               <input type="checkbox" class="layer-cb" id="cb-polymarket" style="color:var(--amber)" onchange="toggleLayer('polymarket')">
               <span class="layer-icon" style="color:var(--amber)">📊</span>
               <span class="layer-name">POLYMARKET ODDS</span>
               <span class="layer-count" id="cnt-polymarket" style="background:var(--amber)">0</span>
             </label>
-            <label class="layer-item" id="lr-wikipedia">
+            <label class="layer-item" id="lr-wikipedia" title="Wikipedia edit spikes — unusual editing activity on conflict/country pages often signals breaking news or active military events.">
               <input type="checkbox" class="layer-cb" id="cb-wikipedia" style="color:var(--amber)" onchange="toggleLayer('wikipedia')">
               <span class="layer-icon" style="color:var(--amber)">📖</span>
               <span class="layer-name">WIKI SPIKES</span>
@@ -1328,35 +1328,41 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-infra-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item" id="lr-nuclear">
+            <label class="layer-item" id="lr-nuclear" title="Nuclear power plants and known nuclear facilities worldwide — high-value targets and radiation risk in conflict zones.">
               <input type="checkbox" class="layer-cb" id="cb-nuclear" checked style="color:var(--yellow)" onchange="toggleLayer('nuclear')">
               <span class="layer-icon" style="color:var(--yellow)">☢</span>
               <span class="layer-name">NUCLEAR PLANTS</span>
               <span class="layer-count" id="cnt-nuclear" style="background:var(--yellow)">0</span>
             </label>
-            <label class="layer-item" id="lr-milbase">
+            <label class="layer-item" id="lr-milbase" title="Military bases and installations worldwide — US, NATO, Russian, Chinese, and other global force posture positions.">
               <input type="checkbox" class="layer-cb" id="cb-mil_base" checked style="color:var(--amber)" onchange="toggleLayer('mil_base')">
               <span class="layer-icon" style="color:var(--amber)">★</span>
               <span class="layer-name">MILITARY BASES</span>
               <span class="layer-count" id="cnt-milbase" style="background:var(--amber)">0</span>
             </label>
-            <label class="layer-item" id="lr-cables">
+            <label class="layer-item" id="lr-cables" title="Undersea fiber optic cable routes — critical communications infrastructure. Cutting cables is an act of hybrid warfare.">
               <input type="checkbox" class="layer-cb" id="chk-cables" style="color:var(--cyan)" onchange="toggleCableLayer(this.checked)">
               <span class="layer-icon" style="color:var(--cyan)">⌇</span>
               <span class="layer-name">SUBSEA CABLES</span>
               <span class="layer-count" id="cnt-cables" style="background:var(--cyan)">0</span>
             </label>
-            <label class="layer-item" id="lr-pipelines">
+            <label class="layer-item" id="lr-pipelines" title="Oil and gas pipeline routes — Druzhba, Nord Stream, TurkStream, BTC, TANAP and other strategic energy infrastructure. From OpenStreetMap/Overpass.">
               <input type="checkbox" class="layer-cb" id="chk-pipelines" style="color:var(--orange)" onchange="togglePipelineLayer(this.checked)">
               <span class="layer-icon" style="color:var(--orange)">⊸</span>
               <span class="layer-name">OIL/GAS PIPELINES</span>
               <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
             </label>
-            <label class="layer-item">
+            <label class="layer-item" title="GPS jamming / electronic warfare signals from GPSJAM.org">
               <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)" onchange="toggleLayer('ew')">
               <span class="layer-icon" style="color:var(--fuchsia)">⚡</span>
-              <span class="layer-name">GPS JAM</span>
+              <span class="layer-name">GPS JAM / EW</span>
               <span class="layer-count" id="cnt-ew" style="background:var(--fuchsia)">0</span>
+            </label>
+            <label class="layer-item" title="Internet outage / blackout events from CAIDA IODA — government shutdowns in conflict zones">
+              <input type="checkbox" class="layer-cb" id="cb-ioda" checked style="color:var(--red)" onchange="toggleLayer('ioda')">
+              <span class="layer-icon" style="color:var(--red)">🔴</span>
+              <span class="layer-name">NET BLACKOUT</span>
+              <span class="layer-count" id="cnt-ioda" style="background:var(--red)">0</span>
             </label>
           </div>
         </div>
@@ -1370,25 +1376,25 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-human-badge">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item">
+            <label class="layer-item" title="User-submitted intel — geolocated reports from the community. Click anywhere on the map in community mode to submit a marker.">
               <input type="checkbox" class="layer-cb" id="cb-community" checked style="color:var(--green)" onchange="toggleLayer('community')">
               <span class="layer-icon" style="color:var(--green)">◈</span>
               <span class="layer-name">COMMUNITY INTEL</span>
               <span class="layer-count" id="cnt-community" style="background:var(--green)">0</span>
             </label>
-            <label class="layer-item" id="lr-unhcr">
+            <label class="layer-item" id="lr-unhcr" title="UNHCR refugee and displacement statistics — countries with 10,000+ displaced persons. Anchored to capital city coordinates.">
               <input type="checkbox" class="layer-cb" id="cb-unhcr" style="color:var(--purple)" onchange="toggleLayer('unhcr')">
               <span class="layer-icon" style="color:var(--purple)">⊙</span>
               <span class="layer-name">DISPLACEMENT</span>
               <span class="layer-count" id="cnt-unhcr" style="background:var(--purple)">0</span>
             </label>
-            <label class="layer-item" id="lr-views">
+            <label class="layer-item" id="lr-views" title="VIEWS (Violence & Impacts Early Warning System) conflict probability forecasts — monthly predictions 1-36 months ahead from academic models.">
               <input type="checkbox" class="layer-cb" id="cb-views" style="color:var(--red)" onchange="toggleLayer('views')">
               <span class="layer-icon" style="color:var(--red)">◉</span>
               <span class="layer-name">CONFLICT FORECAST</span>
               <span class="layer-count" id="cnt-views" style="background:var(--red)">0</span>
             </label>
-            <label class="layer-item" id="lr-shodan">
+            <label class="layer-item" id="lr-shodan" title="Shodan exposed critical infrastructure — ICS/SCADA systems, water treatment, power grid controls found on the internet in conflict zones.">
               <input type="checkbox" class="layer-cb" id="cb-shodan" style="color:var(--cyan)" onchange="toggleLayer('shodan')">
               <span class="layer-icon" style="color:var(--cyan)">🔌</span>
               <span class="layer-name">CYBER INFRA</span>
@@ -1406,19 +1412,19 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-alerts-badge" style="background:var(--red);color:#000">0</span>
           </div>
           <div class="layer-group-body">
-            <label class="layer-item" id="lr-alerts">
+            <label class="layer-item" id="lr-alerts" title="High-priority threat indicators — dark vessels (AIS off in restricted areas), nuclear/pipeline threats, vessel convergence anomalies.">
               <input type="checkbox" class="layer-cb" id="cb-alerts" checked style="color:var(--red)" onchange="toggleLayer('alerts')">
               <span class="layer-icon" style="color:var(--red)">⚡</span>
               <span class="layer-name">THREAT ALERTS</span>
               <span class="layer-count" id="cnt-alerts" style="background:var(--red)">0</span>
             </label>
-            <label class="layer-item" id="lr-pikud">
+            <label class="layer-item" id="lr-pikud" title="Pikud Ha'Oref (Israel Home Front Command) live rocket/missile alerts — real-time air raid warnings across Israel.">
               <input type="checkbox" class="layer-cb" id="cb-pikud" checked style="color:var(--red)" onchange="toggleLayer('pikud')">
               <span class="layer-icon" style="color:var(--red)">🚨</span>
               <span class="layer-name">IL ROCKET ALERTS</span>
               <span class="layer-count" id="cnt-pikud" style="background:var(--red)">0</span>
             </label>
-            <label class="layer-item" id="lr-adsb-emergency">
+            <label class="layer-item" id="lr-adsb-emergency" title="Aircraft squawking 7500 (hijack), 7600 (radio failure), or 7700 (emergency) — extracted from ADS-B feeds in real time.">
               <input type="checkbox" class="layer-cb" id="cb-adsb-emergency" checked style="color:var(--red)" onchange="toggleLayer('adsb_emergency')">
               <span class="layer-icon" style="color:var(--red)">🆘</span>
               <span class="layer-name">EMERGENCY SQUAWK</span>
@@ -2807,7 +2813,7 @@ function hexToRgb(hex){
 let map;
 const markers = {
   adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{},
-  fire:{}, seismic:{}, ew:{}, community:{},
+  fire:{}, seismic:{}, ew:{}, community:{}, ioda:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
   alerts:{}, pikud:{}, wikipedia:{}, adsb_emergency:{},
   polymarket:{}, shodan:{},
@@ -2815,7 +2821,7 @@ const markers = {
 let layers = {};
 const visible = {
   // DEFAULT ON — militarily relevant layers
-  adsb:true, ais:true, acled:true, notam:true, ew:true,
+  adsb:true, ais:true, acled:true, notam:true, ew:true, ioda:true,
   mil_base:true, nuclear:true, alerts:true, pikud:true,
   adsb_emergency:true, osint_geo:true, community:true,
   // DEFAULT OFF — noisy / civilian / optional
@@ -3042,9 +3048,27 @@ function _render2dIsw(){
   iswPolygons.forEach(f=>{
     if(!f.geometry) return;
     const strokeCol = f._stroke||'#ef4444';
-    gjLayers.push(L.geoJSON({type:'Feature',geometry:f.geometry,properties:{}},{
+    const zoneName  = f.properties?.name || f._type || 'Conflict Zone';
+    const zoneType  = f._type || (f._isw==='ukraine'?'Ukraine Frontline':'ME Zone');
+    gjLayers.push(L.geoJSON({type:'Feature',geometry:f.geometry,properties:{name:zoneName,type:zoneType}},{
       style:{fillColor:strokeCol,fillOpacity:.1,color:strokeCol,weight:1.5,opacity:.65,dashArray:'4 5'},
       pointToLayer:(feat,latlng)=>L.circleMarker(latlng,{radius:3,color:strokeCol,fillColor:strokeCol,fillOpacity:.7,weight:1}),
+      onEachFeature:(feat,layer)=>{
+        const name = feat.properties?.name || zoneName;
+        const type = feat.properties?.type || zoneType;
+        layer.on('click', e=>{
+          L.popup({className:'wardar-popup',maxWidth:260})
+            .setLatLng(e.latlng)
+            .setContent(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;padding:.4rem;border:1px solid #1e1e2a">
+              <div style="color:${strokeCol};font-size:.65rem;letter-spacing:.12em;margin-bottom:.3rem">◉ ${esc(type.toUpperCase())}</div>
+              <div style="color:#e0e2e8;font-size:.72rem;margin-bottom:.4rem">${esc(name)}</div>
+              <div style="font-size:.55rem;color:#555;letter-spacing:.06em">ISW/OSINT FRONTLINE DATA</div>
+            </div>`)
+            .openOn(_map2d);
+        });
+        layer.on('mouseover', ()=>layer.setStyle({fillOpacity:.2,opacity:.9}));
+        layer.on('mouseout', ()=>layer.setStyle({fillOpacity:.1,opacity:.65}));
+      },
     }));
   });
   if(gjLayers.length){
@@ -3106,31 +3130,72 @@ const _ACTYPE_WIKI = {
 
 // Title/type pattern → Wikipedia article (checked last, partial match)
 const _TITLE_WIKI = [
+  // SAM / air defense
   {pat:'s-400',w:'S-400 missile system'},{pat:'s-300',w:'S-300 missile system'},
+  {pat:'s-500',w:'S-500 missile system'},{pat:'s-350',w:'S-350E Poliment-Redut'},
   {pat:'patriot',w:'MIM-104 Patriot'},{pat:'thaad',w:'Terminal High Altitude Area Defense'},
   {pat:'iron dome',w:'Iron Dome'},{pat:'david sling',w:"David's Sling"},
-  {pat:'arrow',w:'Arrow (Israeli missile)'},{pat:'iskander',w:'Iskander'},
-  {pat:'kalibr',w:'Kalibr (missile)'},{pat:'kinzhal',w:'Kh-47M2 Kinzhal'},
-  {pat:'hypersoni',w:'Hypersonic missile'},
+  {pat:'arrow 3',w:'Arrow 3'},{pat:'arrow missile',w:'Arrow (Israeli missile)'},
+  {pat:'nasams',w:'National Advanced Surface-to-Air Missile System'},
+  {pat:'hawk missile',w:'MIM-23 Hawk'},{pat:'mim-104',w:'MIM-104 Patriot'},
+  {pat:'pantsir',w:'Pantsir missile system'},{pat:'buk',w:'Buk missile system'},
+  {pat:'tor missile',w:'Tor missile system'},{pat:'osa missile',w:'9K33 Osa'},
+  // Ballistic / cruise missiles
+  {pat:'icbm',w:'Intercontinental ballistic missile'},
+  {pat:'topol',w:'RT-2PM2 Topol-M'},{pat:'sarmat',w:'RS-28 Sarmat'},
+  {pat:'bulava',w:'RSM-56 Bulava'},{pat:'yars',w:'RS-24 Yars'},
+  {pat:'iskander',w:'Iskander'},{pat:'kalibr',w:'Kalibr (missile)'},
+  {pat:'kinzhal',w:'Kh-47M2 Kinzhal'},{pat:'zircon',w:'3M22 Zircon'},
+  {pat:'hypersoni',w:'Hypersonic missile'},{pat:'kh-101',w:'Kh-101'},
+  {pat:'shahed',w:'Shahed 136'},{pat:'geran',w:'Shahed 136'},
+  {pat:'tomahawk',w:'BGM-109 Tomahawk'},{pat:'jassm',w:'AGM-158 JASSM'},
+  {pat:'atacms',w:'MGM-140 ATACMS'},{pat:'himars',w:'M142 HIMARS'},
+  {pat:'mlrs',w:'M270 MLRS'},{pat:'grad',w:'BM-21 Grad'},
+  {pat:'smerch',w:'BM-30 Smerch'},{pat:'tornado',w:'Tornado-G MLRS'},
+  // Tanks / ground
   {pat:'f-35',w:'Lockheed Martin F-35 Lightning II'},
   {pat:'f-22',w:'Lockheed Martin F-22 Raptor'},
   {pat:'f-16',w:'General Dynamics F-16 Fighting Falcon'},
+  {pat:'f-15',w:'McDonnell Douglas F-15 Eagle'},
   {pat:'b-52',w:'Boeing B-52 Stratofortress'},
+  {pat:'b-2 spirit',w:'Northrop Grumman B-2 Spirit'},
   {pat:'su-35',w:'Sukhoi Su-35'},{pat:'su-34',w:'Sukhoi Su-34'},
   {pat:'su-27',w:'Sukhoi Su-27'},{pat:'su-25',w:'Sukhoi Su-25'},
+  {pat:'su-24',w:'Sukhoi Su-24'},{pat:'su-57',w:'Sukhoi Su-57'},
   {pat:'mig-29',w:'Mikoyan MiG-29'},{pat:'mig-31',w:'Mikoyan-Gurevich MiG-31'},
   {pat:'tu-95',w:'Tupolev Tu-95'},{pat:'tu-160',w:'Tupolev Tu-160'},
-  {pat:'abrams',w:'M1 Abrams'},{pat:'leopard 2',w:'Leopard 2'},
-  {pat:'t-72',w:'T-72'},{pat:'t-80',w:'T-80'},{pat:'t-90',w:'T-90'},
-  {pat:'challenger',w:'Challenger 2'},{pat:'leclerc',w:'Leclerc (tank)'},
-  {pat:'bradl',w:'Bradley Fighting Vehicle'},
-  {pat:'destroyer',w:'Arleigh Burke-class destroyer'},
-  {pat:'aircraft carrier',w:'Nimitz-class aircraft carrier'},
-  {pat:'submarine',w:'Virginia-class submarine'},
-  {pat:'frigate',w:'Oliver Hazard Perry-class frigate'},
+  {pat:'tu-22',w:'Tupolev Tu-22M'},{pat:'il-76',w:'Ilyushin Il-76'},
+  {pat:'a-10',w:'Fairchild Republic A-10 Thunderbolt II'},
+  {pat:'ah-64',w:'Boeing AH-64 Apache'},{pat:'v-22',w:'Bell Boeing V-22 Osprey'},
   {pat:'mq-9',w:'General Atomics MQ-9 Reaper'},
   {pat:'global hawk',w:'Northrop Grumman RQ-4 Global Hawk'},
   {pat:'predator',w:'General Atomics MQ-1 Predator'},
+  {pat:'bayraktar',w:'Bayraktar TB2'},
+  // Ground forces
+  {pat:'abrams',w:'M1 Abrams'},{pat:'leopard 2',w:'Leopard 2'},
+  {pat:'t-72',w:'T-72'},{pat:'t-80',w:'T-80'},{pat:'t-90',w:'T-90'},
+  {pat:'t-14 armata',w:'T-14 Armata'},{pat:'armata',w:'T-14 Armata'},
+  {pat:'challenger',w:'Challenger 2'},{pat:'leclerc',w:'Leclerc (tank)'},
+  {pat:'bradl',w:'Bradley Fighting Vehicle'},
+  {pat:'btr-82',w:'BTR-82'},{pat:'bmp-3',w:'BMP-3'},
+  {pat:'javelin',w:'FGM-148 Javelin'},{pat:'stinger',w:'FIM-92 Stinger'},
+  {pat:'nlaw',w:'NLAW'},{pat:'rpg-7',w:'RPG-7'},
+  {pat:'howitzer',w:'M777 howitzer'},{pat:'m777',w:'M777 howitzer'},
+  {pat:'caesar',w:'CAESAR howitzer'},{pat:'paladin',w:'M109 Paladin'},
+  {pat:'pzh 2000',w:'PzH 2000'},{pat:'msta',w:'2S19 Msta'},
+  // Naval
+  {pat:'destroyer',w:'Arleigh Burke-class destroyer'},
+  {pat:'aircraft carrier',w:'Gerald R. Ford-class aircraft carrier'},
+  {pat:'carrier group',w:'Carrier strike group'},
+  {pat:'submarine',w:'Virginia-class submarine'},
+  {pat:'frigate',w:'Oliver Hazard Perry-class frigate'},
+  {pat:'cruiser',w:'Ticonderoga-class cruiser'},
+  {pat:'corvette',w:'Karakurt-class corvette'},
+  {pat:'moskva',w:'Russian cruiser Moskva'},
+  // Specific events
+  {pat:'nuclear test',w:'Nuclear weapons testing'},
+  {pat:'airstrike',w:'Airstrike'},{pat:'drone strike',w:'Drone warfare'},
+  {pat:'shelling',w:'Artillery'},{pat:'artillery fire',w:'Artillery'},
 ];
 
 function _getWikiArticle(p){
@@ -3204,10 +3269,8 @@ function buildPopup(p){
   if(isMil)      badge='<div class="delay-badge">[DELAYED 24H — MILITARY]</div>';
   else if(isConflict) badge='<div class="delay-badge conflict">[DELAYED 1H — CONFLICT]</div>';
 
-  // Equipment image — for military assets and conflict equipment
-  const showImg = isMil || ['warspot','ucdp','acled','mil_base','nuclear'].includes(src)
-    || (p.category||'').includes('conflict') || (p.category||'').includes('equipment');
-  const eqImg = showImg ? _mkEqImgPlaceholder(p) : {html:'',article:null,id:null};
+  // Equipment image — always try to find one; _getWikiArticle returns null if no match
+  const eqImg = _mkEqImgPlaceholder(p);
   _pendingEqImg = eqImg.article ? eqImg : null;
 
   if(p.title){
@@ -3363,7 +3426,7 @@ function initMap2D(){
 
   // Cluster group per layer key
   const _allLK = ['adsb','ais','tle','acled','notam','fire','seismic','osint','community',
-    'nuclear','mil_base','ew','alerts','pikud','wikipedia','adsb_emergency','polymarket',
+    'nuclear','mil_base','ew','ioda','alerts','pikud','wikipedia','adsb_emergency','polymarket',
     'shodan','osint_geo','unhcr','views','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
   for(const lk of _allLK){
     _cluster2d[lk] = L.markerClusterGroup({
@@ -3449,7 +3512,7 @@ function addMarker2D(key, d){
         dashArray:'6 8',
       });
       c.bindTooltip(`⬤ NET BLACKOUT: ${(d.country||'').toUpperCase()} (score ${score})`,{className:'measure-tip',sticky:true});
-      if(visible.ew) c.addTo(_map2d);
+      if(visible.ioda) c.addTo(_map2d);
       _iodaCircles2d[key] = c;
     }
   }
@@ -3537,8 +3600,58 @@ function togglePanelCollapse(){
 // ── AI Asset Prediction ───────────────────────────────────────────────────────
 const THREAT_COLORS = {LOW:'#22c55e',MODERATE:'#f59e0b',HIGH:'#f97316',CRITICAL:'#ef4444'};
 
+// Great-circle dead-reckoning path — accurate, instant, no API needed
+function _gcDeadReckoning(lat0, lon0, headingDeg, speedKts, nPoints=8, intervalMin=15){
+  if(!speedKts || speedKts < 1) return [];
+  const R = 6371; // km
+  const speedKmh = speedKts * 1.852;
+  const distKmPerStep = speedKmh * (intervalMin / 60);
+  const brg = headingDeg * Math.PI / 180;
+  const pts = [];
+  let latR = lat0 * Math.PI / 180;
+  let lonR = lon0 * Math.PI / 180;
+  for(let i = 0; i < nPoints; i++){
+    const d = distKmPerStep / R;
+    const lat2 = Math.asin(Math.sin(latR)*Math.cos(d) + Math.cos(latR)*Math.sin(d)*Math.cos(brg));
+    const lon2 = lonR + Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(latR), Math.cos(d)-Math.sin(latR)*Math.sin(lat2));
+    latR = lat2; lonR = lon2;
+    pts.push({lat: lat2*180/Math.PI, lon: ((lon2*180/Math.PI)+540)%360-180});
+  }
+  return pts;
+}
+
 async function predictPath(d){
   // d = position object from positionStore
+  const hasTelemetry = d.heading_deg!=null && d.speed_kts!=null && d.speed_kts > 0;
+
+  // ── Step 1: Instant dead-reckoning path (no API, shows immediately) ──────────
+  let drPath = [];
+  if(hasTelemetry){
+    drPath = _gcDeadReckoning(d.lat, d.lon, d.heading_deg, d.speed_kts, 8, 15);
+  }
+
+  // Show dead-reckoning path immediately
+  if(drPath.length >= 2 && _map2d && _mapMode==='2d'){
+    if(window._predictPolylines) window._predictPolylines.forEach(pl=>_map2d.removeLayer(pl));
+    window._predictPolylines = [];
+    const latlngs = [{lat:d.lat,lon:d.lon}, ...drPath].map(p=>[p.lat,p.lon]);
+    // Fading dashes: draw segmented for fade effect
+    for(let i=0;i<latlngs.length-1;i++){
+      const alpha = Math.max(0.15, 0.9 - i*0.1);
+      const pl = L.polyline([latlngs[i],latlngs[i+1]],{
+        color:`#f59e0b`, weight:2, opacity:alpha, dashArray:'8,5',
+      }).addTo(_map2d);
+      window._predictPolylines.push(pl);
+    }
+    // Endpoint circle
+    const endPt = latlngs[latlngs.length-1];
+    const ep = L.circleMarker(endPt,{radius:5,color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:0.4,weight:1.5})
+      .addTo(_map2d)
+      .bindTooltip(`ETA ~${Math.round(drPath.length*15/60*10)/10}h`,{className:'measure-tip',direction:'top'});
+    window._predictPolylines.push(ep);
+    _map2d.fitBounds(L.polyline(latlngs).getBounds(),{padding:[40,40],maxZoom:7});
+  }
+
   // Find the active popup container — works in both 2D (Leaflet) and 3D (Cesium overlay)
   let inner = null;
   if(_mapMode === '2d'){
@@ -3554,7 +3667,10 @@ async function predictPath(d){
     const sec = document.createElement('div');
     sec.className = 'predict-section';
     sec.style.cssText = 'margin-top:.5rem;border-top:1px solid #333;padding-top:.4rem';
-    sec.innerHTML = '<div style="color:var(--amber);font-size:.6rem;letter-spacing:.1em">⟳ PREDICTING PATH...</div>';
+    sec.innerHTML = hasTelemetry
+      ? `<div style="color:var(--amber);font-size:.6rem;letter-spacing:.1em">⟳ AI ASSESSMENT...</div>
+         <div style="color:#555;font-size:.5rem;margin-top:.2rem">Dead-reckoning: ${drPath.length}×15min waypoints shown</div>`
+      : `<div style="color:#666;font-size:.6rem">No telemetry — querying AI...</div>`;
     inner.appendChild(sec);
   }
 
@@ -3586,12 +3702,14 @@ async function predictPath(d){
 
   const tColor = result.threat_level ? (THREAT_COLORS[result.threat_level] || '#f59e0b') : '#f59e0b';
 
-  // ── Render predicted path ────────────────────────────────────────────────────
-  if(result.path && result.path.length >= 2 && !result.error){
-    const allPts = [{lat:d.lat,lon:d.lon}, ...result.path];
+  // ── Render AI-refined path (replace dead-reckoning if AI gives better path) ────
+  const pathToRender = (result.path && result.path.length >= 2 && !result.error)
+    ? result.path : drPath;
+
+  if(pathToRender.length >= 2){
+    const allPts = [{lat:d.lat,lon:d.lon}, ...pathToRender];
 
     if(_mapMode === '3d'){
-      // 3D: Cesium polyline arcs
       _predictArcs = [];
       for(let i=0;i<allPts.length-1;i++){
         const alpha = 0.85 - (i * 0.12);
@@ -3606,20 +3724,20 @@ async function predictPath(d){
       _scheduleRebuild();
       if(cesium) cesium.scene.requestRender();
     } else if(_map2d){
-      // 2D: Leaflet polyline + dashed predict line
-      // Clear previous predict polylines
-      if(window._predictPolylines){
-        window._predictPolylines.forEach(pl => _map2d.removeLayer(pl));
-      }
+      // Replace dead-reckoning with AI-refined path (colored by threat)
+      if(window._predictPolylines) window._predictPolylines.forEach(pl=>_map2d.removeLayer(pl));
       window._predictPolylines = [];
-      const latlngs = allPts.map(p => [p.lat, p.lon]);
-      const pl = L.polyline(latlngs, {
-        color: tColor, weight: 2.5, opacity: 0.85,
-        dashArray: '8,5', className: 'predict-line',
-      }).addTo(_map2d);
-      window._predictPolylines.push(pl);
-      // Fit map to show the path
-      _map2d.fitBounds(pl.getBounds(), {padding:[40,40], maxZoom:7});
+      const latlngs = allPts.map(p=>[p.lat,p.lon]);
+      for(let i=0;i<latlngs.length-1;i++){
+        const alpha = Math.max(0.15, 0.9 - i*0.09);
+        window._predictPolylines.push(
+          L.polyline([latlngs[i],latlngs[i+1]],{color:tColor,weight:2.5,opacity:alpha,dashArray:'8,5'}).addTo(_map2d)
+        );
+      }
+      const ep = L.circleMarker(latlngs[latlngs.length-1],{radius:6,color:tColor,fillColor:tColor,fillOpacity:0.4,weight:2})
+        .bindTooltip(result.destination||'Predicted destination',{className:'measure-tip',direction:'top'})
+        .addTo(_map2d);
+      window._predictPolylines.push(ep);
     }
 
     // Auto-clear after 5 minutes
@@ -3627,8 +3745,8 @@ async function predictPath(d){
       _predictArcs=[];
       if(_mapMode==='3d'){ _scheduleRebuild(); if(cesium) cesium.scene.requestRender(); }
       else if(_map2d && window._predictPolylines){
-        window._predictPolylines.forEach(pl => _map2d.removeLayer(pl));
-        window._predictPolylines = [];
+        window._predictPolylines.forEach(pl=>_map2d.removeLayer(pl));
+        window._predictPolylines=[];
       }
     }, 300000);
   }
@@ -3681,7 +3799,8 @@ function sourceToLayerKey(source){
   if(['gdelt','osint_news'].includes(s)) return 'osint';
   if(s==='firms') return 'fire';
   if(s==='usgs')  return 'seismic';
-  if(s==='gpsjam'||s==='ioda') return 'ew';       // EW + internet blackouts
+  if(s==='gpsjam') return 'ew';                    // GPS jamming / EW
+  if(s==='ioda')   return 'ioda';                 // internet outage blackouts (own layer)
   if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
@@ -3724,7 +3843,7 @@ function spawnPulse(lat, lon, color){
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
-  ew:'#e879f9',community:'#22c55e',
+  ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
   pikud:'#ef4444',wikipedia:'#f59e0b',adsb_emergency:'#ef4444',
@@ -3913,6 +4032,8 @@ function refreshCounts(){
   document.getElementById('cnt-fire').textContent    = nFire;
   document.getElementById('cnt-seismic').textContent = nSeismic;
   document.getElementById('cnt-ew').textContent      = nEw;
+  const cntIoda = document.getElementById('cnt-ioda');
+  if(cntIoda) cntIoda.textContent = (_cnt.ioda||0);
   document.getElementById('cnt-community').textContent = nComm;
 
   document.getElementById('cnt-nuclear').textContent   = (_cnt.nuclear||0);
@@ -3950,7 +4071,7 @@ function refreshCounts(){
   _gb('grp-tracking-badge', ['adsb','ais','tle']);
   _gb('grp-conflict-badge',  ['acled','notam','fire','seismic']);
   _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia']);
-  _gb('grp-infra-badge',     ['nuclear','mil_base','ew']);
+  _gb('grp-infra-badge',     ['nuclear','mil_base','ew','ioda']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
   const nAlertTotal = nAlerts + nPikud + nEmergency;
   const ab = document.getElementById('grp-alerts-badge');
@@ -3977,10 +4098,10 @@ function toggleLayer(key){
     if(visible[key]) _cluster2d[key].addTo(_map2d);
     else _cluster2d[key].remove();
   }
-  // Show/hide IODA outage circles when 'ew' layer is toggled
-  if(key==='ew' && _map2d){
+  // Show/hide IODA outage circles when 'ioda' layer is toggled
+  if(key==='ioda' && _map2d){
     Object.values(_iodaCircles2d).forEach(c=>{
-      if(visible.ew) c.addTo(_map2d); else c.remove();
+      if(visible.ioda) c.addTo(_map2d); else c.remove();
     });
   }
   if(_mapMode==='3d') _scheduleRebuild();
