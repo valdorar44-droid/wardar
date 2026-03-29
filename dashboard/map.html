@@ -2193,6 +2193,8 @@ function pushFeed(item){
 const SRC_COLORS = {
   adsb:'var(--amber)',opensky:'var(--amber)',ais:'var(--cyan)',tle:'var(--purple)',
   acled:'var(--red)',notam:'var(--yellow)',gdelt:'var(--blue)',osint_news:'var(--blue)',
+  reddit_osint:'#ff6314',iran_intl:'#ff6314',mehr_news:'#22c55e',al_monitor:'#06b6d4',
+  tasnim:'#22c55e',jpost:'#3b82f6',haaretz:'#3b82f6',arab_news:'#f59e0b',
   firms:'var(--orange)',usgs:'var(--lime)',gpsjam:'var(--fuchsia)',community:'var(--green)',
   twz:'var(--red)',usni:'var(--cyan)',bellingcat:'var(--orange)',oryx:'var(--orange)',
   defense_news:'var(--blue)',defense_one:'var(--blue)',ukmod:'var(--cyan)',
@@ -2228,22 +2230,27 @@ function renderFeed(){
 }
 
 // ── WAR NEWS tab ──────────────────────────────────────────────────────────────
-const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled','pentagon','africom','navy','un_peace','crisisgroup','state_dept','warspot','ucdp'];
+const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled','pentagon','africom','navy','un_peace','crisisgroup','state_dept','warspot','ucdp','iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news','reddit_osint'];
 const NEWS_SRC_LABELS = {
   twz:'TWZ',usni:'USNI',bellingcat:'BELLINGCAT',oryx:'ORYX',
   defense_news:'DEFNEWS',defense_one:'DEFONE',ukmod:'UK MOD',
   rusi:'RUSI',gcaptain:'GCAPT',krebs:'KREBS',gdelt:'GDELT',osint_news:'OSINT',acled:'ACLED',
   pentagon:'PENTAGON',africom:'AFRICOM',navy:'US NAVY',un_peace:'UN P&S',
   crisisgroup:'CRISIS GRP',state_dept:'STATE DEPT',warspot:'WARSPOT',ucdp:'UCDP',
+  iran_intl:'IRAN INTL',mehr_news:'MEHR NEWS',al_monitor:'AL-MONITOR',
+  tasnim:'TASNIM',jpost:'J.POST',haaretz:'HAARETZ',arab_news:'ARAB NEWS',
+  reddit_osint:'REDDIT OSINT',
 };
 const CONFLICT_ZONES = [
   {label:'ALL',  tag:null},
   {label:'UKRAINE', tag:'ukraine'},
+  {label:'IRAN', tag:'iran'},
   {label:'MIDDLE EAST', tag:'israel'},
+  {label:'GAZA', tag:'gaza'},
+  {label:'HOUTHI', tag:'houthi'},
   {label:'RED SEA', tag:'red sea'},
   {label:'RUSSIA', tag:'russia'},
   {label:'CHINA', tag:'china'},
-  {label:'IRAN', tag:'iran'},
 ];
 
 let newsBuffer = [];
@@ -2885,6 +2892,7 @@ const ICONS = {
   ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
   ioda:           {fn:()=>makePulseIcon('🔴','#ef4444','NET↓')},
   protest:        {fn:()=>makeIcon('✊','#fb923c',18)},
+  reddit_osint:   {fn:()=>makePulseIcon('🔶','#ff6314','RDDT')},
 };
 
 function iconFor(source, mil, extra){
@@ -3812,6 +3820,8 @@ function sourceToLayerKey(source, category){
   if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
+  if(s==='reddit_osint') return 'osint_geo';          // AI-filtered Reddit OSINT → geolocated layer
+  if(['iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news'].includes(s)) return 'osint'; // Iran/ME feeds → news layer
   if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
   if(s==='unhcr') return 'unhcr';
   if(s==='views_forecast') return 'views';

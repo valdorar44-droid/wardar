@@ -191,3 +191,9 @@ OFAC_INTERVAL_SEC     = _i("OFAC_INTERVAL_SEC",     86400)  # daily
 UCDP_TOKEN            = _s("UCDP_TOKEN",            "")     # free token via email
 ENABLE_UCDP           = _b("ENABLE_UCDP",           True)   # enable if token set
 UCDP_INTERVAL_SEC     = _i("UCDP_INTERVAL_SEC",     3600)   # hourly
+
+# ── Reddit OSINT (AI-filtered crowd-sourced conflict intelligence) ─────────────
+# No Reddit API key needed — uses public JSON endpoint
+# Requires ANTHROPIC_API_KEY for AI noise filtering
+ENABLE_REDDIT_OSINT       = _b("ENABLE_REDDIT_OSINT",       True)   # free, uses Claude AI to filter
+REDDIT_OSINT_INTERVAL_SEC = _i("REDDIT_OSINT_INTERVAL_SEC", 900)    # every 15 min

@@ -208,6 +208,9 @@ _ALL_OSINT_SOURCES = [
     "defense_news", "defense_one", "ukmod", "rusi", "gcaptain", "krebs",
     "isw", "aljazeera", "mem", "toi", "ukrinform", "kyiv_ind",
     "reliefweb", "centcom", "reuters", "bbc",
+    # Iran / Middle East focus
+    "iran_intl", "mehr_news", "al_monitor", "tasnim", "jpost", "haaretz", "arab_news",
+    "pentagon", "africom", "navy", "un_peace", "crisisgroup", "state_dept",
 ]
 
 async def _tick_osint():
@@ -465,6 +468,19 @@ async def _tick_ucdp():
     except Exception as exc:
         log_err(f"tick_ucdp: {exc}")
 
+async def _tick_reddit_osint():
+    if not C.ENABLE_REDDIT_OSINT or not C.ANTHROPIC_API_KEY:
+        return
+    try:
+        from ingestors import reddit_osint
+        events = await reddit_osint.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["reddit_osint"], limit=200)
+            await _broadcast({"type": "events", "sources": ["reddit_osint"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_reddit_osint: {exc}")
+
 async def _tick_intel_brief():
     if not C.ENABLE_INTEL_BRIEF or not C.ANTHROPIC_API_KEY:
         return
@@ -537,7 +553,8 @@ async def start():
         asyncio.create_task(_run_every(_tick_warspot,      C.WARSPOT_INTERVAL_SEC,     "warspot")),
         asyncio.create_task(_run_every(_tick_safecast,     C.SAFECAST_INTERVAL_SEC,    "safecast")),
         asyncio.create_task(_run_every(_tick_ofac,         C.OFAC_INTERVAL_SEC,        "ofac")),
-        asyncio.create_task(_run_every(_tick_ucdp,         C.UCDP_INTERVAL_SEC,        "ucdp")),
+        asyncio.create_task(_run_every(_tick_ucdp,          C.UCDP_INTERVAL_SEC,         "ucdp")),
+        asyncio.create_task(_run_every(_tick_reddit_osint,  C.REDDIT_OSINT_INTERVAL_SEC, "reddit_osint")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

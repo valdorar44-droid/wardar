@@ -516,6 +516,24 @@ _fetch_un_peace      = _make_rss_fetcher('un_peace',   'https://news.un.org/feed
 _fetch_crisisgroup   = _make_rss_fetcher('crisisgroup','https://www.crisisgroup.org/rss/crisiswatch')
 _fetch_state_dept    = _make_rss_fetcher('state_dept', 'https://www.state.gov/rss-feeds/', atom=False)
 
+# ── Iran / Middle East focus feeds ───────────────────────────────────────────
+# Iran International — London-based, English, independent reporting on Iran
+_fetch_iran_intl     = _make_rss_fetcher('iran_intl',  'https://www.iranintl.com/en/rss.xml')
+# Mehr News Agency — Iranian semi-official, gives Iran-side perspective
+_fetch_mehr_news     = _make_rss_fetcher('mehr_news',  'https://en.mehrnews.com/rss')
+# Al-Monitor — specialist Middle East analysis and reporting
+_fetch_al_monitor    = _make_rss_fetcher('al_monitor', 'https://www.al-monitor.com/rss')
+# Tasnim — Iranian news agency, military/IRGC events often first here
+_fetch_tasnim        = _make_rss_fetcher('tasnim',     'https://www.tasnimnews.com/en/rss/feed/0/8/0/tasnim-english-news')
+# CENTCOM — US Central Command (covers Iran/ME AOR)
+_fetch_centcom_news  = _make_rss_fetcher('centcom',    'https://www.centcom.mil/RSS/CENTCOM-News/', atom=True)
+# Jerusalem Post — Israel-side conflict reporting
+_fetch_jpost         = _make_rss_fetcher('jpost',      'https://www.jpost.com/rss/rssfeedsfrontpage.aspx')
+# Haaretz — Israeli paper, often breaks military news
+_fetch_haaretz       = _make_rss_fetcher('haaretz',    'https://www.haaretz.com/cmlink/1.628765')
+# Arab News — Saudi perspective, Houthi/Yemen/Iran coverage
+_fetch_arab_news     = _make_rss_fetcher('arab_news',  'https://www.arabnews.com/rss.xml')
+
 
 async def fetch() -> list[dict]:
     from core.engine import log
@@ -550,6 +568,15 @@ async def fetch() -> list[dict]:
         _fetch_un_peace(),
         _fetch_crisisgroup(),
         _fetch_state_dept(),
+        # Iran / Middle East focus
+        _fetch_iran_intl(),
+        _fetch_mehr_news(),
+        _fetch_al_monitor(),
+        _fetch_tasnim(),
+        _fetch_centcom_news(),
+        _fetch_jpost(),
+        _fetch_haaretz(),
+        _fetch_arab_news(),
     )
     results = []
     for chunk in results_list:
