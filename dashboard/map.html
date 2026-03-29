@@ -1243,6 +1243,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">OSINT VERIFIED</span>
               <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
             </label>
+            <label class="layer-item" title="Breaking conflict news from Google News, BBC, Al Jazeera, Reuters — AI geo-tagged and classified">
+              <input type="checkbox" class="layer-cb" id="cb-breaking" checked style="color:var(--red)" onchange="toggleLayer('breaking')">
+              <span class="layer-icon" style="color:var(--red)">⚡</span>
+              <span class="layer-name">BREAKING NEWS</span>
+              <span class="layer-count" id="cnt-breaking" style="background:var(--red)">0</span>
+            </label>
             <label class="layer-item" title="Telegram OSINT — Claude AI scans Intel Slava, War Translated, OSINT Defender, Gaza Now, Conflict News + 5 more public Telegram channels. Only HIGH/MEDIUM confidence geolocated events shown. Updates every 15 min.">
               <input type="checkbox" class="layer-cb" id="cb-reddit" checked style="color:#2da5e0" onchange="toggleLayer('reddit')">
               <span class="layer-icon" style="color:#2da5e0">📡</span>
@@ -1976,6 +1982,7 @@ const BOOT_LINES = [
   {t:"IRAN INTL · MEHR · AL-MONITOR.......", cls:"ok"},
   {t:"TASNIM · J.POST · HAARETZ · ARAB....", cls:"ok"},
   {t:"TELEGRAM AI-OSINT (CLAUDE FILTER)...", cls:"ok"},
+  {t:"BREAKING NEWS FEEDS...", ok:true},
   {t:"FAA NOTAM FEED......................", cls:"ok"},
   {t:"NASA FIRMS THERMAL + USGS SEISMIC...", cls:"ok"},
   {t:"GPSJAM EW + IODA NET BLACKOUT.......", cls:"ok"},
@@ -2248,7 +2255,7 @@ function pushFeed(item){
 const SRC_COLORS = {
   adsb:'var(--amber)',opensky:'var(--amber)',ais:'var(--cyan)',tle:'var(--purple)',
   acled:'var(--red)',notam:'var(--yellow)',gdelt:'var(--blue)',osint_news:'var(--blue)',
-  reddit_osint:'#ff6314',telegram_osint:'#2da5e0',iran_intl:'#ff6314',mehr_news:'#22c55e',al_monitor:'#06b6d4',
+  reddit_osint:'#ff6314',telegram_osint:'#2da5e0',breaking_news:'#ef4444',iran_intl:'#ff6314',mehr_news:'#22c55e',al_monitor:'#06b6d4',
   tasnim:'#22c55e',jpost:'#3b82f6',haaretz:'#3b82f6',arab_news:'#f59e0b',
   firms:'var(--orange)',usgs:'var(--lime)',gpsjam:'var(--fuchsia)',community:'var(--green)',
   twz:'var(--red)',usni:'var(--cyan)',bellingcat:'var(--orange)',oryx:'var(--orange)',
@@ -2285,7 +2292,7 @@ function renderFeed(){
 }
 
 // ── WAR NEWS tab ──────────────────────────────────────────────────────────────
-const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled','pentagon','africom','navy','un_peace','crisisgroup','state_dept','warspot','ucdp','iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news','reddit_osint','telegram_osint'];
+const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled','pentagon','africom','navy','un_peace','crisisgroup','state_dept','warspot','ucdp','iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news','reddit_osint','telegram_osint','breaking_news'];
 const NEWS_SRC_LABELS = {
   twz:'TWZ',usni:'USNI',bellingcat:'BELLINGCAT',oryx:'ORYX',
   defense_news:'DEFNEWS',defense_one:'DEFONE',ukmod:'UK MOD',
@@ -2296,6 +2303,7 @@ const NEWS_SRC_LABELS = {
   tasnim:'TASNIM',jpost:'J.POST',haaretz:'HAARETZ',arab_news:'ARAB NEWS',
   reddit_osint:'REDDIT OSINT',
   telegram_osint:'TG OSINT',
+  breaking_news:'BREAKING NEWS',
 };
 const CONFLICT_ZONES = [
   {label:'ALL',  tag:null},
@@ -2892,7 +2900,7 @@ const visible = {
   // DEFAULT ON — militarily relevant layers
   adsb:true, ais:true, acled:true, notam:true, ew:true, ioda:true,
   mil_base:true, nuclear:true, alerts:true, pikud:true,
-  adsb_emergency:true, osint_geo:true, community:true, reddit:true,
+  adsb_emergency:true, osint_geo:true, community:true, reddit:true, breaking:true,
   // DEFAULT OFF — noisy / civilian / optional
   tle:false, osint:false, fire:false, seismic:false, protest:false,
   unhcr:false, views:false, wikipedia:false, polymarket:false, shodan:false,
@@ -2951,6 +2959,8 @@ const ICONS = {
   reddit_osint:   {fn:()=>makePulseIcon('📡','#2da5e0','TG')},
   telegram_osint: {fn:()=>makePulseIcon('📡','#2da5e0','TG')},
   reddit:         {fn:()=>makePulseIcon('📡','#2da5e0','TG')},
+  breaking:       {fn:()=>makeIcon('⚡','#ef4444',16)},
+  breaking_news:  {fn:()=>makeIcon('⚡','#ef4444',16)},
 };
 
 function iconFor(source, mil, extra){
@@ -3568,7 +3578,7 @@ function buildRedditPopup(d){
 
   // Body excerpt
   const body = d.description||'';
-  const bodySnip = body.length>240 ? esc(body.substring(0,240))+'…' : esc(body);
+  const bodySnip = body.length>400 ? esc(body.substring(0,400))+'…' : esc(body);
   const bodyBlock = bodySnip
     ? `<div style="margin:.4rem 0;color:var(--dim2);font-size:.58rem;line-height:1.55;border-left:2px solid ${srcColor};padding-left:.4rem">${bodySnip}</div>`
     : '';
@@ -3581,6 +3591,7 @@ function buildRedditPopup(d){
     ${delayBadge}
   </div>
   <div style="font-weight:700;font-size:.68rem;color:#e8eaf0;line-height:1.35;margin-bottom:.3rem">${esc(d.title||d.summary||'OSINT Report')}</div>
+  ${ex.brief?`<div style="background:#0a0a10;border-left:2px solid ${srcColor};padding:.45rem .55rem;margin:.35rem 0;font-size:.62rem;line-height:1.6;color:#c8ccdc">🤖 ${esc(ex.brief)}</div>`:''}
   ${mediaBlock}
   ${bodyBlock}
   <div style="display:flex;flex-direction:column;gap:.2rem;margin:.35rem 0">
@@ -3597,6 +3608,52 @@ function buildRedditPopup(d){
     ${linkedUrl&&linkedUrl!==postUrl&&!directVidUrl?`<a href="${esc(linkedUrl)}" target="_blank" rel="noopener"
       style="display:block;text-align:center;padding:.3rem;background:#111120;color:var(--cyan);font-size:.52rem;text-decoration:none;border-radius:2px;border:1px solid #1e2a30">
       EXTERNAL SOURCE ↗</a>`:''}
+    ${d.country?`<button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI INTEL BRIEF</button>`:''}
+  </div>
+</div>`;
+}
+
+function buildBreakingPopup(d){
+  let ex={};
+  try{ ex=JSON.parse(d.extra||d._extra||'{}'); }catch(e){}
+  const sev   = ex.severity||3;
+  const brief = ex.brief||'';
+  const outlet= esc(ex.outlet||'');
+  const evType= esc((ex.event_type||'REPORT').toUpperCase().replace(/_/g,' '));
+  const aiLoc = esc(ex.ai_location||d.location_name||'');
+  const thumb = (ex.thumbnail_url||'').replace(/&amp;/g,'&');
+  const srcUrl= esc(d.source_url||d.url||'');
+  const now   = Date.now();
+  const ts    = d.raw_ts_utc||d.created_at;
+  const ageMs = ts ? now - new Date(ts).getTime() : Infinity;
+  const ageMin= Math.round(ageMs/60000);
+  const ageStr= ageMin<1?'JUST NOW':ageMin<60?`${ageMin}m AGO`:`${Math.round(ageMin/60)}h AGO`;
+  const isLive= ageMin<30;
+
+  const SEV_COL  = {1:'#6b7280',2:'#eab308',3:'#f59e0b',4:'#f97316',5:'#ef4444'};
+  const SEV_LBL  = {1:'LOW',2:'MINOR',3:'CONFIRMED',4:'SIGNIFICANT',5:'CRITICAL'};
+  const sc = SEV_COL[sev]||'#f59e0b';
+  const sl = SEV_LBL[sev]||'CONFIRMED';
+
+  return `<div style="min-width:240px;max-width:320px">
+  <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.4rem;flex-wrap:wrap">
+    ${isLive?`<span style="background:var(--red);color:#fff;font-size:.44rem;padding:.1rem .3rem;border-radius:2px;font-weight:700;letter-spacing:.06em;animation:amberpulse 1s ease-in-out infinite">⚡ LIVE</span>`:''}
+    <span style="background:${sc};color:#000;font-size:.44rem;padding:.1rem .3rem;border-radius:2px;font-weight:700;letter-spacing:.04em">${sl}</span>
+    <span style="background:#111120;color:${sc};font-size:.44rem;padding:.1rem .3rem;border-radius:2px;border:1px solid ${sc}">${evType}</span>
+    <span style="color:var(--dim2);font-size:.44rem;margin-left:auto">${ageStr}</span>
+  </div>
+  <div style="font-weight:700;font-size:.68rem;color:#e8eaf0;line-height:1.4;margin-bottom:.4rem;word-break:break-word">${esc(d.title||'Breaking Report')}</div>
+  ${brief?`<div style="background:#0a0a10;border-left:2px solid ${sc};padding:.5rem .55rem;margin:.4rem 0;font-size:.62rem;line-height:1.6;color:#c8ccdc">🤖 ${esc(brief)}</div>`:''}
+  ${thumb?`<img src="${esc(thumb)}" onerror="this.style.display='none'" style="width:100%;max-height:150px;object-fit:cover;border:1px solid #1e1e2a;border-radius:2px;margin:.4rem 0;display:block">`:''}
+  <div style="display:flex;flex-direction:column;gap:.2rem;margin:.35rem 0">
+    ${aiLoc?`<div class="popup-row"><span class="popup-label">LOCATION</span><span class="popup-val">${aiLoc}</span></div>`:''}
+    <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(d.country||'—')}</span></div>
+    ${outlet?`<div class="popup-row"><span class="popup-label">SOURCE</span><span class="popup-val" style="color:var(--cyan)">${outlet}</span></div>`:''}
+    <div class="popup-row"><span class="popup-label">REPORTED</span><span class="popup-val">${fmtTs(d.created_at||d.raw_ts_utc)}</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.4rem">
+    ${srcUrl?`<a href="${srcUrl}" target="_blank" rel="noopener"
+      style="display:block;text-align:center;padding:.3rem;background:#1a1a28;color:var(--cyan);font-size:.58rem;font-weight:700;text-decoration:none;border-radius:2px;border:1px solid #1e2a30;letter-spacing:.04em">READ FULL REPORT ↗</a>`:''}
     ${d.country?`<button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI INTEL BRIEF</button>`:''}
   </div>
 </div>`;
@@ -3652,7 +3709,7 @@ function initMap2D(){
   // Cluster group per layer key
   const _allLK = ['adsb','ais','tle','acled','protest','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','ioda','alerts','pikud','wikipedia','adsb_emergency','polymarket',
-    'shodan','osint_geo','unhcr','views','reddit','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
+    'shodan','osint_geo','unhcr','views','reddit','breaking','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
   for(const lk of _allLK){
     _cluster2d[lk] = L.markerClusterGroup({
       maxClusterRadius:50, disableClusteringAtZoom:9,
@@ -3712,8 +3769,9 @@ function addMarker2D(key, d){
       _lastPopupData = d;
       const _psrc = (d.source||d._lk||'').toLowerCase();
       const _isOsint = _psrc==='reddit_osint'||_psrc==='telegram_osint';
-      const html = d._isComm ? buildCommunityPopup(d) : _isOsint ? buildRedditPopup(d) : buildPopup(d);
-      const _pw = _isOsint ? 320 : 300;
+      const _isBreaking = _psrc==='breaking_news';
+      const html = d._isComm ? buildCommunityPopup(d) : _isBreaking ? buildBreakingPopup(d) : _isOsint ? buildRedditPopup(d) : buildPopup(d);
+      const _pw = (_isOsint||_isBreaking) ? 320 : 300;
       m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:_pw}).openPopup();
       // Load equipment image asynchronously after popup renders
       if(_pendingEqImg){
@@ -4033,6 +4091,7 @@ function sourceToLayerKey(source, category){
   if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
+  if(s==='breaking_news') return 'breaking';
   if(s==='reddit_osint'||s==='telegram_osint') return 'reddit';  // AI-filtered TG/Reddit OSINT → shared layer
   if(['iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news'].includes(s)) return 'osint'; // Iran/ME feeds → news layer
   if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
@@ -4078,7 +4137,7 @@ const LAYER_COLORS = {
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
   pikud:'#ef4444',wikipedia:'#f59e0b',adsb_emergency:'#ef4444',
-  polymarket:'#f59e0b',shodan:'#06b6d4',
+  polymarket:'#f59e0b',shodan:'#06b6d4',breaking:'#ef4444',
 };
 
 function updatePosition(p, isNew){
@@ -4257,6 +4316,8 @@ function refreshCounts(){
   document.getElementById('cnt-osint').textContent   = (_cnt.osint||0);
   const cntReddit = document.getElementById('cnt-reddit');
   if(cntReddit) cntReddit.textContent = (_cnt.reddit||0);
+  const cntBreaking = document.getElementById('cnt-breaking');
+  if(cntBreaking) cntBreaking.textContent = (_cnt.breaking||0);
   document.getElementById('cnt-fire').textContent    = nFire;
   document.getElementById('cnt-seismic').textContent = nSeismic;
   document.getElementById('cnt-ew').textContent      = nEw;
@@ -4298,7 +4359,7 @@ function refreshCounts(){
   };
   _gb('grp-tracking-badge', ['adsb','ais','tle']);
   _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic']);
-  _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia','reddit']);
+  _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia','reddit','breaking']);
   _gb('grp-infra-badge',     ['nuclear','mil_base','ew','ioda']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
   const nAlertTotal = nAlerts + nPikud + nEmergency;
@@ -4544,7 +4605,8 @@ function showGlobePopup(d,ev){
   _lastPopupData = d;
   const _gsrc=(d.source||d._lk||'').toLowerCase();
   const _gIsOsint=_gsrc==='reddit_osint'||_gsrc==='telegram_osint';
-  const html=d._isComm?buildCommunityPopup(d):_gIsOsint?buildRedditPopup(d):buildPopup(d);
+  const _gIsBreaking=_gsrc==='breaking_news';
+  const html=d._isComm?buildCommunityPopup(d):_gIsBreaking?buildBreakingPopup(d):_gIsOsint?buildRedditPopup(d):buildPopup(d);
   showGlobePopupRaw(html,ev);
   if(_pendingEqImg){
     const eq=_pendingEqImg; _pendingEqImg=null;
@@ -4919,7 +4981,7 @@ async function loadInitialData(){
       fetch('/api/positions?limit=2000').then(r=>r.json()),
       fetch('/api/events?limit=300').then(r=>r.json()),
       // Fetch map-relevant event sources separately — they get buried under news in default sort
-      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket,reddit_osint,telegram_osint,unhcr,views_forecast,warspot,ucdp,safecast&limit=500').then(r=>r.json()),
+      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket,reddit_osint,telegram_osint,breaking_news,unhcr,views_forecast,warspot,ucdp,safecast&limit=500').then(r=>r.json()),
     ]);
     (posRes.data||[]).forEach(p=>updatePosition(p,false));
     (evtRes.data||[]).forEach(e=>updateEvent(e,false));

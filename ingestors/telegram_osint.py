@@ -36,6 +36,9 @@ _CHANNELS = [
     ("SahelIntelligence","Sahel Intelligence — Mali/Niger/Burkina"),
     # Yemen / Houthi
     ("YemenWatch",       "Yemen Watch — Houthi/coalition activity"),
+    ("Flash_news_ua",    "Flash: Ukraine Breaking News"),
+    ("AirAlerts_ua",     "Ukraine Air Raid Alerts"),
+    ("warnewsua",        "War News Ukraine"),
 ]
 
 # Pre-filter keywords (same as Reddit ingestor)
@@ -158,13 +161,13 @@ async def _ai_classify(posts: list[dict]) -> list[dict]:
         for i, p in enumerate(posts):
             txt = p["title"]
             if p.get("selftext"):
-                txt += " | " + p["selftext"][:150]
-            lines.append(f"{i}: {txt[:280]}")
+                txt += " | " + p["selftext"][:300]
+            lines.append(f"{i}: {txt[:500]}")
 
         prompt = (
             "You are a military OSINT analyst. Classify these Telegram channel posts.\n"
             "For each return ONE JSON object per line:\n"
-            '{"i":N,"keep":true/false,"type":"missile_strike|airstrike|explosion|aircraft_down|naval|troop_movement|equipment_loss|protest|drone_attack|sanctions|nuclear|other","location":"city or region or null","country":"2-letter ISO or null","confidence":"high|medium|low"}\n\n'
+            '{"i":N,"keep":true/false,"type":"missile_strike|airstrike|explosion|aircraft_down|naval|troop_movement|equipment_loss|protest|drone_attack|journalist_killed|sanctions|nuclear|other","location":"city or region","country":"2-letter ISO","confidence":"high|medium|low","severity":1,"brief":"1 sentence if keep=true else null"}\n\n'
             "RULES:\n"
             "- keep=true ONLY for real, current military/conflict events (not opinion, rumor, historical, game)\n"
             "- Iran/Middle East/Houthi/IRGC/Hamas/Hezbollah: high priority\n"
@@ -175,7 +178,7 @@ async def _ai_classify(posts: list[dict]) -> list[dict]:
         )
         msg = await client.messages.create(
             model=C.AI_MODEL,
-            max_tokens=1200,
+            max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
         out = []
@@ -296,7 +299,7 @@ async def fetch() -> list[dict]:
                         content_html = _html.unescape(content_raw)
 
                         selftext = re.sub(r"<[^>]+>", " ", content_html).strip()
-                        selftext = re.sub(r"\s+", " ", selftext)[:300]
+                        selftext = re.sub(r"\s+", " ", selftext)[:500]
 
                         preview_url = ""
                         img_m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', content_html, re.I)
@@ -383,7 +386,7 @@ async def fetch() -> list[dict]:
 
         events.append({
             "source":      "telegram_osint",
-            "title":       f"[{post['channel']}] {post['title'][:180]}",
+            "title":       f"[{post['channel']}] {post['title'][:250]}",
             "description": post.get("selftext", ""),
             "lat":         lat,
             "lon":         lon,
@@ -396,6 +399,8 @@ async def fetch() -> list[dict]:
                 "confidence":     confidence,
                 "channel":        post["channel"],
                 "channel_label":  post.get("channel_label", ""),
+                "brief":         ai.get("brief") or "",
+                "severity":      ai.get("severity", 3),
                 "ai_location":    ai.get("location"),
                 "is_video":       post.get("is_video", False),
                 "media_url":      post.get("media_url", ""),

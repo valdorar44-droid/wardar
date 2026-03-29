@@ -494,6 +494,20 @@ async def _tick_telegram_osint():
     except Exception as exc:
         log_err(f"tick_telegram_osint: {exc}")
 
+async def _tick_breaking_news():
+    if not C.ENABLE_BREAKING_NEWS or not C.ANTHROPIC_API_KEY:
+        return
+    try:
+        from ingestors import breaking_news
+        events = await breaking_news.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["breaking_news"], limit=100)
+            await _broadcast({"type": "events", "sources": ["breaking_news"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_breaking_news: {exc}")
+
+
 async def _tick_intel_brief():
     if not C.ENABLE_INTEL_BRIEF or not C.ANTHROPIC_API_KEY:
         return
@@ -569,6 +583,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_ucdp,          C.UCDP_INTERVAL_SEC,         "ucdp")),
         asyncio.create_task(_run_every(_tick_reddit_osint,    C.REDDIT_OSINT_INTERVAL_SEC,    "reddit_osint")),
         asyncio.create_task(_run_every(_tick_telegram_osint,  C.TELEGRAM_OSINT_INTERVAL_SEC,  "telegram_osint")),
+        asyncio.create_task(_run_every(_tick_breaking_news,   C.BREAKING_NEWS_INTERVAL_SEC,   "breaking_news")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks
