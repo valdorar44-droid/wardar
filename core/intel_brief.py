@@ -115,33 +115,37 @@ async def generate_country_brief(country: str) -> dict:
 
     try:
         from db import store as DB
-        context, _ = _build_context(DB, country=country, hours=72)
+        context, sources_used = _build_country_context(DB, country=country, hours=72)
     except Exception as exc:
         return {"error": f"db_error: {exc}", "text": ""}
 
-    if not context.strip():
-        return {"error": "no_data", "text": f"No recent data found for {country}."}
-
     now = datetime.now(timezone.utc).isoformat()
 
-    prompt = f"""You are an intelligence analyst. Based on the sensor data below for {country}, write a concise 3-5 sentence intelligence assessment covering: current threat level, active incidents, notable patterns, and outlook. Use direct, precise language. No preamble.
+    if not context.strip():
+        prompt = f"""You are an intelligence analyst. Our sensor database has no current indexed events for {country} in the last 72 hours.
+Write a 3-5 sentence background intelligence assessment for {country} based on your general knowledge of the country's current geopolitical situation, security environment, and threat landscape as of early 2026. Be direct and precise. Note that this is a background assessment, not based on live sensor data."""
+    else:
+        prompt = f"""You are an intelligence analyst. Based on the sensor data below for {country}, write a concise intelligence assessment (5-8 sentences) covering: current threat level, active incidents, notable patterns, and near-term outlook. Use direct, precise military-style language. Focus on security-relevant findings only — ignore sports, entertainment, or commercial topics. No preamble.
 
 SENSOR DATA ({now[:10]}, last 72h, {country}):
-{context}"""
+{context}
+
+If the data above lacks security-relevant content, supplement with your general knowledge of {country}'s current threat environment."""
 
     try:
         import anthropic
         client = anthropic.AsyncAnthropic(api_key=C.ANTHROPIC_API_KEY)
         message = await client.messages.create(
             model=C.AI_MODEL,
-            max_tokens=400,
+            max_tokens=700,
             messages=[{"role": "user", "content": prompt}],
         )
         text = message.content[0].text.strip() if message.content else ""
+        model = message.model or C.AI_MODEL
     except Exception as exc:
         return {"error": f"API error: {exc}", "text": ""}
 
-    return {"text": text, "country": country, "generated_at": now}
+    return {"text": text, "country": country, "generated_at": now, "model": model, "sources_used": sources_used}
 
 
 # ── Context builder ───────────────────────────────────────────────────────────
@@ -295,6 +299,135 @@ def _build_context(DB: Any, country: str | None = None, hours: int = 6) -> tuple
         for e in notams[:8]:
             parts.append(f"  - {e.get('title','')}")
         sources_used.append("notam")
+
+    return "\n".join(parts), list(set(sources_used))
+
+
+def _build_country_context(DB: Any, country: str, hours: int = 72) -> tuple[str, list[str]]:
+    """
+    Build context for a country-specific brief.
+    Searches country field AND title/description to catch all relevant events.
+    Excludes sports/entertainment Polymarket entries.
+    """
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    now   = datetime.now(timezone.utc).isoformat()
+    parts: list[str] = []
+    sources_used: list[str] = []
+
+    # All non-polymarket news/conflict sources — search by country field OR title/description
+    _NEWS_SOURCES = [
+        "acled","ucdp","warspot","breaking_news","telegram_osint","osint_news","gdelt",
+        "mem","twz","ukmod","usni","aljazeera","reliefweb","toi","bellingcat","krebs",
+        "defense_news","osint_geo","community","gpsjam","firms","notam",
+        "pikud_haoref","wikipedia","dark_vessel","convergence","nuclear_threat",
+        "pipeline_threat","views_forecast","unhcr","safecast","ioda",
+    ]
+
+    try:
+        conn = DB.get_conn()
+        cpat = f"%{country.lower()}%"
+        placeholders = ",".join("?" * len(_NEWS_SOURCES))
+        rows = conn.execute(
+            f"""SELECT source, title, description, lat, lon, country, raw_ts_utc, extra
+                FROM events
+                WHERE release_ts_utc <= ? AND raw_ts_utc >= ?
+                  AND source IN ({placeholders})
+                  AND (
+                    LOWER(country) LIKE ?
+                    OR LOWER(title) LIKE ?
+                    OR LOWER(COALESCE(description,'')) LIKE ?
+                  )
+                ORDER BY raw_ts_utc DESC LIMIT 50""",
+            [now, since] + _NEWS_SOURCES + [cpat, cpat, cpat],
+        ).fetchall()
+
+        if rows:
+            by_src: dict[str, list] = {}
+            for r in rows:
+                by_src.setdefault(r["source"], []).append(dict(r))
+
+            # Conflict/OSINT events
+            for src in ["acled","ucdp","warspot","breaking_news","telegram_osint","osint_news","gdelt"]:
+                evts = by_src.get(src, [])
+                if evts:
+                    label = src.upper().replace("_", " ")
+                    parts.append(f"\n{label} EVENTS:")
+                    for e in evts[:8]:
+                        ts = (e.get("raw_ts_utc") or "")[:10]
+                        parts.append(f"  - {e.get('title','')} ({ts})")
+                    sources_used.append(src)
+
+            # Defense / news feeds
+            def_evts: list[dict] = []
+            for src in ["mem","twz","ukmod","usni","aljazeera","reliefweb","toi","bellingcat","krebs","defense_news"]:
+                def_evts.extend(by_src.get(src, []))
+            if def_evts:
+                def_evts.sort(key=lambda x: x.get("raw_ts_utc",""), reverse=True)
+                parts.append("\nDEFENSE & MEDIA REPORTS:")
+                for e in def_evts[:10]:
+                    src_label = (e.get("source","")).upper().replace("_"," ")
+                    parts.append(f"  - [{src_label}] {e.get('title','')}")
+                sources_used.append("defense_news")
+
+            # Sensor events (GPS jamming, fires, NOTAM)
+            for src, label in [("gpsjam","GPS JAMMING"), ("firms","THERMAL ANOMALIES"), ("notam","NOTAM RESTRICTIONS")]:
+                evts = by_src.get(src, [])
+                if evts:
+                    parts.append(f"\n{label} ({len(evts)} in {hours}h):")
+                    for e in evts[:4]:
+                        parts.append(f"  - {e.get('title','')}")
+                    sources_used.append(src)
+
+            # Displacement / forecast
+            for src, label in [("unhcr","DISPLACEMENT"), ("views_forecast","CONFLICT FORECAST")]:
+                evts = by_src.get(src, [])
+                if evts:
+                    parts.append(f"\n{label}:")
+                    for e in evts[:2]:
+                        parts.append(f"  - {e.get('title','')} — {e.get('description','')[:120]}")
+                    sources_used.append(src)
+
+            # Alerts
+            for src in ["convergence","nuclear_threat","pipeline_threat","dark_vessel"]:
+                evts = by_src.get(src, [])
+                if evts:
+                    parts.append(f"\nALERT — {src.upper().replace('_',' ')}:")
+                    for e in evts[:3]:
+                        parts.append(f"  - {e.get('title','')}")
+                    sources_used.append(src)
+
+    except Exception:
+        pass
+
+    # Polymarket — geopolitical only (exclude sports/entertainment keywords)
+    _SPORTS_KEYWORDS = {"fifa","world cup","nba","nfl","nhl","mlb","oscar","emmy","grammy",
+                        "soccer","cricket","olympics","tennis","formula 1","f1","boxing"}
+    try:
+        conn = DB.get_conn()
+        cpat = f"%{country.lower()}%"
+        poly_rows = conn.execute(
+            """SELECT title, description, extra FROM events
+               WHERE source='polymarket' AND release_ts_utc <= ? AND raw_ts_utc >= ?
+                 AND (LOWER(country) LIKE ? OR LOWER(title) LIKE ? OR LOWER(COALESCE(description,'')) LIKE ?)
+               ORDER BY raw_ts_utc DESC LIMIT 20""",
+            [now, since, cpat, cpat, cpat],
+        ).fetchall()
+        geo_poly = [
+            dict(r) for r in poly_rows
+            if not any(kw in (r["title"] or "").lower() for kw in _SPORTS_KEYWORDS)
+        ]
+        if geo_poly:
+            parts.append("\nPREDICTION MARKET SIGNALS (geopolitical):")
+            for e in geo_poly[:6]:
+                ex = _parse_extra(e)
+                prob = ex.get("prob_pct")
+                line = f"  - {e.get('title','')}"
+                if prob is not None:
+                    line += f" [YES: {prob}%]"
+                parts.append(line)
+            sources_used.append("polymarket")
+    except Exception:
+        pass
 
     return "\n".join(parts), list(set(sources_used))
 
