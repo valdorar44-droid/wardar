@@ -261,26 +261,47 @@ async def vote_community_report(report_id: int, body: VoteIn):
         raise HTTPException(status_code=404, detail="not found")
     return JSONResponse(updated)
 
-# ── Image Upload ─────────────────────────────────────────────────────────────
+# ── Media Upload (images + video) ────────────────────────────────────────────
 
-_ALLOWED_TYPES = {"image/jpeg","image/png","image/gif","image/webp","image/heic"}
-_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+_ALLOWED_IMAGE_TYPES = {"image/jpeg","image/png","image/gif","image/webp","image/heic","image/heif"}
+_ALLOWED_VIDEO_TYPES = {"video/mp4","video/webm","video/quicktime","video/x-msvideo","video/x-matroska"}
+_ALLOWED_TYPES       = _ALLOWED_IMAGE_TYPES | _ALLOWED_VIDEO_TYPES
+_MAX_IMAGE_BYTES     = 10 * 1024 * 1024   # 10 MB for images
+_MAX_VIDEO_BYTES     = 50 * 1024 * 1024   # 50 MB for video
+
+_IMAGE_EXTS = {"jpg","jpeg","png","gif","webp","heic","heif"}
+_VIDEO_EXTS = {"mp4","webm","mov","avi","mkv"}
 
 @app.post("/api/community/upload")
-async def upload_image(file: UploadFile = File(...)):
-    if file.content_type not in _ALLOWED_TYPES:
-        raise HTTPException(status_code=415, detail="Image files only (JPEG/PNG/GIF/WEBP/HEIC)")
+async def upload_media(file: UploadFile = File(...)):
+    ct = (file.content_type or "").lower().split(";")[0].strip()
+    if ct not in _ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Accepted: JPEG/PNG/GIF/WEBP (10 MB) or MP4/WEBM/MOV (50 MB)"
+        )
+    is_video  = ct in _ALLOWED_VIDEO_TYPES
+    max_bytes = _MAX_VIDEO_BYTES if is_video else _MAX_IMAGE_BYTES
+    max_label = "50 MB" if is_video else "10 MB"
+
     data = await file.read()
-    if len(data) > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Max 10 MB")
-    ext = (file.filename or "img").rsplit(".", 1)[-1].lower()
-    if ext not in ("jpg", "jpeg", "png", "gif", "webp", "heic"):
-        ext = "jpg"
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File too large — max {max_label}")
+
+    ext = (file.filename or "file").rsplit(".", 1)[-1].lower()
+    allowed_exts = _VIDEO_EXTS if is_video else _IMAGE_EXTS
+    if ext not in allowed_exts:
+        ext = "mp4" if is_video else "jpg"
+
     fname = f"{uuid.uuid4().hex}.{ext}"
     dest  = os.path.join(_UPLOADS_DIR, fname)
-    with open(dest, "wb") as f:
-        f.write(data)
-    return JSONResponse({"url": f"/static/uploads/{fname}"})
+    with open(dest, "wb") as fh:
+        fh.write(data)
+    return JSONResponse({
+        "url":      f"/static/uploads/{fname}",
+        "is_video": is_video,
+        "size_kb":  len(data) // 1024,
+    })
 
 # ── Static Infrastructure Layers ─────────────────────────────────────────────
 

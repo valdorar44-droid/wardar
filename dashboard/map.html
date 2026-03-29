@@ -633,16 +633,17 @@ body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(
 }
 .chat-status{font-size:.44rem;color:var(--dim2);letter-spacing:.06em}
 
-/* ── IMAGE UPLOAD AREA ── */
+/* ── MEDIA UPLOAD AREA ── */
 .dlg-upload-area{
   border:1px dashed var(--border2);padding:.7rem;cursor:pointer;
-  transition:border-color .15s;text-align:center;
+  transition:border-color .15s,background .15s;text-align:center;
   background:rgba(8,8,12,.5);
 }
-.dlg-upload-area:hover{border-color:var(--amber)}
-.dlg-upload-area.has-img{border-color:var(--green);border-style:solid}
-.dlg-upload-label{font-size:.52rem;letter-spacing:.08em;color:var(--dim2)}
-.dlg-upload-preview{max-width:100%;max-height:120px;margin-top:.4rem;display:none}
+.dlg-upload-area:hover{border-color:var(--amber);background:rgba(245,158,11,.04)}
+.dlg-upload-area.has-media{border-color:var(--green);border-style:solid;background:rgba(34,197,94,.04)}
+.dlg-upload-area.drag-over{border-color:var(--cyan);background:rgba(6,182,212,.08);border-style:solid}
+.dlg-upload-label{font-size:.52rem;letter-spacing:.06em;color:var(--dim2);line-height:1.6}
+.dlg-upload-preview{max-width:100%;max-height:120px;margin-top:.4rem;border-radius:2px}
 .dlg-upload-status{font-size:.46rem;letter-spacing:.06em;color:var(--dim2);margin-top:.2rem}
 
 /* COMMUNITY PANEL */
@@ -1880,20 +1881,22 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         <input class="dlg-input" id="dlg-url" type="url" maxlength="500" placeholder="https://...">
       </div>
     </div>
-    <!-- Row 6: Image — upload or URL -->
+    <!-- Row 6: Photo / Video upload -->
     <div class="dlg-row">
-      <label class="dlg-label">PHOTO EVIDENCE</label>
+      <label class="dlg-label">PHOTO / VIDEO EVIDENCE</label>
       <div class="dlg-upload-area" id="dlg-upload-area" onclick="document.getElementById('dlg-file-input').click()">
-        <input type="file" id="dlg-file-input" accept="image/*" capture="environment"
+        <input type="file" id="dlg-file-input"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,video/mp4,video/webm,video/quicktime"
           style="display:none" onchange="handleFileSelect(this)">
-        <div class="dlg-upload-label">📷 TAP TO CAPTURE / UPLOAD PHOTO (max 10 MB)</div>
-        <img class="dlg-upload-preview" id="dlg-preview">
+        <div class="dlg-upload-label" id="dlg-upload-label">📷 PHOTO (10 MB) &nbsp;|&nbsp; 🎥 VIDEO (50 MB)<br><span style="font-size:.45rem;opacity:.6">tap to browse files · drag & drop supported</span></div>
+        <img class="dlg-upload-preview" id="dlg-preview" style="display:none">
+        <video id="dlg-video-preview" style="max-width:100%;max-height:120px;margin-top:.4rem;display:none;border-radius:2px;border:1px solid #1e1e2a" playsinline controls></video>
         <div class="dlg-upload-status" id="dlg-upload-status"></div>
       </div>
     </div>
     <div class="dlg-row">
-      <label class="dlg-label">OR IMAGE URL</label>
-      <input class="dlg-input" id="dlg-imgurl" type="url" maxlength="1000" placeholder="https://...  (external link — leave blank if uploaded above)">
+      <label class="dlg-label">OR MEDIA URL</label>
+      <input class="dlg-input" id="dlg-imgurl" type="url" maxlength="1000" placeholder="https://... image or video link (leave blank if uploaded above)">
     </div>
     <div style="font-size:.48rem;color:var(--dim2);letter-spacing:.06em;margin-top:.3rem;line-height:1.6">
       NO ACCOUNT REQUIRED · CALLSIGN OPTIONAL · COMMUNITY VERIFICATION APPLIES DELAY POLICY
@@ -3418,12 +3421,19 @@ function buildCommunityPopup(r){
   let nickname = '';
   try{ const ex=JSON.parse(r.extra||'{}'); nickname=ex.nickname||''; }catch(e){}
 
-  // Photo evidence inline
+  // Photo / video evidence inline
+  const _isVidUrl = /\.(mp4|webm|mov|avi|mkv)(\?.*)?$/i.test(r.image_url||'');
   const imgBlock = r.image_url
-    ? `<div style="margin:.5rem 0;cursor:pointer" onclick="window.open('${esc(r.image_url)}','_blank')">
-        <img src="${esc(r.image_url)}" alt="evidence" onerror="this.style.display='none'"
-          style="width:100%;max-height:140px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
-       </div>` : '';
+    ? (_isVidUrl
+        ? `<video src="${esc(r.image_url)}" controls playsinline
+            style="width:100%;max-height:150px;border:1px solid #1e1e2a;display:block;border-radius:2px;margin:.5rem 0;background:#000"
+            onerror="this.outerHTML='<div style=\'text-align:center;padding:.5rem;color:var(--red);font-size:.55rem\'>VIDEO UNAVAILABLE</div>'">
+           </video>`
+        : `<div style="margin:.5rem 0;cursor:pointer" onclick="window.open('${esc(r.image_url)}','_blank')">
+            <img src="${esc(r.image_url)}" alt="evidence" onerror="this.style.display='none'"
+              style="width:100%;max-height:140px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
+           </div>`)
+    : '';
 
   return `<div class="popup-inner">
     <div class="popup-call" style="color:var(--green)">${rtIcon} ${esc(r.title||'COMMUNITY INTEL')}</div>
@@ -4150,16 +4160,7 @@ async function submitReport(){
       ['dlg-title','dlg-desc','dlg-lat','dlg-lon','dlg-country','dlg-url','dlg-imgurl'].forEach(id=>{
         document.getElementById(id).value='';
       });
-      // Reset upload state
-      _uploadedImageUrl='';
-      const prev=document.getElementById('dlg-preview');
-      if(prev){prev.style.display='none';prev.src='';}
-      const area=document.getElementById('dlg-upload-area');
-      if(area) area.classList.remove('has-img');
-      const st=document.getElementById('dlg-upload-status');
-      if(st) st.textContent='';
-      const fi=document.getElementById('dlg-file-input');
-      if(fi) fi.value='';
+      _resetUploadUI();
       loadCommunityGlobal();
     }
   }catch(e){ console.warn('submit failed',e); }
@@ -5656,47 +5657,114 @@ document.addEventListener('fullscreenchange', ()=>{
   }
 });
 
-// ── Photo Upload ──────────────────────────────────────────────────────────────
+// ── Media Upload (photo + video) ─────────────────────────────────────────────
 let _uploadedImageUrl = '';
+let _uploadedIsVideo  = false;
 
-function handleFileSelect(input){
-  const file = input.files[0];
-  if(!file) return;
-  const area = document.getElementById('dlg-upload-area');
-  const preview = document.getElementById('dlg-preview');
-  const status = document.getElementById('dlg-upload-status');
-
-  // Show local preview immediately
-  const reader = new FileReader();
-  reader.onload = e => {
-    preview.src = e.target.result;
-    preview.style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-
-  // Upload to server
-  status.textContent = '⌛ UPLOADING...';
-  status.style.color = 'var(--amber)';
+function _resetUploadUI(){
   _uploadedImageUrl = '';
+  _uploadedIsVideo  = false;
+  const area    = document.getElementById('dlg-upload-area');
+  const imgPrev = document.getElementById('dlg-preview');
+  const vidPrev = document.getElementById('dlg-video-preview');
+  const status  = document.getElementById('dlg-upload-status');
+  const lbl     = document.getElementById('dlg-upload-label');
+  const fi      = document.getElementById('dlg-file-input');
+  if(area)    area.classList.remove('has-media');
+  if(imgPrev){ imgPrev.style.display='none'; imgPrev.src=''; }
+  if(vidPrev){ vidPrev.style.display='none'; vidPrev.src=''; }
+  if(status)  status.textContent='';
+  if(lbl)     lbl.style.display='';
+  if(fi)      fi.value='';
+}
+
+function _doUpload(file){
+  const area    = document.getElementById('dlg-upload-area');
+  const imgPrev = document.getElementById('dlg-preview');
+  const vidPrev = document.getElementById('dlg-video-preview');
+  const status  = document.getElementById('dlg-upload-status');
+  const lbl     = document.getElementById('dlg-upload-label');
+
+  const isVideo   = file.type.startsWith('video/');
+  const maxBytes  = isVideo ? 50*1024*1024 : 10*1024*1024;
+  const maxLabel  = isVideo ? '50 MB' : '10 MB';
+  const sizeLabel = file.size < 1024*1024
+    ? (file.size/1024).toFixed(0)+' KB'
+    : (file.size/1024/1024).toFixed(1)+' MB';
+
+  // Client-side size guard
+  if(file.size > maxBytes){
+    status.textContent = `✗ FILE TOO LARGE (${sizeLabel}) — max ${maxLabel}`;
+    status.style.color = 'var(--red)';
+    return;
+  }
+
+  // Local preview immediately
+  if(isVideo){
+    const objUrl = URL.createObjectURL(file);
+    if(vidPrev){ vidPrev.src=objUrl; vidPrev.style.display='block'; }
+    if(imgPrev)  imgPrev.style.display='none';
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      if(imgPrev){ imgPrev.src=e.target.result; imgPrev.style.display='block'; }
+      if(vidPrev)  vidPrev.style.display='none';
+    };
+    reader.readAsDataURL(file);
+  }
+  if(lbl) lbl.style.display='none';
+
+  // Upload
+  status.textContent = `⌛ UPLOADING ${sizeLabel}...`;
+  status.style.color = 'var(--amber)';
+  _uploadedImageUrl  = '';
+  _uploadedIsVideo   = false;
 
   const fd = new FormData();
   fd.append('file', file);
   fetch('/api/community/upload', {method:'POST', body: fd})
     .then(r => {
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      if(!r.ok) return r.json().then(e=>{ throw new Error(e.detail||`HTTP ${r.status}`); });
       return r.json();
     })
     .then(data => {
       _uploadedImageUrl = data.url;
-      area.classList.add('has-img');
-      status.textContent = '✓ UPLOADED — ' + data.url.split('/').pop();
+      _uploadedIsVideo  = data.is_video || false;
+      area.classList.add('has-media');
+      status.textContent = `✓ ${data.is_video?'VIDEO':'PHOTO'} READY — ${sizeLabel}`;
       status.style.color = 'var(--green)';
     })
     .catch(err => {
-      status.textContent = '✗ UPLOAD FAILED — check file type/size';
+      status.textContent = `✗ ${err.message||'UPLOAD FAILED'}`;
       status.style.color = 'var(--red)';
+      if(imgPrev){ imgPrev.style.display='none'; imgPrev.src=''; }
+      if(vidPrev){ vidPrev.style.display='none'; vidPrev.src=''; }
+      if(lbl) lbl.style.display='';
     });
 }
+
+function handleFileSelect(input){
+  const file = input.files[0];
+  if(file) _doUpload(file);
+}
+
+// Drag-and-drop on upload area
+(function(){
+  function initDrop(){
+    const area = document.getElementById('dlg-upload-area');
+    if(!area) return;
+    area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag-over'); });
+    area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+    area.addEventListener('drop', e => {
+      e.preventDefault();
+      area.classList.remove('drag-over');
+      const file = e.dataTransfer?.files?.[0];
+      if(file) _doUpload(file);
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDrop);
+  else initDrop();
+})();
 
 // ── Alert Engine (client-side) ────────────────────────────────────────────────
 const alertBuffer = [];
