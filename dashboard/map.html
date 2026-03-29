@@ -1194,6 +1194,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">CONFLICT EVENTS</span>
               <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
             </label>
+            <label class="layer-item" title="Civil unrest — protests and riots from ACLED data. Separate from armed conflict events. Often precede military crackdowns.">
+              <input type="checkbox" class="layer-cb" id="cb-protest" style="color:#fb923c" onchange="toggleLayer('protest')">
+              <span class="layer-icon" style="color:#fb923c">✊</span>
+              <span class="layer-name">PROTESTS / UNREST</span>
+              <span class="layer-count" id="cnt-protest" style="background:#fb923c">0</span>
+            </label>
             <label class="layer-item" title="NOTAMs (Notice to Airmen) — active airspace restrictions, temporary flight restrictions, military exercise zones via CheckWX/FAA.">
               <input type="checkbox" class="layer-cb" id="cb-notam" checked style="color:var(--yellow)" onchange="toggleLayer('notam')">
               <span class="layer-icon" style="color:var(--yellow)">⚠</span>
@@ -2566,7 +2572,7 @@ function _rebuildGlobe(){
 
   for(const[k,d] of entries){
     if(d.lat==null||d.lon==null) continue;
-    const lk=sourceToLayerKey(d.source||d._lk||'');
+    const lk=sourceToLayerKey(d.source||d._lk||'',d.category||'');
     if(!visible[lk]) continue;
     const isMil=parseInt(d.military_flag||0);
     if(_milOnlyMode&&!isMil&&(lk==='adsb'||lk==='ais')) continue;
@@ -2813,7 +2819,7 @@ function hexToRgb(hex){
 let map;
 const markers = {
   adsb:{}, ais:{}, tle:{}, acled:{}, notam:{}, osint:{},
-  fire:{}, seismic:{}, ew:{}, community:{}, ioda:{},
+  fire:{}, seismic:{}, ew:{}, community:{}, ioda:{}, protest:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
   alerts:{}, pikud:{}, wikipedia:{}, adsb_emergency:{},
   polymarket:{}, shodan:{},
@@ -2825,7 +2831,7 @@ const visible = {
   mil_base:true, nuclear:true, alerts:true, pikud:true,
   adsb_emergency:true, osint_geo:true, community:true,
   // DEFAULT OFF — noisy / civilian / optional
-  tle:false, osint:false, fire:false, seismic:false,
+  tle:false, osint:false, fire:false, seismic:false, protest:false,
   unhcr:false, views:false, wikipedia:false, polymarket:false, shodan:false,
   // cables/pipelines handled separately (not cluster-based)
   cables:false, pipelines:false,
@@ -2878,6 +2884,7 @@ const ICONS = {
   safecast:       {fn:()=>makeIcon('☢','#22c55e',17)},
   ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
   ioda:           {fn:()=>makePulseIcon('🔴','#ef4444','NET↓')},
+  protest:        {fn:()=>makeIcon('✊','#fb923c',18)},
 };
 
 function iconFor(source, mil, extra){
@@ -3425,7 +3432,7 @@ function initMap2D(){
   });
 
   // Cluster group per layer key
-  const _allLK = ['adsb','ais','tle','acled','notam','fire','seismic','osint','community',
+  const _allLK = ['adsb','ais','tle','acled','protest','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','ioda','alerts','pikud','wikipedia','adsb_emergency','polymarket',
     'shodan','osint_geo','unhcr','views','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
   for(const lk of _allLK){
@@ -3444,7 +3451,7 @@ function initMap2D(){
 
 function addMarker2D(key, d){
   if(!_map2d || d.lat==null || d.lon==null) return;
-  const lk = sourceToLayerKey(d.source||d._lk||'');
+  const lk = sourceToLayerKey(d.source||d._lk||'',d.category||'');
   if(!_cluster2d[lk]) return;
   // Military-only filter: skip civilian aircraft/ships when mode is active
   if(_milOnlyMode && (lk==='adsb'||lk==='ais')){
@@ -3786,7 +3793,7 @@ async function predictPath(d){
 }
 
 // ── Layer helpers ─────────────────────────────────────────────────────────────
-function sourceToLayerKey(source){
+function sourceToLayerKey(source, category){
   const s=(source||'').toLowerCase();
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
@@ -3794,7 +3801,8 @@ function sourceToLayerKey(source){
   if(['adsb','opensky','airplaneslive'].includes(s)) return 'adsb';
   if(s==='ais')   return 'ais';
   if(s==='tle')   return 'tle';
-  if(s==='acled') return 'acled';
+  // ACLED civil unrest → separate protest layer
+  if(s==='acled') return (category==='civil_unrest') ? 'protest' : 'acled';
   if(s==='notam') return 'notam';
   if(['gdelt','osint_news'].includes(s)) return 'osint';
   if(s==='firms') return 'fire';
@@ -3843,7 +3851,7 @@ function spawnPulse(lat, lon, color){
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
-  ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',
+  ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',protest:'#fb923c',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
   pikud:'#ef4444',wikipedia:'#f59e0b',adsb_emergency:'#ef4444',
@@ -4009,11 +4017,11 @@ async function submitReport(){
 // ── Count + UI refresh ────────────────────────────────────────────────────────
 function refreshCounts(){
   const _cnt={};
-  for(const[k,d] of Object.entries(positionStore)){ const lk=sourceToLayerKey(d.source); _cnt[lk]=(_cnt[lk]||0)+1; }
+  for(const[k,d] of Object.entries(positionStore)){ const lk=sourceToLayerKey(d.source,d.category); _cnt[lk]=(_cnt[lk]||0)+1; }
   for(const[k,r] of Object.entries(communityStore)){ _cnt.community=(_cnt.community||0)+1; }
   for(const sp of staticPoints){ _cnt[sp._lk]=(_cnt[sp._lk]||0)+1; }
   // OSINT news articles have no lat/lon so aren't in positionStore — count from newsBuffer
-  _cnt.osint = (_cnt.osint||0) + newsBuffer.filter(n=>sourceToLayerKey(n.source)==='osint').length;
+  _cnt.osint = (_cnt.osint||0) + newsBuffer.filter(n=>sourceToLayerKey(n.source,n.category)==='osint').length;
   const ac=(_cnt.adsb||0);
   const sh  = (_cnt.ais||0);
   const sat = (_cnt.tle||0);
@@ -4027,6 +4035,8 @@ function refreshCounts(){
   document.getElementById('cnt-ais').textContent     = sh;
   document.getElementById('cnt-tle').textContent     = sat;
   document.getElementById('cnt-acled').textContent   = (_cnt.acled||0);
+  const cntProtest = document.getElementById('cnt-protest');
+  if(cntProtest) cntProtest.textContent = (_cnt.protest||0);
   document.getElementById('cnt-notam').textContent   = (_cnt.notam||0);
   document.getElementById('cnt-osint').textContent   = (_cnt.osint||0);
   document.getElementById('cnt-fire').textContent    = nFire;
@@ -4069,7 +4079,7 @@ function refreshCounts(){
     if(el) el.textContent = t||'';
   };
   _gb('grp-tracking-badge', ['adsb','ais','tle']);
-  _gb('grp-conflict-badge',  ['acled','notam','fire','seismic']);
+  _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic']);
   _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia']);
   _gb('grp-infra-badge',     ['nuclear','mil_base','ew','ioda']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
@@ -4375,7 +4385,7 @@ function toggleMilOnly(){
       Object.keys(_markers2d).forEach(k=>{ if(k.includes('_'+lk)||k.includes(lk+'_')) delete _markers2d[k]; });
       // Re-add from positionStore
       for(const[k,d] of Object.entries(positionStore)){
-        if(sourceToLayerKey(d.source||'')===lk) addMarker2D(k,d);
+        if(sourceToLayerKey(d.source||'',d.category||'')===lk) addMarker2D(k,d);
       }
     });
   }
@@ -4527,7 +4537,7 @@ function setTimeFilter(f){
     if(!isEvent) return;
     const ts = d.raw_ts_utc ? new Date(d.raw_ts_utc) : null;
     const show = !ts||!cutoff||(ts>=cutoff);
-    const lk = sourceToLayerKey(d.source||d._lk||'');
+    const lk = sourceToLayerKey(d.source||d._lk||'',d.category||'');
     const cl = _cluster2d[lk];
     if(show && cl && !cl.hasLayer(m)) cl.addLayer(m);
     else if(!show && cl && cl.hasLayer(m)) cl.removeLayer(m);
