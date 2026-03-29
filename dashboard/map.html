@@ -3469,71 +3469,133 @@ function buildCommunityPopup(r){
   </div>`;
 }
 
-// ── Reddit OSINT Popup ────────────────────────────────────────────────────────
+// ── AI OSINT Popup (Reddit + Telegram) ───────────────────────────────────────
 function buildRedditPopup(d){
   let ex={};
   try{ ex=JSON.parse(d.extra||d._extra||'{}'); }catch(e){}
-  const sub      = esc(ex.subreddit||'reddit');
-  const evType   = esc((ex.event_type||d.event_type||'REPORT').toUpperCase());
-  const conf     = ex.confidence||0;
-  const confPct  = Math.round(conf*100);
-  const confColor= conf>=0.8?'var(--green)':conf>=0.5?'var(--amber)':'var(--dim2)';
-  const score    = ex.score||0;
-  const aiLoc    = esc(ex.ai_location||d.location_name||'');
-  const isVideo  = ex.is_video||false;
-  const isGallery= ex.is_gallery||false;
-  const previewUrl = (ex.preview_url||'').replace(/&amp;/g,'&');
-  const mediaUrl   = (ex.media_url||'').replace(/&amp;/g,'&');
-  const videoThumb = (ex.video_thumb||'').replace(/&amp;/g,'&');
-  const linkedUrl  = ex.linked_url||'';
-  const postUrl    = d.source_url||d.url||'';
 
-  // Best image to show
-  const imgSrc = previewUrl || mediaUrl || videoThumb || '';
+  const isTelegram = (d.source||'').toLowerCase()==='telegram_osint';
+  const src        = isTelegram ? 'TELEGRAM' : 'REDDIT';
+  const srcColor   = isTelegram ? '#2da5e0' : '#ff6314';
+
+  // Source label — channel for TG, subreddit for Reddit
+  const srcLabel = isTelegram
+    ? esc(ex.channel_label || ex.channel || 'Telegram')
+    : `r/${esc(ex.subreddit||'reddit')}`;
+
+  const evType = esc((ex.event_type||d.event_type||'REPORT').toUpperCase());
+
+  // Confidence — string ("high"/"medium"/"low") from TG, or number (0-1) from Reddit
+  let confPct=0, confColor='var(--dim2)';
+  if(typeof ex.confidence==='number'){
+    confPct=Math.round(ex.confidence*100);
+    confColor=ex.confidence>=0.8?'var(--green)':ex.confidence>=0.5?'var(--amber)':'var(--dim2)';
+  } else if(ex.confidence==='high'){
+    confPct=90; confColor='var(--green)';
+  } else if(ex.confidence==='medium'){
+    confPct=65; confColor='var(--amber)';
+  } else if(ex.confidence==='low'){
+    confPct=30; confColor='var(--dim2)';
+  }
+
+  const aiLoc    = esc(ex.ai_location||d.location_name||'');
+  const isVideo  = !!(ex.is_video);
+  const isGallery= !!(ex.is_gallery);
+  const previewUrl= (ex.preview_url||'').replace(/&amp;/g,'&');
+  const mediaUrl  = (ex.media_url||'').replace(/&amp;/g,'&');
+  const videoThumb= (ex.video_thumb||'').replace(/&amp;/g,'&');
+  const linkedUrl = (ex.linked_url||'').replace(/&amp;/g,'&');
+  const postUrl   = d.source_url||d.url||'';
+  const score     = ex.score||0;
 
   // Delay badge
-  const delayBadge = `<span style="background:#b45309;color:#fff;font-size:.5rem;padding:.1rem .35rem;border-radius:2px;letter-spacing:.05em">DELAYED 1H</span>`;
+  const delayBadge = `<span style="background:#92400e;color:#fef3c7;font-size:.48rem;padding:.1rem .3rem;border-radius:2px;letter-spacing:.04em">⏱ DELAYED 1H</span>`;
 
-  // Image block
+  // ── Media block ───────────────────────────────────────────────────────────
+  // Priority: try inline video → thumbnail+play → image → nothing
+  const _DIRECT_VID = /\.(mp4|webm|mov|m3u8)(\?[^"]*)?$/i;
+  const directVidUrl =
+    (_DIRECT_VID.test(mediaUrl)   ? mediaUrl   : null) ||
+    (_DIRECT_VID.test(linkedUrl)  ? linkedUrl  : null) ||
+    (_DIRECT_VID.test(previewUrl) ? previewUrl : null);
+
+  // Thumb — best still image we have
+  const thumbUrl = videoThumb || previewUrl || mediaUrl || '';
+
   let mediaBlock = '';
-  if(imgSrc){
-    mediaBlock = `<div style="margin:.5rem 0;position:relative;cursor:pointer" onclick="window.open('${esc(postUrl||imgSrc)}','_blank')">
-      <img src="${esc(imgSrc)}" alt="post media" onerror="this.style.display='none'"
-        style="width:100%;max-height:160px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
-      ${isVideo?`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.65);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:1rem">▶</div>`:''}
+
+  if(isVideo && directVidUrl){
+    // ── Case 1: direct MP4/WEBM → embed inline, fall back on error ───────
+    const fallbackHref = esc(postUrl||directVidUrl);
+    mediaBlock = `
+    <div class="osint-vid-wrap" style="margin:.5rem 0;position:relative">
+      <video src="${esc(directVidUrl)}"
+        controls playsinline preload="metadata"
+        ${thumbUrl?`poster="${esc(thumbUrl)}"`:''}
+        style="width:100%;max-height:200px;background:#000;border:1px solid #1e1e2a;border-radius:2px;display:block"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      </video>
+      <div style="display:none;flex-direction:column;align-items:center;gap:.5rem;background:#0d0d14;border:1px solid #1e1e2a;border-radius:2px;padding:.8rem;text-align:center">
+        ${thumbUrl?`<img src="${esc(thumbUrl)}" style="width:100%;max-height:120px;object-fit:cover;border-radius:2px;opacity:.7" onerror="this.style.display='none'">`:''}
+        <span style="color:var(--dim2);font-size:.55rem">VIDEO BLOCKED BY BROWSER</span>
+        <a href="${fallbackHref}" target="_blank" rel="noopener"
+          style="padding:.25rem .7rem;background:${srcColor};color:#000;font-size:.55rem;font-weight:700;text-decoration:none;border-radius:2px">▶ OPEN SOURCE ↗</a>
+      </div>
     </div>`;
-  } else if(isVideo){
-    mediaBlock = `<div style="margin:.5rem 0;background:#0d0d14;border:1px solid #1e1e2a;padding:.5rem;text-align:center;color:var(--dim2);font-size:.6rem">▶ VIDEO — CLICK BELOW TO WATCH</div>`;
+  } else if(isVideo && thumbUrl){
+    // ── Case 2: video but no direct URL — thumbnail + play button ─────────
+    const watchHref = esc(postUrl||linkedUrl||'#');
+    mediaBlock = `
+    <div style="margin:.5rem 0;position:relative;cursor:pointer" onclick="window.open('${watchHref}','_blank')">
+      <img src="${esc(thumbUrl)}" onerror="this.style.display='none'"
+        style="width:100%;max-height:160px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35)">
+        <div style="background:rgba(0,0,0,.75);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;border:2px solid rgba(255,255,255,.3)">▶</div>
+      </div>
+      <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));padding:.3rem .4rem">
+        <span style="color:#fff;font-size:.5rem;font-weight:600">▶ PLAY ON ${src}</span>
+      </div>
+    </div>`;
+  } else if(thumbUrl){
+    // ── Case 3: image/thumbnail only ──────────────────────────────────────
+    const clickHref = esc(postUrl||linkedUrl||thumbUrl);
+    mediaBlock = `
+    <div style="margin:.5rem 0;cursor:pointer" onclick="window.open('${clickHref}','_blank')">
+      <img src="${esc(thumbUrl)}" onerror="this.style.display='none'"
+        style="width:100%;max-height:160px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
+    </div>`;
   }
 
   // Body excerpt
   const body = d.description||'';
-  const bodySnip = body.length>250 ? esc(body.substring(0,250))+'…' : esc(body);
-  const bodyBlock = bodySnip ? `<div style="margin:.4rem 0;color:var(--dim2);font-size:.6rem;line-height:1.5;border-left:2px solid #ff6314;padding-left:.4rem">${bodySnip}</div>` : '';
+  const bodySnip = body.length>240 ? esc(body.substring(0,240))+'…' : esc(body);
+  const bodyBlock = bodySnip
+    ? `<div style="margin:.4rem 0;color:var(--dim2);font-size:.58rem;line-height:1.55;border-left:2px solid ${srcColor};padding-left:.4rem">${bodySnip}</div>`
+    : '';
 
-  return `<div style="min-width:220px">
-  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem;flex-wrap:wrap">
-    <span style="background:#ff6314;color:#000;font-size:.5rem;padding:.1rem .35rem;font-weight:700;border-radius:2px;letter-spacing:.05em">r/${sub}</span>
-    <span style="background:#1a1a28;color:#ff6314;font-size:.5rem;padding:.1rem .35rem;border-radius:2px;border:1px solid #ff6314">${evType}</span>
-    <span style="color:${confColor};font-size:.5rem;padding:.1rem .35rem">AI ${confPct}%</span>
+  return `<div style="min-width:220px;max-width:300px">
+  <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.4rem;flex-wrap:wrap">
+    <span style="background:${srcColor};color:#000;font-size:.48rem;padding:.1rem .35rem;font-weight:700;border-radius:2px;letter-spacing:.04em;max-width:130px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${srcLabel}</span>
+    <span style="background:#111120;color:${srcColor};font-size:.48rem;padding:.1rem .3rem;border-radius:2px;border:1px solid ${srcColor}">${evType}</span>
+    <span style="color:${confColor};font-size:.48rem">AI ${confPct}%</span>
     ${delayBadge}
   </div>
-  <div style="font-weight:700;font-size:.7rem;color:#e8eaf0;line-height:1.3;margin-bottom:.4rem">${esc(d.title||d.summary||'Reddit OSINT Report')}</div>
+  <div style="font-weight:700;font-size:.68rem;color:#e8eaf0;line-height:1.35;margin-bottom:.3rem">${esc(d.title||d.summary||'OSINT Report')}</div>
   ${mediaBlock}
   ${bodyBlock}
-  <div style="display:flex;flex-direction:column;gap:.2rem;margin:.4rem 0">
+  <div style="display:flex;flex-direction:column;gap:.2rem;margin:.35rem 0">
     ${aiLoc?`<div class="popup-row"><span class="popup-label">LOCATION</span><span class="popup-val">${aiLoc}</span></div>`:''}
     <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(d.country||'—')}</span></div>
-    <div class="popup-row"><span class="popup-label">UPVOTES</span><span class="popup-val" style="color:var(--amber)">▲ ${score.toLocaleString()}</span></div>
+    ${score>0?`<div class="popup-row"><span class="popup-label">${isTelegram?'VIEWS':'UPVOTES'}</span><span class="popup-val" style="color:var(--amber)">▲ ${score.toLocaleString()}</span></div>`:''}
     <div class="popup-row"><span class="popup-label">REPORTED</span><span class="popup-val">${fmtTs(d.created_at)}</span></div>
     ${isGallery?`<div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val" style="color:var(--cyan)">GALLERY</span></div>`:''}
   </div>
-  <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem">
+  <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.4rem">
     ${postUrl?`<a href="${esc(postUrl)}" target="_blank" rel="noopener"
-      style="display:block;text-align:center;padding:.3rem;background:#ff6314;color:#000;font-size:.6rem;font-weight:700;text-decoration:none;border-radius:2px;letter-spacing:.05em">
-      ${isVideo?'▶ WATCH ON REDDIT':'OPEN REDDIT POST ↗'}</a>`:''}
-    ${linkedUrl&&linkedUrl!==postUrl?`<a href="${esc(linkedUrl)}" target="_blank" rel="noopener"
-      style="display:block;text-align:center;padding:.3rem;background:#1a1a28;color:var(--cyan);font-size:.55rem;text-decoration:none;border-radius:2px;border:1px solid #1e2a30;letter-spacing:.05em">
+      style="display:block;text-align:center;padding:.3rem;background:${srcColor};color:#000;font-size:.58rem;font-weight:700;text-decoration:none;border-radius:2px;letter-spacing:.04em">
+      ${isVideo&&!directVidUrl?`▶ WATCH ON ${src}`:`OPEN ${src} POST ↗`}</a>`:''}
+    ${linkedUrl&&linkedUrl!==postUrl&&!directVidUrl?`<a href="${esc(linkedUrl)}" target="_blank" rel="noopener"
+      style="display:block;text-align:center;padding:.3rem;background:#111120;color:var(--cyan);font-size:.52rem;text-decoration:none;border-radius:2px;border:1px solid #1e2a30">
       EXTERNAL SOURCE ↗</a>`:''}
     ${d.country?`<button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI INTEL BRIEF</button>`:''}
   </div>
@@ -3649,8 +3711,10 @@ function addMarker2D(key, d){
       }
       _lastPopupData = d;
       const _psrc = (d.source||d._lk||'').toLowerCase();
-      const html = d._isComm ? buildCommunityPopup(d) : _psrc==='reddit_osint' ? buildRedditPopup(d) : buildPopup(d);
-      m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;max-width:280px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:300}).openPopup();
+      const _isOsint = _psrc==='reddit_osint'||_psrc==='telegram_osint';
+      const html = d._isComm ? buildCommunityPopup(d) : _isOsint ? buildRedditPopup(d) : buildPopup(d);
+      const _pw = _isOsint ? 320 : 300;
+      m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:_pw}).openPopup();
       // Load equipment image asynchronously after popup renders
       if(_pendingEqImg){
         const eq = _pendingEqImg; _pendingEqImg = null;
@@ -4479,7 +4543,8 @@ let _lastPopupData = null;  // used by predictPath() button
 function showGlobePopup(d,ev){
   _lastPopupData = d;
   const _gsrc=(d.source||d._lk||'').toLowerCase();
-  const html=d._isComm?buildCommunityPopup(d):_gsrc==='reddit_osint'?buildRedditPopup(d):buildPopup(d);
+  const _gIsOsint=_gsrc==='reddit_osint'||_gsrc==='telegram_osint';
+  const html=d._isComm?buildCommunityPopup(d):_gIsOsint?buildRedditPopup(d):buildPopup(d);
   showGlobePopupRaw(html,ev);
   if(_pendingEqImg){
     const eq=_pendingEqImg; _pendingEqImg=null;
