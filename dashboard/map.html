@@ -1242,11 +1242,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">OSINT VERIFIED</span>
               <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
             </label>
-            <label class="layer-item" title="Reddit AI-OSINT — Claude AI scans r/CombatFootage, r/war, r/iran, r/middleeast, r/ukraine + 9 more. Only HIGH/MEDIUM confidence geolocated events shown. Updates every 15 min.">
-              <input type="checkbox" class="layer-cb" id="cb-reddit" checked style="color:#ff6314" onchange="toggleLayer('reddit')">
-              <span class="layer-icon" style="color:#ff6314">🔶</span>
-              <span class="layer-name">REDDIT AI-OSINT</span>
-              <span class="layer-count" id="cnt-reddit" style="background:#ff6314">0</span>
+            <label class="layer-item" title="Telegram OSINT — Claude AI scans Intel Slava, War Translated, OSINT Defender, Gaza Now, Conflict News + 5 more public Telegram channels. Only HIGH/MEDIUM confidence geolocated events shown. Updates every 15 min.">
+              <input type="checkbox" class="layer-cb" id="cb-reddit" checked style="color:#2da5e0" onchange="toggleLayer('reddit')">
+              <span class="layer-icon" style="color:#2da5e0">📡</span>
+              <span class="layer-name">TG AI-OSINT</span>
+              <span class="layer-count" id="cnt-reddit" style="background:#2da5e0">0</span>
             </label>
             <label class="layer-item" id="lr-polymarket" title="Polymarket prediction market odds for geopolitical conflict events — crowd-sourced probability forecasts.">
               <input type="checkbox" class="layer-cb" id="cb-polymarket" style="color:var(--amber)" onchange="toggleLayer('polymarket')">
@@ -1772,6 +1772,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <span class="dlg-title">SUBMIT FIELD INTEL REPORT</span>
     <button class="dlg-close" onclick="document.getElementById('submit-dialog').close()">✕</button>
   </div>
+  <!-- Reporter Identity -->
+  <div style="background:#0a0a12;border-bottom:1px solid #1e1e2a;padding:.5rem .75rem;display:flex;align-items:center;gap:.6rem">
+    <span style="font-size:.5rem;color:var(--dim2);letter-spacing:.1em;flex-shrink:0">FIELD REPORTER</span>
+    <div id="dlg-callsign-display" style="display:flex;align-items:center;gap:.4rem;flex:1"></div>
+  </div>
   <div class="dlg-body">
     <!-- Row 1: Report type + Category -->
     <div class="dlg-row2">
@@ -1891,7 +1896,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <input class="dlg-input" id="dlg-imgurl" type="url" maxlength="1000" placeholder="https://...  (external link — leave blank if uploaded above)">
     </div>
     <div style="font-size:.48rem;color:var(--dim2);letter-spacing:.06em;margin-top:.3rem;line-height:1.6">
-      ANONYMOUS · NO ACCOUNT REQUIRED · COMMUNITY VERIFICATION APPLIES DELAY POLICY
+      NO ACCOUNT REQUIRED · CALLSIGN OPTIONAL · COMMUNITY VERIFICATION APPLIES DELAY POLICY
     </div>
   </div>
   <div class="dlg-ft">
@@ -1920,6 +1925,42 @@ function getAuthorToken(){
 }
 const AUTHOR_TOKEN = getAuthorToken();
 
+// ── Callsign / Reporter Identity ──────────────────────────────────────────────
+function getCallsign(){
+  return localStorage.getItem('wardar_callsign') || '';
+}
+function saveCallsign(cs){
+  cs = cs.toUpperCase().replace(/[^A-Z0-9_\-\.]/g,'').substring(0,20);
+  if(cs) localStorage.setItem('wardar_callsign', cs);
+  else   localStorage.removeItem('wardar_callsign');
+  return cs;
+}
+function renderCallsignBadge(){
+  const cs = getCallsign();
+  const el = document.getElementById('dlg-callsign-display');
+  if(!el) return;
+  if(cs){
+    el.innerHTML = `<span style="background:#22c55e;color:#000;font-size:.55rem;font-weight:700;padding:.1rem .4rem;border-radius:2px;letter-spacing:.08em">◈ ${esc(cs)}</span>&nbsp;<button onclick="promptCallsign()" style="background:none;border:1px solid #2a2a3a;color:var(--dim2);font-size:.5rem;padding:.1rem .3rem;cursor:pointer;font-family:monospace;letter-spacing:.06em">✎ CHANGE</button>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--dim2);font-size:.55rem">ANONYMOUS</span>&nbsp;<button onclick="promptCallsign()" style="background:#22c55e;border:none;color:#000;font-size:.5rem;padding:.15rem .5rem;cursor:pointer;font-family:monospace;font-weight:700;letter-spacing:.06em;border-radius:2px">SET CALLSIGN</button>`;
+  }
+}
+function promptCallsign(){
+  const cur = getCallsign();
+  const val = window.prompt('SET YOUR FIELD CALLSIGN\n(3–20 chars, letters/numbers/underscore)', cur || '');
+  if(val === null) return; // cancelled
+  const saved = saveCallsign(val.trim());
+  renderCallsignBadge();
+  if(saved) showToast(`CALLSIGN SET: ${saved}`);
+}
+function showToast(msg){
+  let t = document.getElementById('_toast');
+  if(!t){ t=document.createElement('div'); t.id='_toast'; t.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#22c55e;color:#000;font-family:monospace;font-size:.65rem;font-weight:700;padding:.4rem 1rem;border-radius:3px;z-index:9999;letter-spacing:.08em;pointer-events:none;transition:opacity .4s'; document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._tid);
+  t._tid=setTimeout(()=>{ t.style.opacity='0'; },2500);
+}
+
 // ── Boot sequence ─────────────────────────────────────────────────────────────
 const BOOT_LINES = [
   {t:"WARDAR v0.3  INITIALIZING SYSTEMS...", cls:""},
@@ -1931,7 +1972,7 @@ const BOOT_LINES = [
   {t:"GDELT + 20 OSINT FEEDS..............", cls:"ok"},
   {t:"IRAN INTL · MEHR · AL-MONITOR.......", cls:"ok"},
   {t:"TASNIM · J.POST · HAARETZ · ARAB....", cls:"ok"},
-  {t:"REDDIT AI-OSINT (CLAUDE FILTER).....", cls:"ok"},
+  {t:"TELEGRAM AI-OSINT (CLAUDE FILTER)...", cls:"ok"},
   {t:"FAA NOTAM FEED......................", cls:"ok"},
   {t:"NASA FIRMS THERMAL + USGS SEISMIC...", cls:"ok"},
   {t:"GPSJAM EW + IODA NET BLACKOUT.......", cls:"ok"},
@@ -2204,7 +2245,7 @@ function pushFeed(item){
 const SRC_COLORS = {
   adsb:'var(--amber)',opensky:'var(--amber)',ais:'var(--cyan)',tle:'var(--purple)',
   acled:'var(--red)',notam:'var(--yellow)',gdelt:'var(--blue)',osint_news:'var(--blue)',
-  reddit_osint:'#ff6314',iran_intl:'#ff6314',mehr_news:'#22c55e',al_monitor:'#06b6d4',
+  reddit_osint:'#ff6314',telegram_osint:'#2da5e0',iran_intl:'#ff6314',mehr_news:'#22c55e',al_monitor:'#06b6d4',
   tasnim:'#22c55e',jpost:'#3b82f6',haaretz:'#3b82f6',arab_news:'#f59e0b',
   firms:'var(--orange)',usgs:'var(--lime)',gpsjam:'var(--fuchsia)',community:'var(--green)',
   twz:'var(--red)',usni:'var(--cyan)',bellingcat:'var(--orange)',oryx:'var(--orange)',
@@ -2241,7 +2282,7 @@ function renderFeed(){
 }
 
 // ── WAR NEWS tab ──────────────────────────────────────────────────────────────
-const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled','pentagon','africom','navy','un_peace','crisisgroup','state_dept','warspot','ucdp','iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news','reddit_osint'];
+const NEWS_SOURCES = ['twz','usni','bellingcat','oryx','defense_news','defense_one','ukmod','rusi','gcaptain','krebs','gdelt','osint_news','acled','pentagon','africom','navy','un_peace','crisisgroup','state_dept','warspot','ucdp','iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news','reddit_osint','telegram_osint'];
 const NEWS_SRC_LABELS = {
   twz:'TWZ',usni:'USNI',bellingcat:'BELLINGCAT',oryx:'ORYX',
   defense_news:'DEFNEWS',defense_one:'DEFONE',ukmod:'UK MOD',
@@ -2251,6 +2292,7 @@ const NEWS_SRC_LABELS = {
   iran_intl:'IRAN INTL',mehr_news:'MEHR NEWS',al_monitor:'AL-MONITOR',
   tasnim:'TASNIM',jpost:'J.POST',haaretz:'HAARETZ',arab_news:'ARAB NEWS',
   reddit_osint:'REDDIT OSINT',
+  telegram_osint:'TG OSINT',
 };
 const CONFLICT_ZONES = [
   {label:'ALL',  tag:null},
@@ -2903,8 +2945,9 @@ const ICONS = {
   ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
   ioda:           {fn:()=>makePulseIcon('🔴','#ef4444','NET↓')},
   protest:        {fn:()=>makeIcon('✊','#fb923c',18)},
-  reddit_osint:   {fn:()=>makePulseIcon('🔶','#ff6314','RDDT')},
-  reddit:         {fn:()=>makePulseIcon('🔶','#ff6314','RDDT')},
+  reddit_osint:   {fn:()=>makePulseIcon('📡','#2da5e0','TG')},
+  telegram_osint: {fn:()=>makePulseIcon('📡','#2da5e0','TG')},
+  reddit:         {fn:()=>makePulseIcon('📡','#2da5e0','TG')},
 };
 
 function iconFor(source, mil, extra){
@@ -3371,9 +3414,21 @@ function buildCommunityPopup(r){
   const rtLabel  = (r.report_type||'other').toUpperCase().replace('_',' ');
   const conf     = (r.confidence||'medium').toUpperCase();
 
+  // Extract nickname from extra
+  let nickname = '';
+  try{ const ex=JSON.parse(r.extra||'{}'); nickname=ex.nickname||''; }catch(e){}
+
+  // Photo evidence inline
+  const imgBlock = r.image_url
+    ? `<div style="margin:.5rem 0;cursor:pointer" onclick="window.open('${esc(r.image_url)}','_blank')">
+        <img src="${esc(r.image_url)}" alt="evidence" onerror="this.style.display='none'"
+          style="width:100%;max-height:140px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
+       </div>` : '';
+
   return `<div class="popup-inner">
     <div class="popup-call" style="color:var(--green)">${rtIcon} ${esc(r.title||'COMMUNITY INTEL')}</div>
     ${r.verified?'<div class="delay-badge comm" style="margin-bottom:.4rem">✓ COMMUNITY VERIFIED</div>':''}
+    ${nickname?`<div style="margin-bottom:.4rem;display:flex;align-items:center;gap:.3rem"><span style="background:#22c55e;color:#000;font-size:.5rem;font-weight:700;padding:.1rem .35rem;border-radius:2px;letter-spacing:.06em">◈ ${esc(nickname)}</span><span style="color:var(--dim2);font-size:.5rem">FIELD REPORTER</span></div>`:''}
     <div class="popup-row">
       <span class="popup-label">ASSET TYPE</span>
       <span class="popup-val" style="color:var(--amber)">${esc(rtLabel)}</span>
@@ -3389,9 +3444,9 @@ function buildCommunityPopup(r){
     <div class="popup-row"><span class="popup-label">CATEGORY</span><span class="popup-val">${esc((r.category||'').toUpperCase())}</span></div>
     <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(r.country||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">SUBMITTED</span><span class="popup-val">${fmtTs(r.created_at)}</span></div>
+    ${imgBlock}
     ${r.description?`<div class="popup-row" style="flex-direction:column"><span class="popup-label">DETAILS</span><span class="popup-val" style="color:var(--dim2);font-size:.6rem;margin-top:.2rem">${esc(r.description.substring(0,300))}</span></div>`:''}
-    ${r.image_url?`<div class="popup-row"><span class="popup-label">IMAGE</span><a href="${esc(r.image_url)}" target="_blank" rel="noopener" style="color:var(--cyan);font-size:.6rem">VIEW ↗</a></div>`:''}
-    ${r.source_url?`<div class="popup-row"><span class="popup-label">SOURCE</span><a href="${esc(r.source_url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.6rem">LINK ↗</a></div>`:''}
+    ${!r.image_url&&r.image_url===''&&r.source_url?'':`${r.source_url?`<div class="popup-row"><span class="popup-label">SOURCE</span><a href="${esc(r.source_url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.6rem">LINK ↗</a></div>`:''}`}
     <div class="popup-vote">
       <button class="pvote-btn" onclick="castVote(${r.id},1)">▲ UP (${r.upvotes||0})</button>
       <button class="pvote-btn down" onclick="castVote(${r.id},-1)">▼ DN (${r.downvotes||0})</button>
@@ -3904,7 +3959,7 @@ function sourceToLayerKey(source, category){
   if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
-  if(s==='reddit_osint') return 'reddit';              // AI-filtered Reddit OSINT → dedicated layer
+  if(s==='reddit_osint'||s==='telegram_osint') return 'reddit';  // AI-filtered TG/Reddit OSINT → shared layer
   if(['iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news'].includes(s)) return 'osint'; // Iran/ME feeds → news layer
   if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
   if(s==='unhcr') return 'unhcr';
@@ -4062,6 +4117,7 @@ function openSubmitDialog(lat, lon){
   if(lat!=null) document.getElementById('dlg-lat').value=lat.toFixed(4);
   if(lon!=null) document.getElementById('dlg-lon').value=lon.toFixed(4);
   document.getElementById('submit-dialog').showModal();
+  renderCallsignBadge();
 }
 
 async function submitReport(){
@@ -4081,6 +4137,7 @@ async function submitReport(){
     severity:    parseInt(document.getElementById('dlg-severity').value)||3,
     confidence:  document.getElementById('dlg-confidence').value,
     image_url:   _uploadedImageUrl || document.getElementById('dlg-imgurl').value.trim(),
+    nickname:    getCallsign(),
   };
   try{
     const res=await fetch('/api/community',{
@@ -4796,7 +4853,7 @@ async function loadInitialData(){
       fetch('/api/positions?limit=2000').then(r=>r.json()),
       fetch('/api/events?limit=300').then(r=>r.json()),
       // Fetch map-relevant event sources separately — they get buried under news in default sort
-      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket,reddit_osint,unhcr,views_forecast,warspot,ucdp,safecast&limit=500').then(r=>r.json()),
+      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket,reddit_osint,telegram_osint,unhcr,views_forecast,warspot,ucdp,safecast&limit=500').then(r=>r.json()),
     ]);
     (posRes.data||[]).forEach(p=>updatePosition(p,false));
     (evtRes.data||[]).forEach(e=>updateEvent(e,false));

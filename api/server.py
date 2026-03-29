@@ -194,6 +194,7 @@ class CommunityReportIn(BaseModel):
     severity:     int = Field(3, ge=1, le=5)
     confidence:   str = Field("medium", pattern="^(low|medium|high)$")
     image_url:    str = Field("", max_length=1000)
+    nickname:     str = Field("", max_length=24)   # optional callsign / reporter handle
 
     @field_validator("report_type")
     @classmethod
@@ -236,7 +237,7 @@ async def create_community_report(body: CommunityReportIn):
         "confidence":   body.confidence,
         "image_url":    body.image_url,
         "created_at":   now,
-        "extra":        "{}",
+        "extra":        json.dumps({"nickname": body.nickname}) if body.nickname else "{}",
     }
     report_id = DB.insert_community_report(row)
     return JSONResponse({"id": report_id}, status_code=201)

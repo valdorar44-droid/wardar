@@ -192,8 +192,12 @@ UCDP_TOKEN            = _s("UCDP_TOKEN",            "")     # free token via ema
 ENABLE_UCDP           = _b("ENABLE_UCDP",           True)   # enable if token set
 UCDP_INTERVAL_SEC     = _i("UCDP_INTERVAL_SEC",     3600)   # hourly
 
-# ── Reddit OSINT (AI-filtered crowd-sourced conflict intelligence) ─────────────
-# No Reddit API key needed — uses public JSON endpoint
+# ── Reddit OSINT — DISABLED (Railway datacenter IPs are hard-blocked by Reddit)
+ENABLE_REDDIT_OSINT       = _b("ENABLE_REDDIT_OSINT",       False)  # blocked from cloud IPs
+REDDIT_OSINT_INTERVAL_SEC = _i("REDDIT_OSINT_INTERVAL_SEC", 900)
+
+# ── Telegram OSINT (replaces Reddit — uses RSSHub, not blocked from Railway) ───
+# No Telegram API key needed — reads public channels via RSSHub RSS proxy
 # Requires ANTHROPIC_API_KEY for AI noise filtering
-ENABLE_REDDIT_OSINT       = _b("ENABLE_REDDIT_OSINT",       True)   # free, uses Claude AI to filter
-REDDIT_OSINT_INTERVAL_SEC = _i("REDDIT_OSINT_INTERVAL_SEC", 900)    # every 15 min
+ENABLE_TELEGRAM_OSINT       = _b("ENABLE_TELEGRAM_OSINT",       True)
+TELEGRAM_OSINT_INTERVAL_SEC = _i("TELEGRAM_OSINT_INTERVAL_SEC", 900)  # every 15 min
