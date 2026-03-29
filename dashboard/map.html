@@ -1242,6 +1242,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">OSINT VERIFIED</span>
               <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
             </label>
+            <label class="layer-item" title="Reddit AI-OSINT — Claude AI scans r/CombatFootage, r/war, r/iran, r/middleeast, r/ukraine + 9 more. Only HIGH/MEDIUM confidence geolocated events shown. Updates every 15 min.">
+              <input type="checkbox" class="layer-cb" id="cb-reddit" checked style="color:#ff6314" onchange="toggleLayer('reddit')">
+              <span class="layer-icon" style="color:#ff6314">🔶</span>
+              <span class="layer-name">REDDIT AI-OSINT</span>
+              <span class="layer-count" id="cnt-reddit" style="background:#ff6314">0</span>
+            </label>
             <label class="layer-item" id="lr-polymarket" title="Polymarket prediction market odds for geopolitical conflict events — crowd-sourced probability forecasts.">
               <input type="checkbox" class="layer-cb" id="cb-polymarket" style="color:var(--amber)" onchange="toggleLayer('polymarket')">
               <span class="layer-icon" style="color:var(--amber)">📊</span>
@@ -1916,17 +1922,22 @@ const AUTHOR_TOKEN = getAuthorToken();
 
 // ── Boot sequence ─────────────────────────────────────────────────────────────
 const BOOT_LINES = [
-  {t:"WARDAR v0.2  INITIALIZING SYSTEMS...", cls:""},
+  {t:"WARDAR v0.3  INITIALIZING SYSTEMS...", cls:""},
   {t:"LOADING CARTOGRAPHIC DATABASE.......", cls:"ok"},
-  {t:"ADS-B EXCHANGE FEED.................", cls:"ok"},
+  {t:"ADS-B EXCHANGE + MIL AIRCRAFT.......", cls:"ok"},
   {t:"AIS MARITIME STREAM.................", cls:"ok"},
   {t:"CELESTRAK TLE CATALOG...............", cls:"ok"},
-  {t:"ACLED CONFLICT DATABASE.............", cls:"ok"},
-  {t:"GDELT OSINT MONITOR.................", cls:"ok"},
+  {t:"ACLED CONFLICT + PROTEST EVENTS.....", cls:"ok"},
+  {t:"GDELT + 20 OSINT FEEDS..............", cls:"ok"},
+  {t:"IRAN INTL · MEHR · AL-MONITOR.......", cls:"ok"},
+  {t:"TASNIM · J.POST · HAARETZ · ARAB....", cls:"ok"},
+  {t:"REDDIT AI-OSINT (CLAUDE FILTER).....", cls:"ok"},
   {t:"FAA NOTAM FEED......................", cls:"ok"},
-  {t:"NASA FIRMS THERMAL FEED.............", cls:"ok"},
-  {t:"USGS SEISMIC MONITOR................", cls:"ok"},
-  {t:"GPSJAM EW DETECTION GRID............", cls:"ok"},
+  {t:"NASA FIRMS THERMAL + USGS SEISMIC...", cls:"ok"},
+  {t:"GPSJAM EW + IODA NET BLACKOUT.......", cls:"ok"},
+  {t:"UNHCR DISPLACEMENT + VIEWS FORECAST.", cls:"ok"},
+  {t:"ISW FRONTLINES + NUCLEAR + MIL BASE.", cls:"ok"},
+  {t:"WARSPOT + UCDP + SAFECAST...........", cls:"ok"},
   {t:"COMMUNITY INTEL LAYER...............", cls:"ok"},
   {t:"DELAY POLICY ENGAGED — MULTI-DOMAIN.", cls:"ok"},
   {t:"ALL SYSTEMS NOMINAL ▸ WARDAR ACTIVE", cls:""},
@@ -2829,14 +2840,14 @@ const markers = {
   fire:{}, seismic:{}, ew:{}, community:{}, ioda:{}, protest:{},
   nuclear:{}, mil_base:{}, osint_geo:{}, unhcr:{}, views:{},
   alerts:{}, pikud:{}, wikipedia:{}, adsb_emergency:{},
-  polymarket:{}, shodan:{},
+  polymarket:{}, shodan:{}, reddit:{},
 };
 let layers = {};
 const visible = {
   // DEFAULT ON — militarily relevant layers
   adsb:true, ais:true, acled:true, notam:true, ew:true, ioda:true,
   mil_base:true, nuclear:true, alerts:true, pikud:true,
-  adsb_emergency:true, osint_geo:true, community:true,
+  adsb_emergency:true, osint_geo:true, community:true, reddit:true,
   // DEFAULT OFF — noisy / civilian / optional
   tle:false, osint:false, fire:false, seismic:false, protest:false,
   unhcr:false, views:false, wikipedia:false, polymarket:false, shodan:false,
@@ -2893,6 +2904,7 @@ const ICONS = {
   ioda:           {fn:()=>makePulseIcon('🔴','#ef4444','NET↓')},
   protest:        {fn:()=>makeIcon('✊','#fb923c',18)},
   reddit_osint:   {fn:()=>makePulseIcon('🔶','#ff6314','RDDT')},
+  reddit:         {fn:()=>makePulseIcon('🔶','#ff6314','RDDT')},
 };
 
 function iconFor(source, mil, extra){
@@ -3442,7 +3454,7 @@ function initMap2D(){
   // Cluster group per layer key
   const _allLK = ['adsb','ais','tle','acled','protest','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','ioda','alerts','pikud','wikipedia','adsb_emergency','polymarket',
-    'shodan','osint_geo','unhcr','views','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
+    'shodan','osint_geo','unhcr','views','reddit','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
   for(const lk of _allLK){
     _cluster2d[lk] = L.markerClusterGroup({
       maxClusterRadius:50, disableClusteringAtZoom:9,
@@ -3820,7 +3832,7 @@ function sourceToLayerKey(source, category){
   if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
-  if(s==='reddit_osint') return 'osint_geo';          // AI-filtered Reddit OSINT → geolocated layer
+  if(s==='reddit_osint') return 'reddit';              // AI-filtered Reddit OSINT → dedicated layer
   if(['iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news'].includes(s)) return 'osint'; // Iran/ME feeds → news layer
   if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
   if(s==='unhcr') return 'unhcr';
@@ -3861,7 +3873,7 @@ function spawnPulse(lat, lon, color){
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
-  ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',protest:'#fb923c',
+  ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',protest:'#fb923c',reddit:'#ff6314',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
   alerts:'#ef4444',dark_vessel:'#06b6d4',convergence:'#f59e0b',nuclear_threat:'#ef4444',pipeline_threat:'#f97316',
   pikud:'#ef4444',wikipedia:'#f59e0b',adsb_emergency:'#ef4444',
@@ -4049,6 +4061,8 @@ function refreshCounts(){
   if(cntProtest) cntProtest.textContent = (_cnt.protest||0);
   document.getElementById('cnt-notam').textContent   = (_cnt.notam||0);
   document.getElementById('cnt-osint').textContent   = (_cnt.osint||0);
+  const cntReddit = document.getElementById('cnt-reddit');
+  if(cntReddit) cntReddit.textContent = (_cnt.reddit||0);
   document.getElementById('cnt-fire').textContent    = nFire;
   document.getElementById('cnt-seismic').textContent = nSeismic;
   document.getElementById('cnt-ew').textContent      = nEw;
@@ -4090,7 +4104,7 @@ function refreshCounts(){
   };
   _gb('grp-tracking-badge', ['adsb','ais','tle']);
   _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic']);
-  _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia']);
+  _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia','reddit']);
   _gb('grp-infra-badge',     ['nuclear','mil_base','ew','ioda']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
   const nAlertTotal = nAlerts + nPikud + nEmergency;
@@ -4709,7 +4723,7 @@ async function loadInitialData(){
       fetch('/api/positions?limit=2000').then(r=>r.json()),
       fetch('/api/events?limit=300').then(r=>r.json()),
       // Fetch map-relevant event sources separately — they get buried under news in default sort
-      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket&limit=500').then(r=>r.json()),
+      fetch('/api/events?sources=firms,usgs,gpsjam,pikud_haoref,acled,notam,dark_vessel,wikipedia,ioda,polymarket,reddit_osint,unhcr,views_forecast,warspot,ucdp,safecast&limit=500').then(r=>r.json()),
     ]);
     (posRes.data||[]).forEach(p=>updatePosition(p,false));
     (evtRes.data||[]).forEach(e=>updateEvent(e,false));
