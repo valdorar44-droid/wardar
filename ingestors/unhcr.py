@@ -56,8 +56,7 @@ _CAPITALS = {
 
 _UNHCR_URL = (
     "https://api.unhcr.org/population/v1/population/"
-    "?limit=100&dataset=population&displayType=totals"
-    "&yearFrom=2022&yearTo=2024&sortBy=displaced_total&sortOrder=desc"
+    "?limit=100&year=2023&coo_all=true"
 )
 
 
@@ -86,16 +85,16 @@ async def fetch() -> list[dict]:
 
     for item in items:
         try:
-            country_obj = item.get("country") or item.get("geomaster") or {}
-            iso3 = country_obj.get("iso3Code") or item.get("iso3Code") or ""
-            name = country_obj.get("name") or item.get("name") or iso3
-            total_displaced = (
-                (item.get("refugees_under_UNHCR_mandate") or 0) +
-                (item.get("asylum_seekers") or 0) +
-                (item.get("idps_UNHCR") or 0)
-            )
+            iso3 = item.get("coo_iso") or item.get("coo") or ""
+            name = item.get("coo_name") or iso3
+            if not iso3 or iso3 == "-":
+                continue  # skip aggregate rows
+            def _n(v):
+                try: return int(v) if v and str(v) != "-" else 0
+                except: return 0
+            total_displaced = _n(item.get("refugees")) + _n(item.get("asylum_seekers")) + _n(item.get("idps"))
             if total_displaced < 10000:
-                continue  # skip trivially small numbers
+                continue
 
             coords = _CAPITALS.get(iso3)
             if not coords:
@@ -107,9 +106,9 @@ async def fetch() -> list[dict]:
                 "source":      "unhcr",
                 "title":       f"{country_name}: {fmt} displaced",
                 "description": (
-                    f"Refugees: {item.get('refugees_under_UNHCR_mandate', 0):,} | "
-                    f"Asylum seekers: {item.get('asylum_seekers', 0):,} | "
-                    f"IDPs: {item.get('idps_UNHCR', 0):,}"
+                    f"Refugees: {_n(item.get('refugees')):,} | "
+                    f"Asylum seekers: {_n(item.get('asylum_seekers')):,} | "
+                    f"IDPs: {_n(item.get('idps')):,}"
                 ),
                 "lat":         lat,
                 "lon":         lon,

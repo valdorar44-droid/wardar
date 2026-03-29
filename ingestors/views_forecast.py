@@ -10,13 +10,23 @@ import httpx
 
 from config import settings as C
 
-# VIEWS API v2 — country-month forecasts (public beta)
-_VIEWS_URL = "https://api.viewsforecasting.org/monthly_forecasts/cm/"
-# Fallback: use pre-built VIEWS dataset endpoint
-_VIEWS_FALLBACK = (
-    "https://raw.githubusercontent.com/prio-data/viewser/main/"
-    "tests/fixtures/cm_features.json"
-)
+# VIEWS API v3 — discover latest run, then fetch /{run}/cm
+_VIEWS_BASE = "https://api.viewsforecasting.org"
+
+# 2-letter ISO → 3-letter ISO mapping (subset covering conflict-prone countries)
+_ISO2_TO_3 = {
+    "AF": "AFG", "SY": "SYR", "IQ": "IRQ", "YE": "YEM", "SO": "SOM",
+    "ET": "ETH", "SD": "SDN", "SS": "SSD", "CD": "COD", "NG": "NGA",
+    "ML": "MLI", "CF": "CAF", "UA": "UKR", "RU": "RUS", "MM": "MMR",
+    "PK": "PAK", "LY": "LBY", "MZ": "MOZ", "BI": "BDI", "CM": "CMR",
+    "TD": "TCD", "ER": "ERI", "GN": "GIN", "HT": "HTI", "IN": "IND",
+    "IR": "IRN", "KE": "KEN", "LB": "LBN", "MX": "MEX", "NE": "NER",
+    "PS": "PSE", "TZ": "TZA", "UG": "UGA", "VE": "VEN", "ZW": "ZWE",
+    "BF": "BFA", "MG": "MDG", "RW": "RWA", "GE": "GEO", "AZ": "AZE",
+    "AM": "ARM", "ZM": "ZMB", "MR": "MRT", "GW": "GNB", "SL": "SLE",
+    "LR": "LBR", "CI": "CIV", "KH": "KHM", "PH": "PHL", "LA": "LAO",
+    "NP": "NPL", "BD": "BGD", "MZ": "MOZ",
+}
 
 # Country centroids for mapping forecast results
 _COUNTRY_CENTROIDS = {
@@ -53,31 +63,58 @@ async def fetch() -> list[dict]:
     results = []
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            # Step 1: discover latest fatalities run
+            meta = await client.get(f"{_VIEWS_BASE}/", headers={"Accept": "application/json", "User-Agent": "Wardar/0.1"})
+            if meta.status_code != 200:
+                log_warn(f"views: meta HTTP {meta.status_code}")
+                return []
+            all_runs = meta.json().get("runs", [])
+            # Pick latest fatalities003 t01 run (monthly predictions)
+            fat_runs = sorted([r for r in all_runs if r.startswith("fatalities003_") and r.endswith("_t01")], reverse=True)
+            if not fat_runs:
+                fat_runs = sorted([r for r in all_runs if "fatalities" in r and "_t01" in r], reverse=True)
+            if not fat_runs:
+                log_warn("views: no fatalities run found")
+                return []
+            run = fat_runs[0]
+
+            # Step 2: fetch first 200 rows — country×month forecasts
             r = await client.get(
-                _VIEWS_URL,
+                f"{_VIEWS_BASE}/{run}/cm?limit=200",
                 headers={"Accept": "application/json", "User-Agent": "Wardar/0.1"},
-                follow_redirects=True,
             )
             if r.status_code != 200:
-                log_warn(f"views: API HTTP {r.status_code} — skipping forecast layer")
+                log_warn(f"views: forecast HTTP {r.status_code} (run={run})")
                 return []
             data = r.json()
-            forecasts = data if isinstance(data, list) else (data.get("data") or data.get("forecasts") or [])
+            forecasts = data.get("data") or []
     except Exception as exc:
         log_warn(f"views: {exc}")
         return []
 
-    for fc in forecasts[:50]:  # limit to top 50 high-conflict predictions
+    # Group by country — take first (earliest forecast) month per country
+    seen_countries: set[str] = set()
+    for fc in forecasts:
         try:
-            country_id = fc.get("country_id") or fc.get("iso3") or fc.get("country") or ""
-            prob = float(fc.get("prob_low") or fc.get("probability") or fc.get("fatality_risk") or 0)
-            step = int(fc.get("step") or fc.get("month_ahead") or 1)
+            isoab = fc.get("isoab") or ""            # 2-letter ISO
+            name  = fc.get("name") or isoab
+            # main_dich = probability of >25 battle deaths (0-1)
+            # main_mean = expected fatalities
+            prob  = float(fc.get("main_dich") or fc.get("main_mean_ln") or 0)
+            mean  = float(fc.get("main_mean") or 0)
+            month = int(fc.get("month") or 1)
+            year  = int(fc.get("year") or 2025)
 
             if prob < 0.1:
-                continue  # only show elevated risk
+                continue
+            if isoab in seen_countries:
+                continue
+            seen_countries.add(isoab)
 
-            coords = _COUNTRY_CENTROIDS.get(str(country_id).upper())
+            # Map 2-letter → 3-letter to look up centroid
+            iso3 = _ISO2_TO_3.get(isoab.upper())
+            coords = _COUNTRY_CENTROIDS.get(iso3 or "") if iso3 else None
             if not coords:
                 continue
             lat, lon, country_name = coords
@@ -85,15 +122,19 @@ async def fetch() -> list[dict]:
             risk_pct = int(prob * 100)
             results.append({
                 "source":      "views_forecast",
-                "title":       f"VIEWS FORECAST: {country_name} — {risk_pct}% conflict risk in +{step}mo",
-                "description": f"VIEWS conflict probability forecast. Step: +{step} months. Risk: {risk_pct}%",
+                "title":       f"VIEWS FORECAST: {country_name} — {risk_pct}% conflict probability",
+                "description": (
+                    f"VIEWS fatality forecast for {name} in {year}-{month:02d}. "
+                    f"Conflict probability: {risk_pct}%. Est. fatalities: {mean:.1f}. "
+                    f"Model: {run}"
+                ),
                 "lat":         lat,
                 "lon":         lon,
                 "country":     country_name,
                 "category":    "forecast",
                 "raw_ts_utc":  now,
                 "url":         "https://viewsforecasting.org",
-                "extra":       f'{{"prob":{prob:.3f},"step":{step}}}',
+                "extra":       f'{{"prob":{prob:.3f},"mean_fatalities":{mean:.1f},"forecast_month":"{year}-{month:02d}","run":"{run}"}}',
             })
         except Exception:
             pass
