@@ -758,10 +758,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 .video-scroll::-webkit-scrollbar-thumb{background:var(--border)}
 .video-card{
   flex-shrink:0;display:flex;flex-direction:column;gap:.25rem;position:relative;
+  user-select:none;
 }
+.video-card.dragging{opacity:.4;border:1px dashed var(--amber)}
+.video-card.drag-over{outline:1px solid var(--amber);outline-offset:2px}
 .video-card iframe{
-  border:1px solid var(--border2);display:block;
+  border:1px solid var(--border2);display:block;pointer-events:none;
 }
+.video-card.unmuted iframe{pointer-events:auto}
 .video-card-label{
   font-size:.44rem;letter-spacing:.1em;color:var(--dim2);text-align:center;
 }
@@ -771,6 +775,72 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   box-shadow:0 0 4px var(--red);
   animation:blink 1.4s infinite;
 }
+.vc-drag-handle{
+  position:absolute;top:0;left:0;right:0;height:20px;z-index:3;
+  cursor:grab;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,rgba(0,0,0,.5),transparent);
+}
+.vc-drag-handle:active{cursor:grabbing}
+.vc-drag-dots{color:rgba(255,255,255,.35);font-size:.55rem;letter-spacing:2px;pointer-events:none}
+.vc-remove-btn{
+  position:absolute;top:.2rem;right:.2rem;z-index:4;
+  background:rgba(239,68,68,.8);border:none;color:#fff;
+  font-size:.5rem;cursor:pointer;border-radius:2px;padding:.05rem .3rem;
+  font-family:var(--font);line-height:1.4;opacity:0;transition:opacity .15s;
+}
+.video-card:hover .vc-remove-btn{opacity:1}
+.vc-unmute-btn{
+  position:absolute;bottom:1.4rem;right:.3rem;z-index:4;
+  background:rgba(0,0,0,.7);border:1px solid var(--border2);color:var(--dim2);
+  font-size:.42rem;cursor:pointer;border-radius:2px;padding:.1rem .3rem;
+  font-family:var(--font);opacity:0;transition:opacity .15s;
+}
+.video-card:hover .vc-unmute-btn{opacity:1}
+.vc-add-card{
+  flex-shrink:0;width:200px;height:168px;
+  border:1px dashed var(--border2);border-radius:2px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.4rem;cursor:pointer;color:var(--dim2);font-size:.5rem;letter-spacing:.1em;
+  transition:border-color .15s,color .15s;
+}
+.vc-add-card:hover{border-color:var(--amber);color:var(--amber)}
+.vc-add-card svg{opacity:.4}
+/* Add stream modal */
+#vbar-add-modal{
+  display:none;position:fixed;inset:0;z-index:1100;
+  background:rgba(0,0,0,.7);align-items:center;justify-content:center;
+}
+#vbar-add-modal.open{display:flex}
+#vbar-add-box{
+  background:#08080c;border:1px solid var(--amber);
+  padding:1.2rem 1.4rem;width:380px;max-width:95vw;border-radius:3px;
+}
+.vbar-add-title{
+  font-size:.6rem;font-weight:700;letter-spacing:.15em;color:var(--amber);
+  margin-bottom:.9rem;
+}
+.vbar-add-row{margin-bottom:.65rem}
+.vbar-add-label{font-size:.42rem;letter-spacing:.1em;color:var(--dim2);margin-bottom:.25rem}
+.vbar-add-inp{
+  width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--font);font-size:.5rem;
+  padding:.35rem .5rem;border-radius:2px;outline:none;
+  transition:border-color .15s;
+}
+.vbar-add-inp:focus{border-color:var(--amber)}
+.vbar-add-inp::placeholder{color:var(--dim)}
+.vbar-add-btns{display:flex;gap:.5rem;margin-top:.85rem}
+.vbar-add-ok{
+  flex:1;background:rgba(245,158,11,.15);border:1px solid var(--amber);
+  color:var(--amber);font-family:var(--font);font-size:.5rem;letter-spacing:.1em;
+  padding:.4rem;cursor:pointer;transition:background .15s;border-radius:2px;
+}
+.vbar-add-ok:hover{background:rgba(245,158,11,.28)}
+.vbar-add-cancel{
+  background:none;border:1px solid var(--border);color:var(--dim2);
+  font-family:var(--font);font-size:.5rem;letter-spacing:.1em;
+  padding:.4rem .8rem;cursor:pointer;border-radius:2px;
+}
 .vbar-tab{
   background:none;border:1px solid var(--border);color:var(--dim2);
   font-family:var(--font);font-size:.44rem;letter-spacing:.1em;
@@ -778,6 +848,59 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 }
 .vbar-tab.active{background:rgba(245,158,11,.12);border-color:var(--amber);color:var(--amber)}
 .vbar-tab:hover:not(.active){border-color:var(--dim);color:var(--fg)}
+
+/* ── SETTINGS PANEL ── */
+#settings-panel{
+  position:fixed;top:52px;right:0;width:300px;bottom:44px;
+  z-index:800;background:rgba(5,5,10,.98);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .25s ease;
+}
+#settings-panel.open{transform:translateX(0)}
+#settings-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.65rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#settings-hd span{font-size:.56rem;letter-spacing:.15em;color:var(--amber)}
+#settings-close{
+  background:none;border:none;color:var(--dim2);font-size:.75rem;
+  cursor:pointer;font-family:var(--font);
+}
+#settings-body{flex:1;overflow-y:auto;padding:.75rem 1rem;scrollbar-width:thin}
+.setting-section{margin-bottom:1.1rem}
+.setting-section-title{
+  font-size:.4rem;letter-spacing:.18em;color:var(--amber);
+  margin-bottom:.5rem;padding-bottom:.3rem;border-bottom:1px solid var(--border);
+}
+.setting-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:.5rem;
+}
+.setting-label{font-size:.48rem;color:var(--text)}
+.setting-desc{font-size:.4rem;color:var(--dim2);margin-top:.1rem}
+/* Toggle switch */
+.sw{position:relative;display:inline-block;width:32px;height:16px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sw-track{
+  position:absolute;inset:0;background:var(--border2);border-radius:8px;
+  cursor:pointer;transition:.2s;
+}
+.sw input:checked + .sw-track{background:var(--amber)}
+.sw-track::before{
+  content:'';position:absolute;left:2px;top:2px;
+  width:12px;height:12px;background:#fff;border-radius:50%;
+  transition:.2s;
+}
+.sw input:checked + .sw-track::before{transform:translateX(16px)}
+.setting-btn{
+  font-family:var(--font);font-size:.44rem;letter-spacing:.1em;
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);
+  color:var(--text);cursor:pointer;padding:.3rem .65rem;border-radius:2px;
+  transition:background .15s;
+}
+.setting-btn:hover{background:rgba(255,255,255,.1);color:var(--amber)}
+.setting-btn.danger{border-color:rgba(239,68,68,.4);color:var(--red)}
+.setting-btn.danger:hover{background:rgba(239,68,68,.1)}
 
 /* ── TIMELINE ── */
 #timeline{
@@ -1337,6 +1460,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <button id="timeline-btn" class="mapmode-btn" onclick="toggleTimeline()" title="Show/hide timeline">⏱ TL</button>
     <button id="cinema-btn"   class="mapmode-btn" onclick="toggleCinema()"   title="Map-only mode — hide all panels">⊞ MAP</button>
     <button id="fullscreen-toggle" class="mapmode-btn" onclick="toggleFullscreen()" title="Browser fullscreen">⛶ FULL</button>
+    <button class="mapmode-btn" onclick="toggleSettings()" title="User settings &amp; preferences" style="letter-spacing:.05em">⚙ SETTINGS</button>
     <div id="hdr-clock">--:--:-- UTC</div>
     <div class="threat-badge" id="threat-badge">
       <div class="threat-dot" id="threat-dot" style="background:var(--green)"></div>
@@ -1690,7 +1814,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
-        CIVILIAN +30s · MILITARY +24H
+        CIVILIAN +30s · MILITARY +5MIN · CONFLICT +10MIN
       </div>
     </div>
 
@@ -1884,140 +2008,130 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:.6rem">
-        <span id="vbar-hint" style="font-size:.44rem;color:var(--dim2);letter-spacing:.08em">ALL MUTED · CLICK TO UNMUTE · SCROLL FOR MORE</span>
+        <span id="vbar-hint" style="font-size:.44rem;color:var(--dim2);letter-spacing:.08em">DRAG TO REORDER · HOVER TO REMOVE · SCROLL FOR MORE</span>
         <button class="video-close-btn" onclick="closeVideoBar()">✕ CLOSE</button>
       </div>
     </div>
-    <!-- NEWS TAB — channel-based live_stream URLs, never stale video IDs -->
-    <div id="vscroll-news" class="video-scroll">
-      <!-- France 24 English — direct official embed (most reliable, no expiry) -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://embed.france24.com/en/live" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">FRANCE 24 ENGLISH</div>
+    <div id="vscroll-news" class="video-scroll"></div>
+    <div id="vscroll-cams" class="video-scroll" style="display:none"></div>
+  </div>
+
+  <!-- ADD STREAM MODAL -->
+  <div id="vbar-add-modal">
+    <div id="vbar-add-box">
+      <div class="vbar-add-title">＋ ADD CUSTOM STREAM</div>
+      <div class="vbar-add-row">
+        <div class="vbar-add-label">STREAM LABEL</div>
+        <input class="vbar-add-inp" id="vbar-add-label" placeholder="MY CHANNEL" maxlength="32">
       </div>
-      <!-- Sky News — channel live_stream (confirmed embeddable) -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">SKY NEWS</div>
+      <div class="vbar-add-row">
+        <div class="vbar-add-label">EMBED URL</div>
+        <input class="vbar-add-inp" id="vbar-add-url" placeholder="YouTube channel URL or direct embed URL" style="font-size:.44rem">
+        <div style="margin-top:.25rem;font-size:.4rem;color:var(--dim2)">
+          YouTube: paste any youtube.com/watch or channel URL — auto-converts<br>
+          Direct: any iframe-embeddable URL
+        </div>
       </div>
-      <!-- DW News (Deutsche Welle) — confirmed embeddable -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">DW NEWS · GERMANY</div>
-      </div>
-      <!-- LiveNOW from FOX — 24/7 YouTube-native channel -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCJg9wBPyKMNA5sRDnvzmkdg&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">LiveNOW · FOX</div>
-      </div>
-      <!-- ABC News Live — confirmed 24/7 YouTube live -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">ABC NEWS LIVE</div>
-      </div>
-      <!-- TRT World (Turkey) -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UC7fWeaHhqgM4Ry-RMpM2YYw&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">TRT WORLD · TURKEY</div>
-      </div>
-      <!-- Al Jazeera English -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">AL JAZEERA ENGLISH</div>
-      </div>
-      <!-- WION (India) -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UC_gUM8rL-Lrg6O3adPW9K1g&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">WION · INDIA</div>
-      </div>
-      <!-- NHK World Japan -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCSPEjw8F2nQDtmUKPFNF7_A&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">NHK WORLD · JAPAN</div>
-      </div>
-      <!-- CGTN (China) -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCgrNz-aDmcr2uuto8_DL2jg&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">CGTN · CHINA</div>
-      </div>
-      <!-- Euronews English -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCSrZ3UV4jOidv8ppoVuvW9Q&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">EURONEWS ENGLISH</div>
-      </div>
-      <!-- i24 NEWS (Israel) -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCvHDpsWKADrDia0c99X37vg&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">i24 NEWS · ISRAEL</div>
-      </div>
-      <!-- AFP News Agency — raw wire footage -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCeY0bbntWzzVIaj2z3QigXg&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">AFP NEWS AGENCY</div>
+      <div class="vbar-add-btns">
+        <button class="vbar-add-cancel" onclick="closeAddStreamModal()">CANCEL</button>
+        <button class="vbar-add-ok" onclick="confirmAddStream()">ADD STREAM ▶</button>
       </div>
     </div>
-    <!-- CAMERAS TAB -->
-    <div id="vscroll-cams" class="video-scroll" style="display:none">
-      <!-- ISS NASA TV — live_stream via NASA channel -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">ISS · NASA TV LIVE</div>
+  </div>
+
+  <!-- SETTINGS PANEL -->
+  <div id="settings-panel">
+    <div id="settings-hd">
+      <span>⚙ USER SETTINGS</span>
+      <button id="settings-close" onclick="toggleSettings()">✕</button>
+    </div>
+    <div id="settings-body">
+      <div class="setting-section">
+        <div class="setting-section-title">DISPLAY</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Alert sounds</div>
+            <div class="setting-desc">Play sound on new high-severity alerts</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="st-sounds" onchange="saveSetting('sounds',this.checked)"><div class="sw-track"></div></label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Compact popups</div>
+            <div class="setting-desc">Smaller marker info windows</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="st-compact" onchange="saveSetting('compact',this.checked)"><div class="sw-track"></div></label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Auto-open SITREP</div>
+            <div class="setting-desc">Show AI brief on startup</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="st-autobrief" onchange="saveSetting('autobrief',this.checked)"><div class="sw-track"></div></label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Show delay badges</div>
+            <div class="setting-desc">Show [DELAYED Xmin] on popups</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="st-delaybadge" checked onchange="saveSetting('delaybadge',this.checked)"><div class="sw-track"></div></label>
+        </div>
       </div>
-      <!-- Windy Middle East / Hormuz radar -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://embed.windy.com/embed2.html?lat=27&lon=55&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=27&detailLon=55&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
-        <div class="video-card-label">WINDY · HORMUZ / GULF RADAR</div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">MAP DEFAULTS</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Save map position</div>
+            <div class="setting-desc">Remember zoom/center on reload</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="st-savemap" checked onchange="saveSetting('savemap',this.checked)"><div class="sw-track"></div></label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Save layer toggles</div>
+            <div class="setting-desc">Remember which layers are on/off</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="st-savelayers" checked onchange="saveSetting('savelayers',this.checked)"><div class="sw-track"></div></label>
+        </div>
+        <div class="setting-row">
+          <button class="setting-btn" onclick="saveMapView()">📍 SAVE CURRENT VIEW</button>
+        </div>
+        <div class="setting-row">
+          <button class="setting-btn" onclick="jumpToSavedView()">↩ JUMP TO SAVED VIEW</button>
+        </div>
       </div>
-      <!-- Windy Ukraine / Black Sea radar -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://embed.windy.com/embed2.html?lat=49&lon=32&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=49&detailLon=32&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
-        <div class="video-card-label">WINDY · UKRAINE RADAR</div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">NOTIFICATIONS</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Browser notifications</div>
+            <div class="setting-desc">Desktop alerts for critical events</div>
+          </div>
+          <button class="setting-btn" id="st-notif-btn" onclick="requestNotifPermission()">REQUEST PERMISSION</button>
+        </div>
       </div>
-      <!-- Windy Taiwan Strait / South China Sea radar -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://embed.windy.com/embed2.html?lat=24&lon=120&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=24&detailLon=120&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
-        <div class="video-card-label">WINDY · TAIWAN STRAIT RADAR</div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">DATA</div>
+        <div class="setting-row">
+          <button class="setting-btn" onclick="exportSettings()">⬇ EXPORT SETTINGS (JSON)</button>
+        </div>
+        <div class="setting-row">
+          <label class="setting-btn" style="cursor:pointer">
+            ⬆ IMPORT SETTINGS
+            <input type="file" accept=".json" style="display:none" onchange="importSettings(this)">
+          </label>
+        </div>
+        <div class="setting-row">
+          <button class="setting-btn danger" onclick="resetAllSettings()">⊗ RESET ALL TO DEFAULTS</button>
+        </div>
       </div>
-      <!-- Windy Red Sea / Bab-el-Mandeb radar -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://embed.windy.com/embed2.html?lat=13&lon=43&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=13&detailLon=43&metricWind=default&metricTemp=default&radarRange=-1" frameborder="0"></iframe>
-        <div class="video-card-label">WINDY · RED SEA RADAR</div>
-      </div>
-      <!-- Jerusalem Old City live cam -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/7YFoEFUfyUo?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">JERUSALEM · OLD CITY CAM</div>
-      </div>
-      <!-- Port of Rotterdam webcam -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/yz7bOo7ABUU?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">PORT OF ROTTERDAM · CAM</div>
-      </div>
-      <!-- Times Square NYC live cam -->
-      <div class="video-card">
-        <div class="vc-live-dot"></div>
-        <iframe width="300" height="168" src="https://www.youtube-nocookie.com/embed/NjVdGVCh_oU?autoplay=1&mute=1&modestbranding=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        <div class="video-card-label">TIMES SQUARE · NYC</div>
+
+      <div style="margin-top:.5rem;font-size:.4rem;color:var(--dim2);line-height:1.6">
+        Settings saved locally in your browser.<br>
+        No account required — data never leaves your device.
       </div>
     </div>
   </div>
@@ -2065,7 +2179,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <span class="sb-count">⚑ <span id="sb-ev">0</span></span>
     <span class="sb-sep">│</span>
     <span id="sb-ts" style="color:var(--dim2)">--:--:-- UTC</span>
-    <span class="sb-delay">DELAYED — CIVILIAN 30s / MILITARY 24H</span>
+    <span class="sb-delay">DELAYED — CIVILIAN 30s / MILITARY 5MIN / CONFLICT 10MIN</span>
   </div>
 
 </div><!-- /shell -->
@@ -2321,6 +2435,9 @@ function runBoot(){
 
   // Hard failsafe — boot overlay ALWAYS removed after 8s regardless of any error
   const failsafeTimer = setTimeout(_dismissBoot, 8000);
+
+  // Apply persisted user settings on startup
+  _applySettings();
 
   // Defer initMap by one tick so all let/const declarations are initialized (avoids TDZ)
   setTimeout(()=>{
@@ -3997,6 +4114,11 @@ function initMap2D(){
     attribution:'© CartoDB',maxZoom:19,
   }).addTo(_map2d);
   L.control.zoom({position:'topleft'}).addTo(_map2d);
+
+  // Restore saved map position
+  _restoreMapView();
+  // Auto-save position on move/zoom
+  _map2d.on('moveend', _onMapMove);
 
   // Zoom-based icon refresh — restyle tracked-asset markers at each zoom tier
   _map2d.on('zoomend', ()=>{
@@ -5933,15 +6055,11 @@ function _showImageryPanel(show){
 function openVideoBar(){
   const vb = document.getElementById('videobar');
   if(!vb) return;
+  // Render streams if not yet done
+  const newsScroll = document.getElementById('vscroll-news');
+  if(newsScroll && newsScroll.children.length === 0) renderVideoBar('news');
   vb.classList.add('open');
   document.body.classList.add('vbar-open');
-  // Reload iframes so autoplay triggers fresh after bar was hidden
-  vb.querySelectorAll('iframe').forEach(f=>{
-    if(f.src && !f.dataset.loaded){
-      f.dataset.loaded='1';
-      const s=f.src; f.src=''; f.src=s;
-    }
-  });
 }
 function closeVideoBar(){
   const vb = document.getElementById('videobar');
@@ -5955,11 +6073,13 @@ function toggleVideoBar(){
   else openVideoBar();
 }
 function switchVbarTab(tab){
+  _vbarTab = tab;
   document.getElementById('vscroll-news').style.display = tab==='news'?'flex':'none';
   document.getElementById('vscroll-cams').style.display = tab==='cams'?'flex':'none';
   document.querySelectorAll('.vbar-tab').forEach(b=>b.classList.remove('active'));
   const bt = document.getElementById('vbt-'+tab);
   if(bt) bt.classList.add('active');
+  renderVideoBar(tab);
 }
 
 // ── Location Search (Nominatim geocoding) ─────────────────────────────────────
@@ -6385,6 +6505,335 @@ async function sendChatMsg(){
     loadChatMessages(); // refresh immediately
   }catch(e){ input.value = msg; }  // restore if failed
 }
+
+// ── SETTINGS (localStorage) ──────────────────────────────────────────────────
+
+const _SETTINGS_KEY = 'wardar_settings_v1';
+const _MAPVIEW_KEY  = 'wardar_mapview_v1';
+
+function _loadSettings(){
+  try{ return JSON.parse(localStorage.getItem(_SETTINGS_KEY)||'{}'); }catch(e){ return {}; }
+}
+function _saveSettings(s){
+  localStorage.setItem(_SETTINGS_KEY, JSON.stringify(s));
+}
+
+let _settings = _loadSettings();
+
+function saveSetting(key, val){
+  _settings[key] = val;
+  _saveSettings(_settings);
+  _applySettings();
+}
+
+function _applySettings(){
+  // Sync checkboxes
+  const keys = ['sounds','compact','autobrief','delaybadge','savemap','savelayers'];
+  const defaults = {sounds:false,compact:false,autobrief:false,delaybadge:true,savemap:true,savelayers:true};
+  keys.forEach(k=>{
+    const el = document.getElementById('st-'+k);
+    if(el) el.checked = _settings[k] !== undefined ? _settings[k] : defaults[k];
+  });
+  // Apply compact mode
+  document.body.classList.toggle('compact-mode', !!_settings.compact);
+  // Notification button
+  const nb = document.getElementById('st-notif-btn');
+  if(nb){
+    const p = Notification.permission;
+    nb.textContent = p==='granted'?'✓ GRANTED':(p==='denied'?'✕ BLOCKED':'REQUEST PERMISSION');
+    nb.style.color = p==='granted'?'var(--green)':(p==='denied'?'var(--red)':'var(--text)');
+  }
+}
+
+function toggleSettings(){
+  const p = document.getElementById('settings-panel');
+  p.classList.toggle('open');
+  _applySettings();
+}
+
+function saveMapView(){
+  if(!_map2d) return;
+  const c = _map2d.getCenter();
+  const z = _map2d.getZoom();
+  localStorage.setItem(_MAPVIEW_KEY, JSON.stringify({lat:c.lat,lng:c.lng,zoom:z}));
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.textContent = '✓ SAVED';
+  setTimeout(()=>{ btn.textContent=orig; }, 1500);
+}
+
+function jumpToSavedView(){
+  try{
+    const v = JSON.parse(localStorage.getItem(_MAPVIEW_KEY)||'null');
+    if(v && _map2d) _map2d.setView([v.lat,v.lng], v.zoom);
+  }catch(e){}
+}
+
+function _restoreMapView(){
+  if(!(_settings.savemap !== false)) return;
+  try{
+    const v = JSON.parse(localStorage.getItem(_MAPVIEW_KEY)||'null');
+    if(v && _map2d) _map2d.setView([v.lat,v.lng], v.zoom);
+  }catch(e){}
+}
+
+function _persistMapView(){
+  if(!_map2d || _settings.savemap === false) return;
+  const c = _map2d.getCenter();
+  const z = _map2d.getZoom();
+  localStorage.setItem(_MAPVIEW_KEY, JSON.stringify({lat:c.lat,lng:c.lng,zoom:z}));
+}
+
+function exportSettings(){
+  const data = {
+    settings: _settings,
+    mapview:  JSON.parse(localStorage.getItem(_MAPVIEW_KEY)||'null'),
+    streams_news: JSON.parse(localStorage.getItem(_VBAR_KEY_NEWS)||'null'),
+    streams_cams: JSON.parse(localStorage.getItem(_VBAR_KEY_CAMS)||'null'),
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `wardar-settings-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importSettings(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(data.settings) { _settings = data.settings; _saveSettings(_settings); }
+      if(data.mapview)   localStorage.setItem(_MAPVIEW_KEY, JSON.stringify(data.mapview));
+      if(data.streams_news) localStorage.setItem(_VBAR_KEY_NEWS, JSON.stringify(data.streams_news));
+      if(data.streams_cams) localStorage.setItem(_VBAR_KEY_CAMS, JSON.stringify(data.streams_cams));
+      _applySettings();
+      renderVideoBar('news');
+      renderVideoBar('cams');
+      alert('Settings imported successfully.');
+    }catch(err){ alert('Invalid settings file.'); }
+  };
+  reader.readAsText(file);
+}
+
+function resetAllSettings(){
+  if(!confirm('Reset ALL settings, saved streams, and map view to defaults?')) return;
+  localStorage.removeItem(_SETTINGS_KEY);
+  localStorage.removeItem(_MAPVIEW_KEY);
+  localStorage.removeItem(_VBAR_KEY_NEWS);
+  localStorage.removeItem(_VBAR_KEY_CAMS);
+  _settings = {};
+  _applySettings();
+  renderVideoBar('news');
+  renderVideoBar('cams');
+}
+
+function requestNotifPermission(){
+  Notification.requestPermission().then(()=>_applySettings());
+}
+
+// Auto-save map position on move (debounced)
+let _mapSaveTimer = null;
+function _onMapMove(){
+  clearTimeout(_mapSaveTimer);
+  _mapSaveTimer = setTimeout(_persistMapView, 2000);
+}
+
+// ── VIDEO BAR — Data-driven + drag-and-drop ───────────────────────────────────
+
+const _VBAR_KEY_NEWS = 'wardar_streams_news_v2';
+const _VBAR_KEY_CAMS = 'wardar_streams_cams_v2';
+
+const _DEFAULT_STREAMS_NEWS = [
+  {id:'f24',  label:'FRANCE 24 ENGLISH',  src:'https://embed.france24.com/en/live'},
+  {id:'sky',  label:'SKY NEWS',           src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'ajz',  label:'AL JAZEERA ENGLISH', src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'dw',   label:'DW NEWS · GERMANY',  src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'i24',  label:'i24 NEWS · ISRAEL',  src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCvHDpsWKADrDia0c99X37vg&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'trt',  label:'TRT WORLD · TÜRKIYE',src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UC7fWeaHhqgM4Ry-RMpM2YYw&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'abc',  label:'ABC NEWS LIVE',      src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'fox',  label:'LiveNOW · FOX',      src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCJg9wBPyKMNA5sRDnvzmkdg&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'wion', label:'WION · INDIA',       src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UC_gUM8rL-Lrg6O3adPW9K1g&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'nhk',  label:'NHK WORLD · JAPAN',  src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCSPEjw8F2nQDtmUKPFNF7_A&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'euro', label:'EURONEWS ENGLISH',   src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCSrZ3UV4jOidv8ppoVuvW9Q&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'cgtn', label:'CGTN · CHINA',       src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCgrNz-aDmcr2uuto8_DL2jg&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'afp',  label:'AFP NEWS AGENCY',    src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCeY0bbntWzzVIaj2z3QigXg&autoplay=1&mute=1&modestbranding=1&rel=0'},
+];
+const _DEFAULT_STREAMS_CAMS = [
+  {id:'iss',   label:'ISS · NASA TV LIVE',        src:'https://www.youtube-nocookie.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'hormuz',label:'WINDY · HORMUZ / GULF',      src:'https://embed.windy.com/embed2.html?lat=27&lon=55&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=27&detailLon=55&metricWind=default&metricTemp=default&radarRange=-1'},
+  {id:'ukraine',label:'WINDY · UKRAINE RADAR',     src:'https://embed.windy.com/embed2.html?lat=49&lon=32&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=49&detailLon=32&metricWind=default&metricTemp=default&radarRange=-1'},
+  {id:'taiwan',label:'WINDY · TAIWAN STRAIT',      src:'https://embed.windy.com/embed2.html?lat=24&lon=120&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=24&detailLon=120&metricWind=default&metricTemp=default&radarRange=-1'},
+  {id:'redsea',label:'WINDY · RED SEA RADAR',      src:'https://embed.windy.com/embed2.html?lat=13&lon=43&zoom=5&level=surface&overlay=radar&menu=&message=true&marker=&calendar=12&pressure=&type=map&location=coordinates&detail=&detailLat=13&detailLon=43&metricWind=default&metricTemp=default&radarRange=-1'},
+  {id:'jlm',  label:'JERUSALEM · OLD CITY CAM',   src:'https://www.youtube-nocookie.com/embed/7YFoEFUfyUo?autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'rtm',  label:'PORT OF ROTTERDAM · CAM',    src:'https://www.youtube-nocookie.com/embed/yz7bOo7ABUU?autoplay=1&mute=1&modestbranding=1&rel=0'},
+  {id:'tsq',  label:'TIMES SQUARE · NYC',         src:'https://www.youtube-nocookie.com/embed/NjVdGVCh_oU?autoplay=1&mute=1&modestbranding=1&rel=0'},
+];
+
+function _getStreams(tab){
+  const key = tab==='news' ? _VBAR_KEY_NEWS : _VBAR_KEY_CAMS;
+  const def  = tab==='news' ? _DEFAULT_STREAMS_NEWS : _DEFAULT_STREAMS_CAMS;
+  try{
+    const stored = JSON.parse(localStorage.getItem(key)||'null');
+    return stored || def;
+  }catch(e){ return def; }
+}
+
+function _saveStreams(tab, arr){
+  const key = tab==='news' ? _VBAR_KEY_NEWS : _VBAR_KEY_CAMS;
+  localStorage.setItem(key, JSON.stringify(arr));
+}
+
+function _ytEmbed(url){
+  // Convert any youtube.com/watch?v=X, youtu.be/X, or channel url to nocookie embed
+  let m;
+  // Already an embed URL
+  if(url.includes('youtube-nocookie.com/embed')||url.includes('youtube.com/embed')) return url;
+  // Watch URL
+  m = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if(m) return `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&mute=1&modestbranding=1&rel=0`;
+  // Channel URL
+  m = url.match(/youtube\.com\/channel\/([a-zA-Z0-9_-]+)/);
+  if(m) return `https://www.youtube-nocookie.com/embed/live_stream?channel=${m[1]}&autoplay=1&mute=1&modestbranding=1&rel=0`;
+  m = url.match(/youtube\.com\/@([^/?]+)/);
+  if(m) return url; // can't resolve handle to channel ID in frontend — use as-is
+  return url;
+}
+
+let _vbarTab = 'news';
+let _vbarDragSrc = null;
+let _vbarDragIdx = null;
+
+function renderVideoBar(tab){
+  tab = tab || _vbarTab;
+  const scrollId = tab==='news' ? 'vscroll-news' : 'vscroll-cams';
+  const wrap = document.getElementById(scrollId);
+  if(!wrap) return;
+
+  const streams = _getStreams(tab);
+  wrap.innerHTML = '';
+
+  streams.forEach((s, idx)=>{
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.draggable = true;
+    card.dataset.idx = idx;
+    card.dataset.tab = tab;
+
+    card.innerHTML = `
+      <div class="vc-live-dot"></div>
+      <div class="vc-drag-handle" title="Drag to reorder"><span class="vc-drag-dots">⠿⠿⠿</span></div>
+      <button class="vc-remove-btn" onclick="removeStream('${tab}',${idx})" title="Remove">✕</button>
+      <iframe width="300" height="168" src="${esc(s.src)}"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen loading="lazy"></iframe>
+      <button class="vc-unmute-btn" onclick="toggleMuteCard(this)" title="Toggle mute/unmute">🔇 MUTED</button>
+      <div class="video-card-label">${esc(s.label)}</div>
+    `;
+
+    // Drag events
+    card.addEventListener('dragstart', e=>{
+      _vbarDragSrc = card;
+      _vbarDragIdx = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(()=>card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', ()=>{
+      card.classList.remove('dragging');
+      wrap.querySelectorAll('.video-card').forEach(c=>c.classList.remove('drag-over'));
+    });
+    card.addEventListener('dragover', e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      wrap.querySelectorAll('.video-card:not(.vc-add-card-wrap)').forEach(c=>c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
+    });
+    card.addEventListener('drop', e=>{
+      e.preventDefault();
+      if(!_vbarDragSrc || _vbarDragSrc===card) return;
+      const arr = _getStreams(tab);
+      const draggedItem = arr.splice(_vbarDragIdx, 1)[0];
+      const targetIdx = parseInt(card.dataset.idx);
+      arr.splice(targetIdx, 0, draggedItem);
+      _saveStreams(tab, arr);
+      renderVideoBar(tab);
+    });
+
+    wrap.appendChild(card);
+  });
+
+  // Add stream button
+  const addCard = document.createElement('div');
+  addCard.className = 'vc-add-card vc-add-card-wrap';
+  addCard.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>ADD STREAM`;
+  addCard.onclick = ()=>openAddStreamModal(tab);
+  wrap.appendChild(addCard);
+}
+
+function removeStream(tab, idx){
+  const arr = _getStreams(tab);
+  arr.splice(idx, 1);
+  _saveStreams(tab, arr);
+  renderVideoBar(tab);
+}
+
+function toggleMuteCard(btn){
+  const card = btn.closest('.video-card');
+  const iframe = card.querySelector('iframe');
+  const isMuted = card.classList.contains('unmuted');
+  if(isMuted){
+    // Re-mute: reload iframe with mute param
+    const src = iframe.src;
+    iframe.src = src.includes('mute=0') ? src.replace('mute=0','mute=1') : src;
+    card.classList.remove('unmuted');
+    btn.textContent = '🔇 MUTED';
+  } else {
+    // Unmute: reload iframe with mute=0 and allow pointer events
+    const src = iframe.src.replace('mute=1','mute=0').replace('autoplay=0','autoplay=1');
+    iframe.src = src;
+    card.classList.add('unmuted');
+    btn.textContent = '🔊 LIVE';
+  }
+}
+
+let _vbarAddTab = 'news';
+function openAddStreamModal(tab){
+  _vbarAddTab = tab || _vbarTab;
+  document.getElementById('vbar-add-label').value = '';
+  document.getElementById('vbar-add-url').value = '';
+  document.getElementById('vbar-add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('vbar-add-label').focus(), 50);
+}
+function closeAddStreamModal(){
+  document.getElementById('vbar-add-modal').classList.remove('open');
+}
+function confirmAddStream(){
+  const label = document.getElementById('vbar-add-label').value.trim().toUpperCase() || 'CUSTOM STREAM';
+  let url = document.getElementById('vbar-add-url').value.trim();
+  if(!url){ alert('Please enter a URL.'); return; }
+  url = _ytEmbed(url);
+  const arr = _getStreams(_vbarAddTab);
+  arr.push({id:'custom_'+Date.now(), label, src:url});
+  _saveStreams(_vbarAddTab, arr);
+  closeAddStreamModal();
+  renderVideoBar(_vbarAddTab);
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', e=>{
+  if(e.target.id==='vbar-add-modal') closeAddStreamModal();
+  if(e.target.id==='settings-panel') {}
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    closeAddStreamModal();
+    const sp = document.getElementById('settings-panel');
+    if(sp.classList.contains('open')) toggleSettings();
+  }
+});
 
 // ── COUNTRY INTEL PANEL ──────────────────────────────────────────────────────
 

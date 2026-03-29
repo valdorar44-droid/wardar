@@ -27,11 +27,13 @@ _on_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAIL
 _default_db = "/data/wardar.db" if _on_railway else os.path.join(_ROOT, "wardar.db")
 DB_PATH = _s("WARDAR_DB_PATH", _default_db)
 
-# ── Delay Policy (NON-NEGOTIABLE — never bypass) ──────
+# ── Delay Policy ──────────────────────────────────────
 # All values in seconds. Applied by core/engine.py:apply_delay()
-DELAY_CIVILIAN_SEC  = _i("DELAY_CIVILIAN_SEC",  30)      # ADS-B / AIS civilian feeds
-DELAY_SENSITIVE_SEC = _i("DELAY_SENSITIVE_SEC", 86400)   # Military-flagged signals: 24h
-DELAY_CONFLICT_SEC  = _i("DELAY_CONFLICT_SEC",  3600)    # Conflict zone event overlays: 1h
+# Military data comes from PUBLIC transponder feeds — 24h was overly conservative.
+# Goal: be faster than broadcast news (TV news ~5-30 min lag).
+DELAY_CIVILIAN_SEC  = _i("DELAY_CIVILIAN_SEC",  30)      # ADS-B / AIS civilian feeds: 30s
+DELAY_SENSITIVE_SEC = _i("DELAY_SENSITIVE_SEC", 300)     # Military-flagged signals: 5 min (was 24h)
+DELAY_CONFLICT_SEC  = _i("DELAY_CONFLICT_SEC",  600)     # Conflict zone event overlays: 10 min (was 1h)
 
 # ── ADS-B Sources ─────────────────────────────────────
 ADSB_EXCHANGE_API_KEY = _s("ADSB_EXCHANGE_API_KEY", "")
