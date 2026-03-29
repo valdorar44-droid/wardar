@@ -1013,6 +1013,229 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 /* ISW 2D frontline flash on load */
 @keyframes iswPulse{0%{opacity:0}50%{opacity:1}100%{opacity:.65}}
 .isw2d-layer{animation:iswPulse .8s ease forwards}
+
+/* ── COUNTRY SEARCH WIDGET (left panel) ── */
+#country-search-bar{
+  padding:.5rem .75rem .6rem;
+  border-top:1px solid var(--border2);
+  background:rgba(8,8,12,.6);
+}
+#country-search-bar .csb-label{
+  font-size:.42rem;letter-spacing:.15em;color:var(--dim2);margin-bottom:.35rem;
+}
+.csb-row{display:flex;gap:.3rem;align-items:center}
+#country-search-inp{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--font);font-size:.52rem;
+  padding:.3rem .5rem;border-radius:2px;outline:none;
+  transition:border-color .15s;
+}
+#country-search-inp:focus{border-color:var(--amber);}
+#country-search-inp::placeholder{color:var(--dim2)}
+.csb-btn{
+  background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);
+  color:var(--amber);font-family:var(--font);font-size:.5rem;
+  padding:.3rem .55rem;border-radius:2px;cursor:pointer;white-space:nowrap;
+  transition:background .15s;
+}
+.csb-btn:hover{background:rgba(245,158,11,.22)}
+#country-suggestions{
+  position:absolute;left:0;right:0;max-height:180px;overflow-y:auto;
+  background:rgba(8,8,12,.98);border:1px solid var(--border2);
+  border-top:none;z-index:9000;scrollbar-width:thin;
+}
+.csb-sug{
+  padding:.35rem .75rem;font-size:.52rem;color:var(--text);cursor:pointer;
+  display:flex;align-items:center;gap:.45rem;
+  transition:background .1s;
+}
+.csb-sug:hover{background:rgba(245,158,11,.1);color:var(--amber)}
+.csb-sug-flag{font-size:.85rem}
+.csb-sug-name{flex:1}
+.csb-sug-iso{color:var(--dim2);font-size:.42rem}
+
+/* ── COUNTRY INTEL PANEL (bottom sheet) ── */
+#cip{
+  position:fixed;bottom:44px;left:0;right:0;
+  height:68vh;max-height:620px;
+  z-index:900;
+  background:#05050a;
+  border-top:2px solid var(--amber);
+  display:flex;flex-direction:column;
+  transform:translateY(100%);
+  transition:transform .35s cubic-bezier(.22,.68,0,1.2);
+}
+#cip.open{transform:translateY(0)}
+#cip-handle{
+  width:40px;height:3px;background:var(--border2);border-radius:2px;
+  margin:.55rem auto .1rem;cursor:pointer;flex-shrink:0;
+}
+#cip-header{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.45rem 1rem .4rem;border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+#cip-flag{font-size:1.8rem;line-height:1}
+#cip-name{
+  font-size:1rem;font-weight:700;letter-spacing:.1em;color:var(--amber);
+  text-shadow:0 0 20px rgba(245,158,11,.3);flex:1;
+}
+#cip-threat-badge{
+  font-size:.45rem;font-weight:700;letter-spacing:.15em;
+  padding:.2rem .55rem;border-radius:2px;
+}
+#cip-close{
+  background:none;border:none;color:var(--dim2);font-size:.85rem;
+  cursor:pointer;padding:.2rem .4rem;font-family:var(--font);
+  transition:color .15s;
+}
+#cip-close:hover{color:var(--text)}
+
+/* Tabs */
+#cip-tabs{
+  display:flex;border-bottom:1px solid var(--border);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;
+}
+.cip-tab{
+  padding:.45rem .9rem;font-size:.48rem;letter-spacing:.12em;
+  color:var(--dim2);cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.cip-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.cip-tab:hover{color:var(--text)}
+
+/* Body */
+#cip-body{flex:1;overflow:hidden;position:relative}
+.cip-pane{
+  position:absolute;inset:0;overflow-y:auto;
+  padding:.75rem 1rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+  display:none;
+}
+.cip-pane.active{display:block}
+
+/* Stat cards row */
+.cip-stats-row{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;
+  margin-bottom:.9rem;
+}
+.cip-stat-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--border2);
+  border-radius:3px;padding:.6rem .65rem;
+  position:relative;overflow:hidden;
+}
+.cip-stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+}
+.cip-stat-card.events::before{background:var(--amber)}
+.cip-stat-card.fatalities::before{background:var(--red)}
+.cip-stat-card.displaced::before{background:var(--purple)}
+.cip-stat-val{
+  font-size:1.15rem;font-weight:700;letter-spacing:-.02em;
+  line-height:1;margin-bottom:.25rem;
+}
+.cip-stat-lbl{font-size:.38rem;letter-spacing:.12em;color:var(--dim2)}
+
+/* Severity gauge */
+.cip-severity-wrap{
+  margin-bottom:.9rem;
+  background:rgba(255,255,255,.02);border:1px solid var(--border2);
+  border-radius:3px;padding:.6rem .75rem;
+}
+.cip-sev-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:.5rem;
+}
+.cip-sev-label{font-size:.42rem;letter-spacing:.14em;color:var(--dim2)}
+.cip-sev-score{font-size:.85rem;font-weight:700;letter-spacing:-.02em}
+.cip-gauge-track{
+  height:10px;background:rgba(255,255,255,.05);border-radius:2px;
+  position:relative;overflow:hidden;
+}
+.cip-gauge-fill{
+  height:100%;border-radius:2px;
+  transition:width .6s cubic-bezier(.22,.68,0,1.1);
+  position:relative;
+}
+.cip-gauge-fill::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.15));
+}
+.cip-sev-ticks{
+  display:flex;justify-content:space-between;
+  margin-top:.25rem;
+}
+.cip-sev-tick{font-size:.36rem;color:var(--dim);letter-spacing:.05em}
+
+/* Source breakdown */
+.cip-breakdown{
+  margin-bottom:.9rem;
+  background:rgba(255,255,255,.02);border:1px solid var(--border2);
+  border-radius:3px;padding:.6rem .75rem;
+}
+.cip-breakdown-title{
+  font-size:.42rem;letter-spacing:.14em;color:var(--dim2);margin-bottom:.5rem;
+}
+.cip-src-row{
+  display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;
+}
+.cip-src-name{font-size:.44rem;color:var(--text);width:90px;flex-shrink:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cip-src-bar-wrap{flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.cip-src-bar{height:100%;border-radius:2px;transition:width .5s ease}
+.cip-src-count{font-size:.42rem;color:var(--dim2);width:30px;text-align:right;flex-shrink:0}
+
+/* VIEWS forecast card */
+.cip-views-card{
+  margin-bottom:.9rem;
+  background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);
+  border-radius:3px;padding:.6rem .75rem;
+}
+.cip-views-title{
+  font-size:.42rem;letter-spacing:.14em;color:var(--red);margin-bottom:.45rem;
+  display:flex;align-items:center;gap:.4rem;
+}
+.cip-prob-bar-wrap{
+  height:14px;background:rgba(255,255,255,.05);border-radius:2px;
+  overflow:hidden;position:relative;margin:.35rem 0;
+}
+.cip-prob-bar{
+  height:100%;background:linear-gradient(90deg,#f59e0b,#ef4444);
+  border-radius:2px;transition:width .6s ease;
+}
+.cip-prob-labels{
+  display:flex;justify-content:space-between;
+  font-size:.38rem;color:var(--dim2);
+}
+
+/* Events feed pane */
+.cip-event-row{
+  padding:.5rem 0;border-bottom:1px solid var(--border);
+  cursor:pointer;
+}
+.cip-event-row:last-child{border-bottom:none}
+.cip-event-row:hover{background:rgba(245,158,11,.04);margin:0 -.5rem;padding-left:.5rem;padding-right:.5rem}
+.cip-evt-source{
+  font-size:.38rem;letter-spacing:.1em;color:var(--amber);margin-bottom:.2rem;
+  display:flex;align-items:center;gap:.35rem;
+}
+.cip-evt-title{font-size:.5rem;color:var(--text);line-height:1.4;margin-bottom:.15rem}
+.cip-evt-ts{font-size:.38rem;color:var(--dim2)}
+
+/* AI SITREP pane */
+#cip-sitrep-btn{
+  display:block;width:100%;
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
+  color:var(--amber);font-family:var(--font);font-size:.52rem;letter-spacing:.12em;
+  padding:.55rem;border-radius:3px;cursor:pointer;margin-bottom:.75rem;
+  transition:background .15s;
+}
+#cip-sitrep-btn:hover{background:rgba(245,158,11,.2)}
+#cip-sitrep-btn:disabled{opacity:.4;cursor:not-allowed}
+#cip-sitrep-out{
+  font-size:.5rem;color:var(--text);line-height:1.7;
+  white-space:pre-wrap;word-break:break-word;
+}
 </style>
 </head>
 <body>
@@ -1453,9 +1676,101 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         </div>
 
       </div>
+      <!-- ── COUNTRY INTEL SEARCH ── -->
+      <div id="country-search-bar" style="position:relative">
+        <div class="csb-label">COUNTRY INTELLIGENCE</div>
+        <div class="csb-row">
+          <input type="text" id="country-search-inp" placeholder="Search country..." autocomplete="off"
+            oninput="onCountrySearchInput(this.value)"
+            onkeydown="if(event.key==='Enter')doCountrySearch()">
+          <button class="csb-btn" onclick="doCountrySearch()">INTEL ▶</button>
+        </div>
+        <div id="country-suggestions" style="display:none"></div>
+      </div>
+
       <div class="panel-ft">
         DATA DELAYED PER POLICY<br>
         CIVILIAN +30s · MILITARY +24H
+      </div>
+    </div>
+
+    <!-- COUNTRY INTEL PANEL (bottom sheet) -->
+    <div id="cip">
+      <div id="cip-handle" onclick="closeCountryIntel()"></div>
+      <div id="cip-header">
+        <div id="cip-flag">🌍</div>
+        <div id="cip-name">—</div>
+        <div id="cip-threat-badge"></div>
+        <button id="cip-close" onclick="closeCountryIntel()">✕</button>
+      </div>
+      <div id="cip-tabs">
+        <div class="cip-tab active" onclick="cipSwitchTab('overview')">OVERVIEW</div>
+        <div class="cip-tab" onclick="cipSwitchTab('events')">EVENT FEED</div>
+        <div class="cip-tab" onclick="cipSwitchTab('sitrep')">AI SITREP</div>
+      </div>
+      <div id="cip-body">
+        <!-- OVERVIEW pane -->
+        <div class="cip-pane active" id="cip-pane-overview">
+          <div class="cip-stats-row">
+            <div class="cip-stat-card events">
+              <div class="cip-stat-val" id="cip-stat-events" style="color:var(--amber)">—</div>
+              <div class="cip-stat-lbl">CONFLICT EVENTS</div>
+            </div>
+            <div class="cip-stat-card fatalities">
+              <div class="cip-stat-val" id="cip-stat-fatalities" style="color:var(--red)">—</div>
+              <div class="cip-stat-lbl">EST. FATALITIES/MO</div>
+            </div>
+            <div class="cip-stat-card displaced">
+              <div class="cip-stat-val" id="cip-stat-displaced" style="color:var(--purple)">—</div>
+              <div class="cip-stat-lbl">TOTAL DISPLACED</div>
+            </div>
+          </div>
+          <div class="cip-severity-wrap">
+            <div class="cip-sev-header">
+              <span class="cip-sev-label">CONFLICT SEVERITY INDEX</span>
+              <span class="cip-sev-score" id="cip-sev-score">—</span>
+            </div>
+            <div class="cip-gauge-track">
+              <div class="cip-gauge-fill" id="cip-sev-bar" style="width:0%"></div>
+            </div>
+            <div class="cip-sev-ticks">
+              <span class="cip-sev-tick">0 LOW</span>
+              <span class="cip-sev-tick">2</span>
+              <span class="cip-sev-tick">4</span>
+              <span class="cip-sev-tick">6</span>
+              <span class="cip-sev-tick">8</span>
+              <span class="cip-sev-tick">10 CRITICAL</span>
+            </div>
+          </div>
+          <div class="cip-views-card" id="cip-views-card" style="display:none">
+            <div class="cip-views-title">
+              <span style="color:var(--red)">◈</span> VIEWS CONFLICT FORECAST
+              <span id="cip-views-month" style="color:var(--dim2);margin-left:auto;font-size:.4rem"></span>
+            </div>
+            <div id="cip-views-prob-text" style="font-size:.75rem;font-weight:700;color:var(--red);margin-bottom:.35rem"></div>
+            <div class="cip-prob-bar-wrap">
+              <div class="cip-prob-bar" id="cip-prob-bar" style="width:0%"></div>
+            </div>
+            <div class="cip-prob-labels">
+              <span>0%</span>
+              <span id="cip-views-details" style="color:var(--dim2)"></span>
+              <span>100%</span>
+            </div>
+          </div>
+          <div class="cip-breakdown" id="cip-breakdown">
+            <div class="cip-breakdown-title">INTELLIGENCE SOURCE BREAKDOWN</div>
+            <div id="cip-src-rows"></div>
+          </div>
+        </div>
+        <!-- EVENTS pane -->
+        <div class="cip-pane" id="cip-pane-events">
+          <div id="cip-events-list" style="color:var(--dim2);font-size:.48rem;padding:.5rem 0">LOADING...</div>
+        </div>
+        <!-- AI SITREP pane -->
+        <div class="cip-pane" id="cip-pane-sitrep">
+          <button id="cip-sitrep-btn" onclick="loadCipSitrep()">⬡ GENERATE AI INTELLIGENCE BRIEF</button>
+          <div id="cip-sitrep-out"></div>
+        </div>
       </div>
     </div>
 
@@ -3367,8 +3682,9 @@ function buildPopup(p){
       ${p.url?`<div class="popup-row"><span class="popup-label">URL</span><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.6rem">OPEN ↗</a></div>`:''}
       ${eqImg.html}
       ${badge}
-    ${p.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
-      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>
+    ${p.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem;flex-wrap:wrap">
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ CHAT</button>
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--purple)" onclick="openCountryIntelFromPopup('${esc(p.country)}')">📊 COUNTRY INTEL</button>
       <button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>
     </div>`:''}
     </div>`;
@@ -3402,7 +3718,8 @@ function buildPopup(p){
     ${eqImg.html}
     ${badge}
     <div style="margin-top:.4rem;display:flex;gap:.3rem;flex-wrap:wrap">
-      ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>`:''}
+      ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ CHAT</button>`:''}
+      ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--purple)" onclick="openCountryIntelFromPopup('${esc(p.country)}')">📊 COUNTRY INTEL</button>`:''}
       ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>`:''}
       <button class="pvote-btn" style="flex:1;text-align:center;color:#a78bfa" onclick="predictPath(_lastPopupData)">🎯 PREDICT PATH</button>
     </div>
@@ -3608,7 +3925,10 @@ function buildRedditPopup(d){
     ${linkedUrl&&linkedUrl!==postUrl&&!directVidUrl?`<a href="${esc(linkedUrl)}" target="_blank" rel="noopener"
       style="display:block;text-align:center;padding:.3rem;background:#111120;color:var(--cyan);font-size:.52rem;text-decoration:none;border-radius:2px;border:1px solid #1e2a30">
       EXTERNAL SOURCE ↗</a>`:''}
-    ${d.country?`<button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI INTEL BRIEF</button>`:''}
+    <div style="display:flex;gap:.3rem">
+      ${d.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--purple)" onclick="openCountryIntelFromPopup('${esc(d.country)}')">📊 COUNTRY INTEL</button>`:''}
+      ${d.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI BRIEF</button>`:''}
+    </div>
   </div>
 </div>`;
 }
@@ -3654,7 +3974,10 @@ function buildBreakingPopup(d){
   <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.4rem">
     ${srcUrl?`<a href="${srcUrl}" target="_blank" rel="noopener"
       style="display:block;text-align:center;padding:.3rem;background:#1a1a28;color:var(--cyan);font-size:.58rem;font-weight:700;text-decoration:none;border-radius:2px;border:1px solid #1e2a30;letter-spacing:.04em">READ FULL REPORT ↗</a>`:''}
-    ${d.country?`<button class="pvote-btn" style="width:100%;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI INTEL BRIEF</button>`:''}
+    ${d.country?`<div style="display:flex;gap:.3rem">
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--purple)" onclick="openCountryIntelFromPopup('${esc(d.country)}')">📊 COUNTRY INTEL</button>
+      <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openCountryBrief('${esc(d.country)}')">🤖 AI BRIEF</button>
+    </div>`:''}
   </div>
 </div>`;
 }
@@ -6061,6 +6384,285 @@ async function sendChatMsg(){
     });
     loadChatMessages(); // refresh immediately
   }catch(e){ input.value = msg; }  // restore if failed
+}
+
+// ── COUNTRY INTEL PANEL ──────────────────────────────────────────────────────
+
+const _CIP_COUNTRIES = [
+  {name:'Ukraine',      iso:'UA', flag:'🇺🇦'},
+  {name:'Russia',       iso:'RU', flag:'🇷🇺'},
+  {name:'Israel',       iso:'IL', flag:'🇮🇱'},
+  {name:'Palestine',    iso:'PS', flag:'🇵🇸'},
+  {name:'Syria',        iso:'SY', flag:'🇸🇾'},
+  {name:'Iran',         iso:'IR', flag:'🇮🇷'},
+  {name:'Iraq',         iso:'IQ', flag:'🇮🇶'},
+  {name:'Yemen',        iso:'YE', flag:'🇾🇪'},
+  {name:'Afghanistan',  iso:'AF', flag:'🇦🇫'},
+  {name:'Somalia',      iso:'SO', flag:'🇸🇴'},
+  {name:'Ethiopia',     iso:'ET', flag:'🇪🇹'},
+  {name:'Sudan',        iso:'SD', flag:'🇸🇩'},
+  {name:'South Sudan',  iso:'SS', flag:'🇸🇸'},
+  {name:'DR Congo',     iso:'CD', flag:'🇨🇩'},
+  {name:'Nigeria',      iso:'NG', flag:'🇳🇬'},
+  {name:'Mali',         iso:'ML', flag:'🇲🇱'},
+  {name:'Burkina Faso', iso:'BF', flag:'🇧🇫'},
+  {name:'Niger',        iso:'NE', flag:'🇳🇪'},
+  {name:'Chad',         iso:'TD', flag:'🇹🇩'},
+  {name:'Central African Republic', iso:'CF', flag:'🇨🇫'},
+  {name:'Libya',        iso:'LY', flag:'🇱🇾'},
+  {name:'Lebanon',      iso:'LB', flag:'🇱🇧'},
+  {name:'Myanmar',      iso:'MM', flag:'🇲🇲'},
+  {name:'Pakistan',     iso:'PK', flag:'🇵🇰'},
+  {name:'Haiti',        iso:'HT', flag:'🇭🇹'},
+  {name:'Venezuela',    iso:'VE', flag:'🇻🇪'},
+  {name:'Mozambique',   iso:'MZ', flag:'🇲🇿'},
+  {name:'Cameroon',     iso:'CM', flag:'🇨🇲'},
+  {name:'Kenya',        iso:'KE', flag:'🇰🇪'},
+  {name:'Uganda',       iso:'UG', flag:'🇺🇬'},
+  {name:'Georgia',      iso:'GE', flag:'🇬🇪'},
+  {name:'Azerbaijan',   iso:'AZ', flag:'🇦🇿'},
+  {name:'Armenia',      iso:'AM', flag:'🇦🇲'},
+  {name:'Rwanda',       iso:'RW', flag:'🇷🇼'},
+  {name:'Zimbabwe',     iso:'ZW', flag:'🇿🇼'},
+  {name:'Indonesia',    iso:'ID', flag:'🇮🇩'},
+  {name:'Philippines',  iso:'PH', flag:'🇵🇭'},
+  {name:'Colombia',     iso:'CO', flag:'🇨🇴'},
+  {name:'Mexico',       iso:'MX', flag:'🇲🇽'},
+  {name:'North Korea',  iso:'KP', flag:'🇰🇵'},
+  {name:'China',        iso:'CN', flag:'🇨🇳'},
+  {name:'India',        iso:'IN', flag:'🇮🇳'},
+  {name:'Türkiye',      iso:'TR', flag:'🇹🇷'},
+  {name:'Saudi Arabia', iso:'SA', flag:'🇸🇦'},
+  {name:'Egypt',        iso:'EG', flag:'🇪🇬'},
+];
+
+// ISO2 → flag emoji
+function _isoFlag(iso2){
+  if(!iso2||iso2.length!==2) return '🌍';
+  const o=127397;
+  return String.fromCodePoint(...iso2.toUpperCase().split('').map(c=>c.charCodeAt(0)+o));
+}
+
+// Format large numbers
+function _fmt(n){
+  if(n==null||isNaN(n)) return '—';
+  if(n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(0)+'K';
+  return String(n);
+}
+
+// Severity → color + label
+function _sevColor(s){
+  if(s>=8) return {color:'#ef4444',label:'CRITICAL'};
+  if(s>=6) return {color:'#f97316',label:'SEVERE'};
+  if(s>=4) return {color:'#eab308',label:'HIGH'};
+  if(s>=2) return {color:'#22c55e',label:'ELEVATED'};
+  return {color:'#3b82f6',label:'LOW'};
+}
+
+// Source display names
+const _CIP_SRC_NAMES = {
+  acled:'ACLED',ucdp:'UCDP',breaking_news:'BREAKING',osint_news:'OSINT',
+  gdelt:'GDELT',telegram_osint:'TELEGRAM',defense_news:'DEFENSE',
+  mem:'MEM',twz:'THE WAR ZONE',ukmod:'UK MOD',aljazeera:'AL JAZEERA',
+  reliefweb:'RELIEFWEB',toi:'TIMES OF ISR',bellingcat:'BELLINGCAT',
+  usni:'USNI',krebs:'KREBS',osint_geo:'OSINT GEO',community:'COMMUNITY',
+  warspot:'WARSPOT',polymarket:'POLYMARKET',nuclear_threat:'NUC THREAT',
+};
+const _CIP_SRC_COLORS = {
+  acled:'#ef4444',ucdp:'#ef4444',breaking_news:'#ef4444',osint_news:'#3b82f6',
+  gdelt:'#3b82f6',telegram_osint:'#06b6d4',defense_news:'#f59e0b',
+  mem:'#f59e0b',twz:'#f97316',ukmod:'#22c55e',aljazeera:'#22c55e',
+  reliefweb:'#a855f7',bellingcat:'#e879f9',usni:'#3b82f6',krebs:'#06b6d4',
+  osint_geo:'#f97316',community:'#22c55e',warspot:'#ef4444',
+  polymarket:'#f59e0b',nuclear_threat:'#ef4444',toi:'#3b82f6',
+};
+
+let _cipCountry = '';
+let _cipCurrentTab = 'overview';
+
+function onCountrySearchInput(val){
+  const box = document.getElementById('country-suggestions');
+  if(!val.trim()){box.style.display='none';return;}
+  const q = val.toLowerCase();
+  const matches = _CIP_COUNTRIES.filter(c=>
+    c.name.toLowerCase().includes(q)||c.iso.toLowerCase()===q
+  ).slice(0,8);
+  if(!matches.length){box.style.display='none';return;}
+  box.innerHTML = matches.map(c=>`
+    <div class="csb-sug" onclick="selectCountry(${JSON.stringify(c.name)},${JSON.stringify(c.flag)})">
+      <span class="csb-sug-flag">${c.flag}</span>
+      <span class="csb-sug-name">${esc(c.name)}</span>
+      <span class="csb-sug-iso">${c.iso}</span>
+    </div>
+  `).join('');
+  box.style.display='block';
+}
+
+function doCountrySearch(){
+  const val = document.getElementById('country-search-inp').value.trim();
+  if(!val) return;
+  const q = val.toLowerCase();
+  const match = _CIP_COUNTRIES.find(c=>
+    c.name.toLowerCase()===q||c.iso.toLowerCase()===q||c.name.toLowerCase().startsWith(q)
+  );
+  const flag = match ? match.flag : _isoFlag('');
+  selectCountry(match?match.name:val, flag);
+}
+
+function selectCountry(name, flag){
+  document.getElementById('country-search-inp').value = name;
+  document.getElementById('country-suggestions').style.display='none';
+  openCountryIntel(name, flag||'🌍');
+}
+
+function openCountryIntel(country, flag){
+  _cipCountry = country;
+  document.getElementById('cip-flag').textContent = flag||'🌍';
+  document.getElementById('cip-name').textContent = country.toUpperCase();
+  document.getElementById('cip-threat-badge').textContent = '…';
+  document.getElementById('cip-threat-badge').style.cssText='background:rgba(255,255,255,.08);color:var(--dim2);font-size:.45rem;font-weight:700;letter-spacing:.15em;padding:.2rem .55rem;border-radius:2px';
+  // reset panes
+  cipSwitchTab('overview');
+  document.getElementById('cip-stat-events').textContent='…';
+  document.getElementById('cip-stat-fatalities').textContent='…';
+  document.getElementById('cip-stat-displaced').textContent='…';
+  document.getElementById('cip-sev-score').textContent='…';
+  document.getElementById('cip-sev-bar').style.width='0%';
+  document.getElementById('cip-src-rows').innerHTML='<div style="color:var(--dim2);font-size:.44rem">LOADING INTELLIGENCE...</div>';
+  document.getElementById('cip-events-list').innerHTML='<div style="color:var(--dim2);font-size:.44rem;padding:.5rem 0">LOADING...</div>';
+  document.getElementById('cip-sitrep-out').innerHTML='';
+  document.getElementById('cip-sitrep-btn').disabled=false;
+  document.getElementById('cip-views-card').style.display='none';
+  document.getElementById('cip').classList.add('open');
+  _fetchCountryStats(country);
+}
+
+function closeCountryIntel(){
+  document.getElementById('cip').classList.remove('open');
+  _cipCountry='';
+}
+
+function cipSwitchTab(tab){
+  _cipCurrentTab=tab;
+  document.querySelectorAll('#cip-tabs .cip-tab').forEach((el,i)=>{
+    const tabs=['overview','events','sitrep'];
+    el.classList.toggle('active', tabs[i]===tab);
+  });
+  document.querySelectorAll('#cip-body .cip-pane').forEach(el=>{
+    el.classList.toggle('active', el.id===`cip-pane-${tab}`);
+  });
+}
+
+async function _fetchCountryStats(country){
+  try{
+    const data = await fetch(`/api/country-stats/${encodeURIComponent(country)}`).then(r=>r.json());
+    _renderCipData(data);
+  }catch(e){
+    document.getElementById('cip-src-rows').innerHTML='<div style="color:var(--red);font-size:.44rem">FETCH ERROR: '+esc(String(e))+'</div>';
+  }
+}
+
+function _renderCipData(d){
+  // Stat cards
+  document.getElementById('cip-stat-events').textContent = _fmt(d.total_events)||'0';
+  const fat = d.views_forecast ? d.views_forecast.mean_fatalities : null;
+  document.getElementById('cip-stat-fatalities').textContent = fat!=null ? _fmt(Math.round(fat)) : '—';
+  document.getElementById('cip-stat-displaced').textContent = d.displaced ? _fmt(d.displaced) : '—';
+
+  // Severity gauge
+  const sev = d.severity_score||0;
+  const {color,label} = _sevColor(sev);
+  document.getElementById('cip-sev-score').textContent = sev.toFixed(1)+' / 10';
+  document.getElementById('cip-sev-score').style.color = color;
+  const bar = document.getElementById('cip-sev-bar');
+  bar.style.width=(sev*10)+'%';
+  bar.style.background=`linear-gradient(90deg,#22c55e,#eab308,${color})`;
+  // Threat badge
+  const badge=document.getElementById('cip-threat-badge');
+  badge.textContent=label;
+  badge.style.cssText=`background:${color}22;color:${color};border:1px solid ${color}55;font-size:.42rem;font-weight:700;letter-spacing:.15em;padding:.2rem .55rem;border-radius:2px`;
+
+  // VIEWS forecast
+  if(d.views_forecast){
+    const vf=d.views_forecast;
+    document.getElementById('cip-views-card').style.display='block';
+    const prob=Math.round((vf.prob||0)*100);
+    document.getElementById('cip-views-prob-text').textContent=prob+'% CONFLICT PROBABILITY';
+    document.getElementById('cip-prob-bar').style.width=prob+'%';
+    document.getElementById('cip-views-month').textContent='FORECAST: '+(vf.forecast_month||'—');
+    document.getElementById('cip-views-details').textContent=
+      vf.mean_fatalities!=null?`EST. ${Math.round(vf.mean_fatalities)} FATALITIES`:'';
+  }
+
+  // Source breakdown
+  const breakdown=d.source_breakdown||{};
+  const sorted=Object.entries(breakdown).sort(([,a],[,b])=>b-a);
+  const maxN=sorted[0]?sorted[0][1]:1;
+  const rows=document.getElementById('cip-src-rows');
+  if(!sorted.length){
+    rows.innerHTML='<div style="color:var(--dim2);font-size:.44rem">NO EVENTS IN DATABASE FOR THIS COUNTRY</div>';
+  } else {
+    rows.innerHTML=sorted.slice(0,10).map(([src,n])=>{
+      const name=_CIP_SRC_NAMES[src]||src.toUpperCase().replace(/_/g,' ');
+      const color=_CIP_SRC_COLORS[src]||'var(--amber)';
+      const pct=Math.round((n/maxN)*100);
+      return `<div class="cip-src-row">
+        <div class="cip-src-name" title="${esc(src)}">${esc(name)}</div>
+        <div class="cip-src-bar-wrap"><div class="cip-src-bar" style="width:${pct}%;background:${color}"></div></div>
+        <div class="cip-src-count">${n}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Events feed
+  const evts=d.recent_events||[];
+  const elist=document.getElementById('cip-events-list');
+  if(!evts.length){
+    elist.innerHTML='<div style="color:var(--dim2);font-size:.48rem;padding:.5rem 0">NO RECENT EVENTS INDEXED FOR THIS COUNTRY</div>';
+  } else {
+    elist.innerHTML=evts.map(ev=>{
+      const src=(ev.source||'').toUpperCase().replace(/_/g,' ');
+      const color=_CIP_SRC_COLORS[ev.source]||'var(--amber)';
+      const ts=ev.raw_ts_utc?new Date(ev.raw_ts_utc).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      const href=ev.url?`href="${esc(ev.url)}" target="_blank" rel="noopener"`:'';
+      return `<div class="cip-event-row">
+        <div class="cip-evt-source"><span style="color:${color}">◆</span>${esc(src)}</div>
+        <div class="cip-evt-title"><a ${href} style="color:inherit;text-decoration:none">${esc((ev.title||'').substring(0,120))}</a></div>
+        <div class="cip-evt-ts">${ts}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function loadCipSitrep(){
+  const country=_cipCountry;
+  if(!country) return;
+  const btn=document.getElementById('cip-sitrep-btn');
+  const out=document.getElementById('cip-sitrep-out');
+  btn.disabled=true;
+  btn.textContent='⟳ GENERATING BRIEF...';
+  out.innerHTML='<div style="color:var(--dim2);font-size:.48rem">QUERYING INTELLIGENCE DATABASE...<br>CONTACTING AI ANALYSIS UNIT...<br>ETA ~15-30s</div>';
+  try{
+    const data=await fetch(`/api/brief/country/${encodeURIComponent(country)}`).then(r=>r.json());
+    const text=data.text||data.error||'No brief generated.';
+    out.innerHTML=`<div id="cip-sitrep-out" style="font-size:.5rem;color:var(--text);line-height:1.7;white-space:pre-wrap">${esc(text)}</div>
+      <div style="margin-top:.5rem;font-size:.38rem;color:var(--dim2)">GENERATED ${new Date().toISOString().slice(0,16).replace('T',' ')} UTC · MODEL: ${esc(data.model||'—')}</div>`;
+    btn.textContent='⟳ REGENERATE';
+    btn.disabled=false;
+  }catch(e){
+    out.innerHTML=`<div style="color:var(--red);font-size:.48rem">BRIEF GENERATION FAILED: ${esc(String(e))}</div>`;
+    btn.textContent='⬡ RETRY';
+    btn.disabled=false;
+  }
+}
+
+// Allow popups to trigger the country panel
+function openCountryIntelFromPopup(country){
+  const match=_CIP_COUNTRIES.find(c=>c.name.toLowerCase()===country.toLowerCase()||c.name.toLowerCase().includes(country.toLowerCase()));
+  const flag=match?match.flag:_isoFlag('');
+  document.getElementById('country-search-inp').value=match?match.name:country;
+  openCountryIntel(match?match.name:country, flag);
 }
 </script>
 </body>

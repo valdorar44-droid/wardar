@@ -464,6 +464,97 @@ Keep path realistic — account for known geography (don't fly through mountains
         return JSONResponse({"error": str(exc)}, status_code=503)
 
 
+@app.get("/api/country-stats/{country}")
+async def get_country_stats(country: str, response: Response):
+    """Aggregate country-level intelligence: events, forecasts, displacement, severity score."""
+    import re as _re
+    country = country.strip()
+    if not country:
+        raise HTTPException(status_code=400, detail="country required")
+
+    response.headers["Cache-Control"] = "public, max-age=120"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    db = DB.get_conn()
+    pat = f"%{country.lower()}%"
+
+    # Source breakdown — exclude sensor/environment noise
+    src_rows = db.execute(
+        """SELECT source, COUNT(*) as n
+           FROM events
+           WHERE lower(country) LIKE ? AND release_ts_utc <= ?
+             AND source NOT IN ('firms','gpsjam','usgs')
+           GROUP BY source ORDER BY n DESC""",
+        (pat, now_iso),
+    ).fetchall()
+    source_counts: dict[str, int] = {r["source"]: r["n"] for r in src_rows}
+    total_events = sum(source_counts.values())
+
+    # All-time event count including sensors (for severity)
+    all_cnt = db.execute(
+        "SELECT COUNT(*) as n FROM events WHERE lower(country) LIKE ? AND release_ts_utc <= ?",
+        (pat, now_iso),
+    ).fetchone()
+    total_all = (all_cnt["n"] if all_cnt else 0)
+
+    # VIEWS forecast
+    vrow = db.execute(
+        """SELECT extra FROM events
+           WHERE source='views_forecast' AND lower(country) LIKE ?
+           ORDER BY raw_ts_utc DESC LIMIT 1""",
+        (pat,),
+    ).fetchone()
+    views_data: dict | None = None
+    if vrow:
+        try:
+            views_data = json.loads(vrow["extra"])
+        except Exception:
+            pass
+
+    # UNHCR displacement — parse from description field
+    urow = db.execute(
+        """SELECT description FROM events
+           WHERE source='unhcr' AND lower(country) LIKE ?
+           ORDER BY raw_ts_utc DESC LIMIT 1""",
+        (pat,),
+    ).fetchone()
+    displaced = 0
+    if urow and urow["description"]:
+        try:
+            nums = _re.findall(r"[\d,]+", urow["description"])
+            displaced = sum(int(n.replace(",", "")) for n in nums[:3])  # refugees+asylum+IDPs
+        except Exception:
+            pass
+
+    # Recent events feed (skip sensor floods and raw lat/lon-only rows)
+    recent_rows = db.execute(
+        """SELECT source, title, description, lat, lon, url, raw_ts_utc
+           FROM events
+           WHERE lower(country) LIKE ? AND release_ts_utc <= ?
+             AND title IS NOT NULL AND title != ''
+             AND source NOT IN ('firms','gpsjam','usgs','views_forecast','unhcr')
+           ORDER BY raw_ts_utc DESC LIMIT 12""",
+        (pat, now_iso),
+    ).fetchall()
+    recent_events = [dict(r) for r in recent_rows]
+
+    # Severity score 0-10
+    event_score  = min(5.0, total_events * 0.4)
+    views_score  = float((views_data or {}).get("prob", 0)) * 4.0
+    disp_score   = 1.0 if displaced > 2_000_000 else (0.5 if displaced > 200_000 else 0.0)
+    severity     = round(min(10.0, event_score + views_score + disp_score), 1)
+
+    return JSONResponse({
+        "country":        country,
+        "total_events":   total_events,
+        "source_breakdown": source_counts,
+        "severity_score": severity,
+        "views_forecast": views_data,
+        "displaced":      displaced,
+        "recent_events":  recent_events,
+    })
+
+
 @app.get("/api/brief/country/{country}")
 async def get_country_brief(country: str):
     """Generate an on-demand AI brief for a specific country."""
