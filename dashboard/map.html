@@ -1106,7 +1106,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <button id="search-btn" onclick="doSearch()" title="Search">⌕</button>
       <div id="search-results"></div>
     </div>
-    <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only display" style="border-color:#ef4444;color:#ef4444;display:none">MIL ALL</button>
+    <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only aircraft/ship display" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.2)">MIL ONLY</button>
     <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">3D GLOBE</button>
     <button id="bright-btn" class="mapmode-btn" onclick="cycleBrightness()" title="Map brightness">☀ DIM</button>
     <button id="measure-btn" class="mapmode-btn" onclick="toggleMeasure()" title="Measure distance (click two points)">⊢ DIST</button>
@@ -1171,7 +1171,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-count" id="cnt-ais" style="background:var(--cyan)">0</span>
             </label>
             <label class="layer-item">
-              <input type="checkbox" class="layer-cb" id="cb-tle" checked style="color:var(--purple)" onchange="toggleLayer('tle')">
+              <input type="checkbox" class="layer-cb" id="cb-tle" style="color:var(--purple)" onchange="toggleLayer('tle')">
               <span class="layer-icon" style="color:var(--purple)">◎</span>
               <span class="layer-name">SATELLITE</span>
               <span class="layer-count" id="cnt-tle" style="background:var(--purple)">0</span>
@@ -1201,13 +1201,13 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-count" id="cnt-notam" style="background:var(--yellow)">0</span>
             </label>
             <label class="layer-item">
-              <input type="checkbox" class="layer-cb" id="cb-fire" checked style="color:var(--orange)" onchange="toggleLayer('fire')">
+              <input type="checkbox" class="layer-cb" id="cb-fire" style="color:var(--orange)" onchange="toggleLayer('fire')">
               <span class="layer-icon" style="color:var(--orange)">🔥</span>
               <span class="layer-name">THERMAL</span>
               <span class="layer-count" id="cnt-fire" style="background:var(--orange)">0</span>
             </label>
             <label class="layer-item">
-              <input type="checkbox" class="layer-cb" id="cb-seismic" checked style="color:var(--lime)" onchange="toggleLayer('seismic')">
+              <input type="checkbox" class="layer-cb" id="cb-seismic" style="color:var(--lime)" onchange="toggleLayer('seismic')">
               <span class="layer-icon" style="color:var(--lime)">◉</span>
               <span class="layer-name">SEISMIC</span>
               <span class="layer-count" id="cnt-seismic" style="background:var(--lime)">0</span>
@@ -1225,7 +1225,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
           </div>
           <div class="layer-group-body">
             <label class="layer-item">
-              <input type="checkbox" class="layer-cb" id="cb-osint" checked style="color:var(--blue)" onchange="toggleLayer('osint')">
+              <input type="checkbox" class="layer-cb" id="cb-osint" style="color:var(--blue)" onchange="toggleLayer('osint')">
               <span class="layer-icon" style="color:var(--blue)">📡</span>
               <span class="layer-name">OSINT NEWS</span>
               <span class="layer-count" id="cnt-osint" style="background:var(--blue)">0</span>
@@ -1237,13 +1237,13 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-count" id="cnt-osintgeo" style="background:var(--orange)">0</span>
             </label>
             <label class="layer-item" id="lr-polymarket">
-              <input type="checkbox" class="layer-cb" id="cb-polymarket" checked style="color:var(--amber)" onchange="toggleLayer('polymarket')">
+              <input type="checkbox" class="layer-cb" id="cb-polymarket" style="color:var(--amber)" onchange="toggleLayer('polymarket')">
               <span class="layer-icon" style="color:var(--amber)">📊</span>
               <span class="layer-name">POLYMARKET ODDS</span>
               <span class="layer-count" id="cnt-polymarket" style="background:var(--amber)">0</span>
             </label>
             <label class="layer-item" id="lr-wikipedia">
-              <input type="checkbox" class="layer-cb" id="cb-wikipedia" checked style="color:var(--amber)" onchange="toggleLayer('wikipedia')">
+              <input type="checkbox" class="layer-cb" id="cb-wikipedia" style="color:var(--amber)" onchange="toggleLayer('wikipedia')">
               <span class="layer-icon" style="color:var(--amber)">📖</span>
               <span class="layer-name">WIKI SPIKES</span>
               <span class="layer-count" id="cnt-wikipedia" style="background:var(--amber)">0</span>
@@ -1341,13 +1341,13 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-count" id="cnt-milbase" style="background:var(--amber)">0</span>
             </label>
             <label class="layer-item" id="lr-cables">
-              <input type="checkbox" class="layer-cb" id="chk-cables" checked style="color:var(--cyan)" onchange="toggleCableLayer(this.checked)">
+              <input type="checkbox" class="layer-cb" id="chk-cables" style="color:var(--cyan)" onchange="toggleCableLayer(this.checked)">
               <span class="layer-icon" style="color:var(--cyan)">⌇</span>
               <span class="layer-name">SUBSEA CABLES</span>
               <span class="layer-count" id="cnt-cables" style="background:var(--cyan)">0</span>
             </label>
             <label class="layer-item" id="lr-pipelines">
-              <input type="checkbox" class="layer-cb" id="chk-pipelines" checked style="color:var(--orange)" onchange="togglePipelineLayer(this.checked)">
+              <input type="checkbox" class="layer-cb" id="chk-pipelines" style="color:var(--orange)" onchange="togglePipelineLayer(this.checked)">
               <span class="layer-icon" style="color:var(--orange)">⊸</span>
               <span class="layer-name">OIL/GAS PIPELINES</span>
               <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
@@ -1377,19 +1377,19 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-count" id="cnt-community" style="background:var(--green)">0</span>
             </label>
             <label class="layer-item" id="lr-unhcr">
-              <input type="checkbox" class="layer-cb" id="cb-unhcr" checked style="color:var(--purple)" onchange="toggleLayer('unhcr')">
+              <input type="checkbox" class="layer-cb" id="cb-unhcr" style="color:var(--purple)" onchange="toggleLayer('unhcr')">
               <span class="layer-icon" style="color:var(--purple)">⊙</span>
               <span class="layer-name">DISPLACEMENT</span>
               <span class="layer-count" id="cnt-unhcr" style="background:var(--purple)">0</span>
             </label>
             <label class="layer-item" id="lr-views">
-              <input type="checkbox" class="layer-cb" id="cb-views" checked style="color:var(--red)" onchange="toggleLayer('views')">
+              <input type="checkbox" class="layer-cb" id="cb-views" style="color:var(--red)" onchange="toggleLayer('views')">
               <span class="layer-icon" style="color:var(--red)">◉</span>
               <span class="layer-name">CONFLICT FORECAST</span>
               <span class="layer-count" id="cnt-views" style="background:var(--red)">0</span>
             </label>
             <label class="layer-item" id="lr-shodan">
-              <input type="checkbox" class="layer-cb" id="cb-shodan" checked style="color:var(--cyan)" onchange="toggleLayer('shodan')">
+              <input type="checkbox" class="layer-cb" id="cb-shodan" style="color:var(--cyan)" onchange="toggleLayer('shodan')">
               <span class="layer-icon" style="color:var(--cyan)">🔌</span>
               <span class="layer-name">CYBER INFRA</span>
               <span class="layer-count" id="cnt-shodan" style="background:var(--cyan)">0</span>
@@ -2461,6 +2461,7 @@ let _mapMode = '2d';
 let _map2d = null;
 let _cluster2d = {};   // layerKey → L.MarkerClusterGroup
 let _markers2d = {};   // positionStore key → L.Marker
+let _iodaCircles2d = {}; // key → L.circle for internet outage radius overlays
 let _globeInited = false;
 
 const _TRAIL_MAX = 5;
@@ -2486,7 +2487,7 @@ const _GLOBE_CAPS = {adsb:300,ais:200,tle:120,acled:200,notam:60,fire:60,seismic
 const _GLOBE_UNCAPPED = new Set(['adsb_emergency','dark_vessel','convergence','nuclear_threat','pipeline_threat','pikud_haoref','pikud']);
 
 // ── Globe display modes ───────────────────────────────────────────────────────
-let _milOnlyMode = false;   // hides civilian aircraft/ships when true
+let _milOnlyMode = true;   // hides civilian aircraft/ships when true (default on)
 
 // Conflict-zone countries (for protest filtering — only show protests here)
 const _CONFLICT_COUNTRIES = new Set([
@@ -2813,11 +2814,15 @@ const markers = {
 };
 let layers = {};
 const visible = {
-  adsb:true, ais:true, tle:true, acled:true, notam:true, osint:true,
-  fire:true, seismic:true, ew:true, community:true,
-  nuclear:true, mil_base:true, osint_geo:true, unhcr:true, views:true,
-  alerts:true, pikud:true, wikipedia:true, adsb_emergency:true,
-  polymarket:true, shodan:true,
+  // DEFAULT ON — militarily relevant layers
+  adsb:true, ais:true, acled:true, notam:true, ew:true,
+  mil_base:true, nuclear:true, alerts:true, pikud:true,
+  adsb_emergency:true, osint_geo:true, community:true,
+  // DEFAULT OFF — noisy / civilian / optional
+  tle:false, osint:false, fire:false, seismic:false,
+  unhcr:false, views:false, wikipedia:false, polymarket:false, shodan:false,
+  // cables/pipelines handled separately (not cluster-based)
+  cables:false, pipelines:false,
 };
 
 // ── Icons — return SVG/HTML for Leaflet DivIcon (globe.gl uses color/radius data) ─────────
@@ -2866,6 +2871,7 @@ const ICONS = {
   warspot:        {fn:()=>makeIcon('💀','#ef4444',18)},
   safecast:       {fn:()=>makeIcon('☢','#22c55e',17)},
   ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
+  ioda:           {fn:()=>makePulseIcon('🔴','#ef4444','NET↓')},
 };
 
 function iconFor(source, mil, extra){
@@ -3047,6 +3053,127 @@ function _render2dIsw(){
   }
 }
 
+// ── Military equipment image lookup (Wikipedia REST API) ──────────────────────
+// ICAO aircraft type designators → Wikipedia article title
+const _ACTYPE_WIKI = {
+  'F35A':'Lockheed Martin F-35 Lightning II','F35B':'Lockheed Martin F-35 Lightning II',
+  'F35C':'Lockheed Martin F-35 Lightning II','F35':'Lockheed Martin F-35 Lightning II',
+  'F22A':'Lockheed Martin F-22 Raptor','F22':'Lockheed Martin F-22 Raptor',
+  'F16C':'General Dynamics F-16 Fighting Falcon','F16D':'General Dynamics F-16 Fighting Falcon',
+  'F16':'General Dynamics F-16 Fighting Falcon',
+  'FA18':'McDonnell Douglas F/A-18 Hornet','F18C':'McDonnell Douglas F/A-18 Hornet',
+  'F18':'McDonnell Douglas F/A-18 Hornet',
+  'F15C':'McDonnell Douglas F-15 Eagle','F15E':'McDonnell Douglas F-15E Strike Eagle',
+  'B52H':'Boeing B-52 Stratofortress','B52':'Boeing B-52 Stratofortress',
+  'B2':'Northrop Grumman B-2 Spirit','B21':'Northrop Grumman B-21 Raider',
+  'B1B':'Rockwell B-1 Lancer','B1':'Rockwell B-1 Lancer',
+  'MQ9':'General Atomics MQ-9 Reaper','MQ1':'General Atomics MQ-1 Predator',
+  'RQ4B':'Northrop Grumman RQ-4 Global Hawk','RQ4':'Northrop Grumman RQ-4 Global Hawk',
+  'U2S':'Lockheed U-2','U2':'Lockheed U-2',
+  'RC135':'Boeing RC-135','RC135V':'Boeing RC-135',
+  'E3CF':'Boeing E-3 Sentry','E3TF':'Boeing E-3 Sentry','E3':'Boeing E-3 Sentry',
+  'E8C':'Northrop Grumman E-8 Joint STARS',
+  'P8':'Boeing P-8 Poseidon','P8A':'Boeing P-8 Poseidon',
+  'C17':'Boeing C-17 Globemaster III','C17A':'Boeing C-17 Globemaster III',
+  'C130':'Lockheed C-130 Hercules','C130J':'Lockheed C-130 Hercules',
+  'KC135':'Boeing KC-135 Stratotanker','KC46':'Boeing KC-46 Pegasus',
+  'V22':'Bell Boeing V-22 Osprey','MV22':'Bell Boeing V-22 Osprey',
+  'AH64':'Boeing AH-64 Apache','AH64D':'Boeing AH-64 Apache',
+  'UH60':'Sikorsky UH-60 Black Hawk','HH60':'Sikorsky UH-60 Black Hawk',
+  'CH47':'Boeing CH-47 Chinook','CH47D':'Boeing CH-47 Chinook',
+  'A10':'Fairchild Republic A-10 Thunderbolt II','A10C':'Fairchild Republic A-10 Thunderbolt II',
+  // Russian
+  'SU35':'Sukhoi Su-35','SU35S':'Sukhoi Su-35',
+  'SU34':'Sukhoi Su-34',
+  'SU27':'Sukhoi Su-27',
+  'SU25':'Sukhoi Su-25',
+  'SU24':'Sukhoi Su-24',
+  'MIG29':'Mikoyan MiG-29','MIG29S':'Mikoyan MiG-29',
+  'MIG31':'Mikoyan-Gurevich MiG-31',
+  'TU95':'Tupolev Tu-95','TU95MS':'Tupolev Tu-95',
+  'TU160':'Tupolev Tu-160',
+  'TU22M':'Tupolev Tu-22M',
+  'IL76':'Ilyushin Il-76',
+  'AN124':'Antonov An-124 Ruslan',
+  // Ships (vessel type codes)
+  'DDG':'Arleigh Burke-class destroyer',
+  'CG':'Ticonderoga-class cruiser',
+  'CVN':'Gerald R. Ford-class aircraft carrier',
+  'LHA':'America-class amphibious assault ship',
+  'SSN':'Virginia-class submarine',
+  'FFG':'Freedom-class littoral combat ship',
+};
+
+// Title/type pattern → Wikipedia article (checked last, partial match)
+const _TITLE_WIKI = [
+  {pat:'s-400',w:'S-400 missile system'},{pat:'s-300',w:'S-300 missile system'},
+  {pat:'patriot',w:'MIM-104 Patriot'},{pat:'thaad',w:'Terminal High Altitude Area Defense'},
+  {pat:'iron dome',w:'Iron Dome'},{pat:'david sling',w:"David's Sling"},
+  {pat:'arrow',w:'Arrow (Israeli missile)'},{pat:'iskander',w:'Iskander'},
+  {pat:'kalibr',w:'Kalibr (missile)'},{pat:'kinzhal',w:'Kh-47M2 Kinzhal'},
+  {pat:'hypersoni',w:'Hypersonic missile'},
+  {pat:'f-35',w:'Lockheed Martin F-35 Lightning II'},
+  {pat:'f-22',w:'Lockheed Martin F-22 Raptor'},
+  {pat:'f-16',w:'General Dynamics F-16 Fighting Falcon'},
+  {pat:'b-52',w:'Boeing B-52 Stratofortress'},
+  {pat:'su-35',w:'Sukhoi Su-35'},{pat:'su-34',w:'Sukhoi Su-34'},
+  {pat:'su-27',w:'Sukhoi Su-27'},{pat:'su-25',w:'Sukhoi Su-25'},
+  {pat:'mig-29',w:'Mikoyan MiG-29'},{pat:'mig-31',w:'Mikoyan-Gurevich MiG-31'},
+  {pat:'tu-95',w:'Tupolev Tu-95'},{pat:'tu-160',w:'Tupolev Tu-160'},
+  {pat:'abrams',w:'M1 Abrams'},{pat:'leopard 2',w:'Leopard 2'},
+  {pat:'t-72',w:'T-72'},{pat:'t-80',w:'T-80'},{pat:'t-90',w:'T-90'},
+  {pat:'challenger',w:'Challenger 2'},{pat:'leclerc',w:'Leclerc (tank)'},
+  {pat:'bradl',w:'Bradley Fighting Vehicle'},
+  {pat:'destroyer',w:'Arleigh Burke-class destroyer'},
+  {pat:'aircraft carrier',w:'Nimitz-class aircraft carrier'},
+  {pat:'submarine',w:'Virginia-class submarine'},
+  {pat:'frigate',w:'Oliver Hazard Perry-class frigate'},
+  {pat:'mq-9',w:'General Atomics MQ-9 Reaper'},
+  {pat:'global hawk',w:'Northrop Grumman RQ-4 Global Hawk'},
+  {pat:'predator',w:'General Atomics MQ-1 Predator'},
+];
+
+function _getWikiArticle(p){
+  // 1. Try ICAO ac_type from extra
+  let acType = '';
+  if(p.extra){
+    try{
+      const ex = typeof p.extra==='string'?JSON.parse(p.extra):p.extra;
+      acType = (ex.ac_type||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    }catch(e){}
+  }
+  if(acType && _ACTYPE_WIKI[acType]) return _ACTYPE_WIKI[acType];
+
+  // 2. Check p.type field (may contain aircraft code)
+  const typeUp = (p.type||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(typeUp && _ACTYPE_WIKI[typeUp]) return _ACTYPE_WIKI[typeUp];
+
+  // 3. Pattern match against title
+  const check = [(p.title||''), (p.type||''), (p.description||'')].join(' ').toLowerCase();
+  for(const {pat,w} of _TITLE_WIKI){
+    if(check.includes(pat)) return w;
+  }
+  return null;
+}
+
+// Async: fetch Wikipedia thumbnail and inject into popup image element
+function _loadEquipmentImage(article, imgContainerId){
+  const container = document.getElementById(imgContainerId);
+  if(!container) return;
+  fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article)}`)
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.thumbnail?.source){
+        const img = container.querySelector('img');
+        if(img){
+          img.src = data.thumbnail.source;
+          container.style.display = 'block';
+        }
+      }
+    })
+    .catch(()=>{});
+}
+
 // ── Popup builders ────────────────────────────────────────────────────────────
 function fmtTs(ts){
   if(!ts) return '—';
@@ -3054,14 +3181,34 @@ function fmtTs(ts){
   catch{ return ts; }
 }
 
+// Pending equipment image load — set by buildPopup, consumed by click handler
+let _pendingEqImg = null;
+
+function _mkEqImgPlaceholder(p){
+  const article = _getWikiArticle(p);
+  if(!article) return {html:'',article:null,id:null};
+  const id = 'eqimg_'+Math.random().toString(36).slice(2);
+  const html = `<div id="${id}" style="display:none;margin:.3rem 0;border:1px solid #1e2030;overflow:hidden">
+    <div style="font-size:.48rem;color:var(--dim2);padding:.15rem .3rem;border-bottom:1px solid #1e2030">◉ ${esc(article)}</div>
+    <img style="width:100%;max-height:90px;object-fit:cover;opacity:.85;display:block" src="" alt="" onerror="this.parentElement.style.display='none'" />
+  </div>`;
+  return {html, article, id};
+}
+
 function buildPopup(p){
   const isMil = parseInt(p.military_flag||0)===1;
   const src   = (p.source||'').toLowerCase();
-  const isConflict = ['acled','gdelt','osint_news'].includes(src);
+  const isConflict = ['acled','gdelt','osint_news','warspot','ucdp'].includes(src);
 
   let badge='';
   if(isMil)      badge='<div class="delay-badge">[DELAYED 24H — MILITARY]</div>';
   else if(isConflict) badge='<div class="delay-badge conflict">[DELAYED 1H — CONFLICT]</div>';
+
+  // Equipment image — for military assets and conflict equipment
+  const showImg = isMil || ['warspot','ucdp','acled','mil_base','nuclear'].includes(src)
+    || (p.category||'').includes('conflict') || (p.category||'').includes('equipment');
+  const eqImg = showImg ? _mkEqImgPlaceholder(p) : {html:'',article:null,id:null};
+  _pendingEqImg = eqImg.article ? eqImg : null;
 
   if(p.title){
     return `<div class="popup-inner">
@@ -3072,6 +3219,7 @@ function buildPopup(p){
       <div class="popup-row"><span class="popup-label">TIME</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
       ${p.description?`<div class="popup-row" style="flex-direction:column"><span class="popup-label">DESC</span><span class="popup-val" style="color:var(--dim2);font-size:.6rem;margin-top:.2rem">${esc(p.description.substring(0,220))}</span></div>`:''}
       ${p.url?`<div class="popup-row"><span class="popup-label">URL</span><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.6rem">OPEN ↗</a></div>`:''}
+      ${eqImg.html}
       ${badge}
     ${p.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
       <button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>
@@ -3084,15 +3232,28 @@ function buildPopup(p){
   const spd = p.speed_kts!=null?Math.round(p.speed_kts)+' kts':'—';
   const hdg = p.heading_deg!=null?Math.round(p.heading_deg)+'°':'—';
 
+  // Extra fields (ac_type, owner, reg for mil aircraft)
+  let extraHtml = '';
+  if(p.extra){
+    try{
+      const ex = typeof p.extra==='string'?JSON.parse(p.extra):p.extra;
+      if(ex.ac_type) extraHtml += `<div class="popup-row"><span class="popup-label">AC TYPE</span><span class="popup-val">${esc(ex.ac_type)}</span></div>`;
+      if(ex.reg)     extraHtml += `<div class="popup-row"><span class="popup-label">REG</span><span class="popup-val">${esc(ex.reg)}</span></div>`;
+      if(ex.owner)   extraHtml += `<div class="popup-row"><span class="popup-label">OWNER</span><span class="popup-val" style="font-size:.55rem">${esc(ex.owner.substring(0,40))}</span></div>`;
+    }catch(e){}
+  }
+
   return `<div class="popup-inner">
     <div class="popup-call">${esc(p.callsign||'UNKNOWN')}${isMil?' <span style="color:var(--red);font-size:.6rem">◈ MIL</span>':''}</div>
     <div class="popup-row"><span class="popup-label">SOURCE</span><span class="popup-val">${esc(src.toUpperCase())}</span></div>
     <div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val">${esc((p.type||'').toUpperCase())}</span></div>
+    ${extraHtml}
     <div class="popup-row"><span class="popup-label">ALTITUDE</span><span class="popup-val">${alt}</span></div>
     <div class="popup-row"><span class="popup-label">SPEED</span><span class="popup-val">${spd}</span></div>
     <div class="popup-row"><span class="popup-label">HEADING</span><span class="popup-val">${hdg}</span></div>
     <div class="popup-row"><span class="popup-label">COUNTRY</span><span class="popup-val">${esc(p.country||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">SEEN</span><span class="popup-val">${fmtTs(p.raw_ts_utc)}</span></div>
+    ${eqImg.html}
     ${badge}
     <div style="margin-top:.4rem;display:flex;gap:.3rem;flex-wrap:wrap">
       ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--amber)" onclick="openChat('${esc(p.country)}')">⚡ INTEL CHAT</button>`:''}
@@ -3222,6 +3383,15 @@ function addMarker2D(key, d){
   if(!_map2d || d.lat==null || d.lon==null) return;
   const lk = sourceToLayerKey(d.source||d._lk||'');
   if(!_cluster2d[lk]) return;
+  // Military-only filter: skip civilian aircraft/ships when mode is active
+  if(_milOnlyMode && (lk==='adsb'||lk==='ais')){
+    const isMil = parseInt(d.military_flag||0)===1;
+    if(!isMil){
+      // Remove if already added
+      if(_markers2d[key]){ _cluster2d[lk].removeLayer(_markers2d[key]); delete _markers2d[key]; }
+      return;
+    }
+  }
   const zoom  = _map2d.getZoom();
   const lIcon = buildZoomIcon(d, zoom);
 
@@ -3254,9 +3424,34 @@ function addMarker2D(key, d){
       _lastPopupData = d;
       const html = d._isComm ? buildCommunityPopup(d) : buildPopup(d);
       m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;max-width:280px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:300}).openPopup();
+      // Load equipment image asynchronously after popup renders
+      if(_pendingEqImg){
+        const eq = _pendingEqImg; _pendingEqImg = null;
+        setTimeout(()=>_loadEquipmentImage(eq.article, eq.id), 200);
+      }
     });
     _markers2d[key] = m;
     _cluster2d[lk].addLayer(m);
+  }
+
+  // IODA internet blackout — add radius circle showing affected area
+  if((d.source||'').toLowerCase()==='ioda' && _map2d){
+    if(_iodaCircles2d[key]){
+      _iodaCircles2d[key].setLatLng([d.lat,d.lon]);
+    } else {
+      let score=50;
+      try{ const ex=typeof d.extra==='string'?JSON.parse(d.extra):d.extra; score=ex.score||50; }catch(e){}
+      const radiusKm = score>80?600:score>50?400:250; // km based on severity
+      const c = L.circle([d.lat,d.lon],{
+        radius: radiusKm*1000,
+        color:'#ef4444', fillColor:'#ef4444',
+        fillOpacity:0.05, weight:1, opacity:0.4,
+        dashArray:'6 8',
+      });
+      c.bindTooltip(`⬤ NET BLACKOUT: ${(d.country||'').toUpperCase()} (score ${score})`,{className:'measure-tip',sticky:true});
+      if(visible.ew) c.addTo(_map2d);
+      _iodaCircles2d[key] = c;
+    }
   }
 }
 
@@ -3293,7 +3488,6 @@ async function toggleMapMode(){
     globeEl.style.display   = 'block';
     leafletEl.style.display = 'none';
     if(focusBar) focusBar.style.display = 'flex';
-    if(milBtn)   milBtn.style.display   = 'inline-block';
     const btn = document.getElementById('mapmode-btn');
     if(btn){ btn.textContent='2D MAP'; btn.classList.add('active'); }
     if(!_globeInited){
@@ -3319,7 +3513,6 @@ async function toggleMapMode(){
     globeEl.style.display   = 'none';
     leafletEl.style.display = 'block';
     if(focusBar) focusBar.style.display = 'none';
-    if(milBtn)   milBtn.style.display   = 'none';
     const btn = document.getElementById('mapmode-btn');
     if(btn){ btn.textContent='3D GLOBE'; btn.classList.remove('active'); }
     if(_map2d) setTimeout(()=>{ _map2d.invalidateSize(); _render2dIsw(); }, 80);
@@ -3488,7 +3681,7 @@ function sourceToLayerKey(source){
   if(['gdelt','osint_news'].includes(s)) return 'osint';
   if(s==='firms') return 'fire';
   if(s==='usgs')  return 'seismic';
-  if(s==='gpsjam')return 'ew';
+  if(s==='gpsjam'||s==='ioda') return 'ew';       // EW + internet blackouts
   if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
@@ -3784,6 +3977,12 @@ function toggleLayer(key){
     if(visible[key]) _cluster2d[key].addTo(_map2d);
     else _cluster2d[key].remove();
   }
+  // Show/hide IODA outage circles when 'ew' layer is toggled
+  if(key==='ew' && _map2d){
+    Object.values(_iodaCircles2d).forEach(c=>{
+      if(visible.ew) c.addTo(_map2d); else c.remove();
+    });
+  }
   if(_mapMode==='3d') _scheduleRebuild();
 }
 
@@ -3996,6 +4195,10 @@ function showGlobePopup(d,ev){
   _lastPopupData = d;
   const html=d._isComm?buildCommunityPopup(d):buildPopup(d);
   showGlobePopupRaw(html,ev);
+  if(_pendingEqImg){
+    const eq=_pendingEqImg; _pendingEqImg=null;
+    setTimeout(()=>_loadEquipmentImage(eq.article, eq.id), 200);
+  }
 }
 
 function showGlobePopupRaw(html,ev){
@@ -4042,6 +4245,19 @@ function toggleMilOnly(){
     btn.style.color = '#ef4444';
   }
   if(_mapMode==='3d') _scheduleRebuild();
+  // Rebuild 2D adsb/ais clusters to apply new filter
+  if(_map2d){
+    ['adsb','ais'].forEach(lk=>{
+      if(!_cluster2d[lk]) return;
+      // Clear all markers for this layer
+      _cluster2d[lk].clearLayers();
+      Object.keys(_markers2d).forEach(k=>{ if(k.includes('_'+lk)||k.includes(lk+'_')) delete _markers2d[k]; });
+      // Re-add from positionStore
+      for(const[k,d] of Object.entries(positionStore)){
+        if(sourceToLayerKey(d.source||'')===lk) addMarker2D(k,d);
+      }
+    });
+  }
 }
 
 function flyTo(lat,lon,alt){

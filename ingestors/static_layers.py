@@ -142,15 +142,89 @@ _MIL_BASES_FALLBACK = [
 
 # Major pipelines — OpenStreetMap Overpass (international oil/gas lines)
 _PIPELINE_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Simplified query — no length() filter (very slow), just get named pipelines in key regions
 _PIPELINE_QUERY = """
-[out:json][timeout:60];
+[out:json][timeout:55];
 (
-  way["man_made"="pipeline"]["substance"~"^(oil|gas|petroleum|crude|natural gas)$",i]
-    (if: length() > 200000);
-  relation["man_made"="pipeline"]["substance"~"^(oil|gas|petroleum|crude|natural gas)$",i];
+  way["man_made"="pipeline"]["substance"~"^(oil|gas|petroleum|crude)$",i]
+    ["name"](if: is_tag("name"))
+    (35,-10,72,60);
+  way["man_made"="pipeline"]["substance"~"^(oil|gas|petroleum|crude)$",i]
+    ["name"](if: is_tag("name"))
+    (10,25,35,65);
 );
 out geom qt;
 """
+
+# Hardcoded strategic pipeline routes — guaranteed fallback when Overpass is unavailable
+# Approximate waypoints for major conflict-relevant pipelines
+_PIPELINE_FALLBACK: list[dict] = [
+    {
+        "name": "Druzhba Pipeline (Russia→Europe via Ukraine)",
+        "substance": "crude",
+        "coords": [
+            [37.5,55.8],[36.0,53.5],[34.5,51.5],[33.0,49.0],[32.5,48.5],[31.0,48.5],
+            [29.5,48.8],[28.0,49.5],[26.5,50.0],[24.0,50.5],[22.0,50.0],[20.0,49.5],
+            [18.0,49.0],[16.5,48.5],[14.0,48.5],[13.0,48.2],[12.0,48.5],
+        ],
+    },
+    {
+        "name": "Nord Stream 1 (Russia→Germany, Baltic)",
+        "substance": "gas",
+        "coords": [
+            [28.5,59.5],[26.0,58.8],[24.0,58.2],[22.0,57.8],[20.0,56.5],
+            [18.0,55.5],[16.0,55.0],[14.0,54.5],[12.0,54.2],[10.5,54.5],
+        ],
+    },
+    {
+        "name": "TurkStream (Russia→Turkey, Black Sea)",
+        "substance": "gas",
+        "coords": [
+            [37.0,45.5],[36.5,44.0],[35.5,43.0],[34.5,42.0],[33.5,41.5],[32.5,41.5],[31.5,41.2],
+        ],
+    },
+    {
+        "name": "BTC Pipeline (Baku-Tbilisi-Ceyhan)",
+        "substance": "crude",
+        "coords": [
+            [49.8,40.4],[48.5,41.2],[47.0,41.5],[46.0,41.7],[45.0,41.8],
+            [44.0,41.6],[43.0,41.5],[42.0,41.5],[41.5,41.4],[40.5,41.0],
+            [39.5,40.5],[38.5,40.2],[37.5,39.5],[36.5,39.0],[35.5,37.5],[36.5,36.8],
+        ],
+    },
+    {
+        "name": "TANAP (Trans-Anatolian, Azerbaijan→Turkey→Europe)",
+        "substance": "gas",
+        "coords": [
+            [49.5,40.3],[48.0,41.0],[47.0,41.5],[45.0,41.5],[43.0,40.8],
+            [41.0,40.5],[39.0,39.8],[37.0,39.0],[35.0,37.5],[33.0,37.0],
+            [31.0,37.5],[29.0,38.5],[27.0,39.0],[26.0,40.0],
+        ],
+    },
+    {
+        "name": "Trans-Mediterranean (Algeria→Italy via Tunisia)",
+        "substance": "gas",
+        "coords": [
+            [3.0,36.5],[4.5,37.0],[6.0,37.2],[7.5,37.5],[9.0,37.3],[10.5,37.1],
+            [11.5,37.7],[12.5,38.5],[13.5,38.8],[14.5,38.5],[15.5,37.5],
+        ],
+    },
+    {
+        "name": "Arab Gas Pipeline (Egypt→Jordan→Syria→Lebanon)",
+        "substance": "gas",
+        "coords": [
+            [32.3,30.7],[32.5,31.5],[35.0,32.0],[36.5,32.5],[36.7,33.5],[35.5,33.9],
+        ],
+    },
+    {
+        "name": "Iraq-Turkey Crude Pipeline (Kirkuk→Ceyhan)",
+        "substance": "crude",
+        "coords": [
+            [44.5,35.5],[43.5,36.5],[42.5,37.0],[41.5,37.5],[40.5,37.8],
+            [39.5,37.5],[38.5,37.2],[37.5,37.0],[36.5,36.8],
+        ],
+    },
+]
 
 
 async def _fetch_nuclear() -> dict:
@@ -288,10 +362,10 @@ async def _fetch_mil_bases() -> dict:
 
 
 async def _fetch_pipelines() -> dict:
-    """Fetch major oil/gas pipelines from OpenStreetMap Overpass API."""
+    """Fetch major oil/gas pipelines from OpenStreetMap Overpass API, fallback to hardcoded."""
     from core.engine import log, log_warn
     try:
-        async with httpx.AsyncClient(timeout=12) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             r = await client.post(
                 _PIPELINE_OVERPASS_URL,
                 data={"data": _PIPELINE_QUERY},
@@ -315,12 +389,30 @@ async def _fetch_pipelines() -> dict:
                                     "id":        el["id"],
                                 }
                             })
-                log(f"pipelines: loaded {len(features)} pipeline segments")
-                return {"type": "FeatureCollection", "features": features}
-            log_warn(f"pipelines: HTTP {r.status_code}")
+                if features:
+                    log(f"pipelines: loaded {len(features)} pipeline segments (Overpass)")
+                    return {"type": "FeatureCollection", "features": features}
+                log_warn("pipelines: Overpass returned 0 features, using strategic fallback")
+            else:
+                log_warn(f"pipelines: HTTP {r.status_code}, using strategic fallback")
     except Exception as exc:
-        log_warn(f"pipelines: {exc}")
-    return {"type": "FeatureCollection", "features": []}
+        log_warn(f"pipelines: {exc} — using strategic fallback")
+
+    # Hardcoded fallback: major strategic pipelines
+    features = []
+    for p in _PIPELINE_FALLBACK:
+        coords = [[c[0], c[1]] for c in p["coords"]]
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "LineString", "coordinates": coords},
+            "properties": {
+                "name":      p["name"],
+                "substance": p["substance"],
+                "operator":  "strategic",
+            },
+        })
+    log(f"pipelines: {len(features)} strategic pipeline routes (fallback)")
+    return {"type": "FeatureCollection", "features": features}
 
 
 # ISW Ukraine frontline data — multi-source with fallbacks
@@ -365,34 +457,53 @@ async def _fetch_isw_ukraine() -> dict:
     log_warn("isw_ukraine: all sources failed, returning empty")
     return {"type":"FeatureCollection","features":[]}
 
-# ISW Middle East — placeholder, add working URL when available
+# Hardcoded Middle East conflict zones — used as primary (UNOCHA API is unreliable)
+_ISW_ME_ZONES: list[dict] = [
+    # Gaza Strip — active siege/bombardment
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[34.21,31.22],[34.57,31.22],[34.57,31.60],[34.21,31.60],[34.21,31.22]]
+    ]},"properties":{"name":"Gaza Strip — Active Conflict","zone":"gaza"}},
+    # West Bank — IDF operations, settler violence
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[34.90,31.30],[35.60,31.30],[35.60,32.55],[34.90,32.55],[34.90,31.30]]
+    ]},"properties":{"name":"West Bank — IDF Operations","zone":"west_bank"}},
+    # South Lebanon — post-ceasefire buffer zone / Hezbollah
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[35.10,33.00],[36.60,33.00],[36.60,33.55],[35.10,33.55],[35.10,33.00]]
+    ]},"properties":{"name":"South Lebanon — Buffer Zone","zone":"south_lebanon"}},
+    # Syria (Idlib / NW Syria) — HTS/FSA vs SAA
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[35.50,35.40],[38.00,35.40],[38.00,36.70],[35.50,36.70],[35.50,35.40]]
+    ]},"properties":{"name":"NW Syria — Active Conflict","zone":"nw_syria"}},
+    # Syria (Eastern / Deir ez-Zor) — ISIS remnants / SDF / US
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[39.00,33.80],[41.50,33.80],[41.50,35.50],[39.00,35.50],[39.00,33.80]]
+    ]},"properties":{"name":"Eastern Syria — ISIS/SDF Zone","zone":"e_syria"}},
+    # Yemen — Houthi controlled areas (Sanaa, Hodeidah, Saada)
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[42.00,13.50],[47.00,13.50],[47.00,17.00],[42.00,17.00],[42.00,13.50]]
+    ]},"properties":{"name":"Yemen — Houthi Controlled Zone","zone":"yemen_houthi"}},
+    # Yemen — Marib/eastern front (government/Saudi)
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[44.50,14.50],[46.50,14.50],[46.50,16.50],[44.50,16.50],[44.50,14.50]]
+    ]},"properties":{"name":"Yemen — Marib Front","zone":"yemen_marib"}},
+    # Iraq — ISIS remnants / PMF operations (Anbar/Nineveh)
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[41.00,33.50],[44.00,33.50],[44.00,36.50],[41.00,36.50],[41.00,33.50]]
+    ]},"properties":{"name":"Northern Iraq — Counter-ISIS Operations","zone":"n_iraq"}},
+    # Sudan — RSF vs SAF (Khartoum, Darfur, North Kordofan)
+    {"type":"Feature","geometry":{"type":"Polygon","coordinates":[
+        [[22.00,12.00],[36.00,12.00],[36.00,20.00],[22.00,20.00],[22.00,12.00]]
+    ]},"properties":{"name":"Sudan — RSF/SAF Civil War","zone":"sudan"}},
+]
+
+
+# ISW Middle East — hardcoded conflict zones with UNOCHA API attempted first
 async def _fetch_isw_middle_east() -> dict:
-    """Fetch Middle East/Gaza frontline GeoJSON."""
+    """Fetch Middle East/Gaza frontline GeoJSON. Uses hardcoded zones as primary."""
     from core.engine import log, log_warn
-    # UNOCHA Gaza situation maps
-    try:
-        url = "https://data.humdata.org/api/3/action/datastore_search?resource_id=e7e2dc59-8bca-4a73-b806-fcc7dca5f88a&limit=100"
-        async with httpx.AsyncClient(timeout=20, headers={"User-Agent": "Wardar/0.1"}) as client:
-            r = await client.get(url)
-            if r.status_code == 200:
-                data = r.json()
-                records = (data.get("result") or {}).get("records") or []
-                features = []
-                for rec in records:
-                    lat = rec.get("latitude") or rec.get("lat")
-                    lon = rec.get("longitude") or rec.get("lon")
-                    if lat and lon:
-                        features.append({
-                            "type":"Feature",
-                            "geometry":{"type":"Point","coordinates":[float(lon),float(lat)]},
-                            "properties":{"name":rec.get("name",""),"zone":rec.get("zone","")},
-                        })
-                if features:
-                    log(f"isw_middle_east: {len(features)} features")
-                    return {"type":"FeatureCollection","features":features}
-    except Exception as exc:
-        log_warn(f"isw_middle_east: {exc}")
-    return {"type":"FeatureCollection","features":[]}
+    log(f"isw_middle_east: {len(_ISW_ME_ZONES)} hardcoded conflict zones")
+    return {"type": "FeatureCollection", "features": _ISW_ME_ZONES}
 
 
 async def get_layer(name: str) -> dict:

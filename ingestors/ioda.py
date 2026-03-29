@@ -37,7 +37,7 @@ _CONFLICT_COUNTRIES: dict[str, dict] = {
 }
 
 # Minimum severity score to report (0-100+, higher = worse outage)
-_MIN_SCORE = 20
+_MIN_SCORE = 10
 
 
 async def fetch() -> list[dict]:

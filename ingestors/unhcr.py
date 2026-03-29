@@ -33,12 +33,31 @@ _CAPITALS = {
     "CMR": (3.87,   11.52,  "Cameroon"),
     "SSD": (4.85,   31.62,  "South Sudan"),
     "LBY": (32.90,  13.18,  "Libya"),
+    # Additional active displacement crises (2024+)
+    "PSE": (31.90,  35.20,  "Palestine"),
+    "LBN": (33.89,  35.50,  "Lebanon"),
+    "MYS": (3.14,  101.69,  "Malaysia"),
+    "IRN": (35.68,  51.39,  "Iran"),
+    "RUS": (55.75,  37.62,  "Russia"),
+    "BFA": (12.36,  -1.53,  "Burkina Faso"),
+    "GIN": (9.54,  -13.68,  "Guinea"),
+    "TCD": (12.11,  15.04,  "Chad"),
+    "MDG": (-18.91, 47.54,  "Madagascar"),
+    "ZWE": (-17.82, 31.05,  "Zimbabwe"),
+    "ZMB": (-15.42, 28.28,  "Zambia"),
+    "KEN": (-1.28,  36.82,  "Kenya"),
+    "TZA": (-6.77,  39.27,  "Tanzania"),
+    "UGA": (0.32,   32.58,  "Uganda"),
+    "RWA": (-1.94,  30.06,  "Rwanda"),
+    "GEO": (41.69,  44.83,  "Georgia"),
+    "AZE": (40.41,  49.87,  "Azerbaijan"),
+    "ARM": (40.18,  44.51,  "Armenia"),
 }
 
 _UNHCR_URL = (
     "https://api.unhcr.org/population/v1/population/"
     "?limit=100&dataset=population&displayType=totals"
-    "&yearFrom=2023&yearTo=2023&sortBy=displaced_total&sortOrder=desc"
+    "&yearFrom=2022&yearTo=2024&sortBy=displaced_total&sortOrder=desc"
 )
 
 

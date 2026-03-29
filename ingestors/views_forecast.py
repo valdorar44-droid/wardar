@@ -74,7 +74,7 @@ async def fetch() -> list[dict]:
             prob = float(fc.get("prob_low") or fc.get("probability") or fc.get("fatality_risk") or 0)
             step = int(fc.get("step") or fc.get("month_ahead") or 1)
 
-            if prob < 0.3:
+            if prob < 0.1:
                 continue  # only show elevated risk
 
             coords = _COUNTRY_CENTROIDS.get(str(country_id).upper())
