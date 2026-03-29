@@ -41,6 +41,10 @@ OPENSKY_PASSWORD      = _s("OPENSKY_PASSWORD", "")
 ENABLE_ADSB           = _b("ENABLE_ADSB", True)
 ENABLE_OPENSKY        = _b("ENABLE_OPENSKY", True)   # fallback if no ADS-B Exchange key
 
+# ── Airplanes.live (free military aircraft feed) ──────
+ENABLE_MIL_AIRCRAFT       = _b("ENABLE_MIL_AIRCRAFT",       True)
+MIL_AIRCRAFT_INTERVAL_SEC = _i("MIL_AIRCRAFT_INTERVAL_SEC", 30)   # every 30s (1 req/sec limit)
+
 # ── AIS Sources ───────────────────────────────────────
 AISSTREAM_API_KEY = _s("AISSTREAM_API_KEY", "")      # aisstream.io API key
 ENABLE_AIS        = _b("ENABLE_AIS", True)
@@ -169,3 +173,21 @@ INTEL_BRIEF_INTERVAL_SEC  = _i("INTEL_BRIEF_INTERVAL_SEC",  21600)  # 6h
 # ── IODA Internet Blackout Monitoring ────────────────────────────────────────
 ENABLE_IODA         = _b("ENABLE_IODA",        True)   # free, no auth
 IODA_INTERVAL_SEC   = _i("IODA_INTERVAL_SEC",  1800)   # every 30 min
+
+# ── WarSpotting (Ukraine equipment losses) ─────────────────────────────────────
+ENABLE_WARSPOT         = _b("ENABLE_WARSPOT",        True)   # free, User-Agent required
+WARSPOT_INTERVAL_SEC   = _i("WARSPOT_INTERVAL_SEC",  3600)   # hourly
+
+# ── Safecast (global radiation monitoring) ────────────────────────────────────
+ENABLE_SAFECAST         = _b("ENABLE_SAFECAST",        True)   # free, CC0 data
+SAFECAST_INTERVAL_SEC   = _i("SAFECAST_INTERVAL_SEC",  3600)   # hourly
+SAFECAST_ALERT_CPM      = _i("SAFECAST_ALERT_CPM",     100)    # alert threshold (normal ~20-30 CPM)
+
+# ── OFAC / EU Sanctions (vessel + aircraft cross-reference) ───────────────────
+ENABLE_OFAC           = _b("ENABLE_OFAC",           True)   # free XML download
+OFAC_INTERVAL_SEC     = _i("OFAC_INTERVAL_SEC",     86400)  # daily
+
+# ── UCDP Conflict Events (Uppsala University) ─────────────────────────────────
+UCDP_TOKEN            = _s("UCDP_TOKEN",            "")     # free token via email
+ENABLE_UCDP           = _b("ENABLE_UCDP",           True)   # enable if token set
+UCDP_INTERVAL_SEC     = _i("UCDP_INTERVAL_SEC",     3600)   # hourly

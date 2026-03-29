@@ -2185,6 +2185,9 @@ const SRC_COLORS = {
   twz:'var(--red)',usni:'var(--cyan)',bellingcat:'var(--orange)',oryx:'var(--orange)',
   defense_news:'var(--blue)',defense_one:'var(--blue)',ukmod:'var(--cyan)',
   rusi:'var(--purple)',gcaptain:'var(--cyan)',krebs:'var(--fuchsia)',
+  pentagon:'var(--blue)',africom:'var(--amber)',navy:'var(--cyan)',
+  un_peace:'var(--blue)',crisisgroup:'var(--red)',state_dept:'var(--blue)',
+  warspot:'var(--red)',safecast:'var(--lime)',ucdp:'var(--orange)',
   nuclear:'var(--yellow)', mil_base:'var(--amber)', osint_geo:'var(--orange)',
   unhcr:'var(--purple)', views_forecast:'var(--red)',
   dark_vessel:'var(--cyan)', convergence:'var(--amber)',
@@ -2858,6 +2861,9 @@ const ICONS = {
   adsb_emergency: {fn:()=>makePulseIcon('🆘','#ef4444','SQUAWK')},
   polymarket:     {fn:()=>makeIcon('📊','#f59e0b',17)},
   shodan:         {fn:()=>makeIcon('🔌','#06b6d4',17)},
+  warspot:        {fn:()=>makeIcon('💀','#ef4444',18)},
+  safecast:       {fn:()=>makeIcon('☢','#22c55e',17)},
+  ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
 };
 
 function iconFor(source, mil, extra){
@@ -3472,7 +3478,7 @@ function sourceToLayerKey(source){
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
   if(s==='shodan')         return 'shodan';
-  if(['adsb','opensky'].includes(s)) return 'adsb';
+  if(['adsb','opensky','airplaneslive'].includes(s)) return 'adsb';
   if(s==='ais')   return 'ais';
   if(s==='tle')   return 'tle';
   if(s==='acled') return 'acled';
@@ -3481,6 +3487,8 @@ function sourceToLayerKey(source){
   if(s==='firms') return 'fire';
   if(s==='usgs')  return 'seismic';
   if(s==='gpsjam')return 'ew';
+  if(s==='warspot'||s==='ucdp') return 'acled';  // conflict events layer
+  if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
   if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
   if(s==='unhcr') return 'unhcr';

@@ -508,6 +508,14 @@ _fetch_centcom       = _make_rss_fetcher('centcom',    'https://www.centcom.mil/
 _fetch_reuters_world = _make_rss_fetcher('reuters',    'https://feeds.reuters.com/reuters/worldNews')
 _fetch_bbc_world     = _make_rss_fetcher('bbc',        'https://feeds.bbci.co.uk/news/world/rss.xml')
 
+# ── New military command + expert feeds ──────────────────────────────────────
+_fetch_pentagon      = _make_rss_fetcher('pentagon',   'https://www.defense.gov/News/RSS/')
+_fetch_africom       = _make_rss_fetcher('africom',    'https://www.africom.mil/rss/press-releases')
+_fetch_navy          = _make_rss_fetcher('navy',       'https://www.navy.mil/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=1&max=10')
+_fetch_un_peace      = _make_rss_fetcher('un_peace',   'https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/feed/rss.xml')
+_fetch_crisisgroup   = _make_rss_fetcher('crisisgroup','https://www.crisisgroup.org/rss/crisiswatch')
+_fetch_state_dept    = _make_rss_fetcher('state_dept', 'https://www.state.gov/rss-feeds/', atom=False)
+
 
 async def fetch() -> list[dict]:
     from core.engine import log
@@ -525,7 +533,6 @@ async def fetch() -> list[dict]:
         _fetch_rusi_rss(),
         _fetch_gcaptain_rss(),
         _fetch_krebs_rss(),
-        # New feeds
         _fetch_isw(),
         _fetch_aljazeera(),
         _fetch_middleeastmon(),
@@ -536,6 +543,13 @@ async def fetch() -> list[dict]:
         _fetch_centcom(),
         _fetch_reuters_world(),
         _fetch_bbc_world(),
+        # Military command + expert feeds
+        _fetch_pentagon(),
+        _fetch_africom(),
+        _fetch_navy(),
+        _fetch_un_peace(),
+        _fetch_crisisgroup(),
+        _fetch_state_dept(),
     )
     results = []
     for chunk in results_list:

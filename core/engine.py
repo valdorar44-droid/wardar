@@ -405,6 +405,66 @@ async def _tick_ioda():
     except Exception as exc:
         log_err(f"tick_ioda: {exc}")
 
+async def _tick_mil_aircraft():
+    if not C.ENABLE_MIL_AIRCRAFT:
+        return
+    try:
+        from ingestors import mil_aircraft
+        positions = await mil_aircraft.fetch()
+        n = _save_positions(positions)
+        if positions:
+            await _broadcast({"type": "positions", "sources": ["airplaneslive"], "data": positions})
+    except Exception as exc:
+        log_err(f"tick_mil_aircraft: {exc}")
+
+async def _tick_warspot():
+    if not C.ENABLE_WARSPOT:
+        return
+    try:
+        from ingestors import warspot
+        events = await warspot.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["warspot"], limit=200)
+            await _broadcast({"type": "events", "sources": ["warspot"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_warspot: {exc}")
+
+async def _tick_safecast():
+    if not C.ENABLE_SAFECAST:
+        return
+    try:
+        from ingestors import safecast
+        events = await safecast.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["safecast"], limit=500)
+            await _broadcast({"type": "events", "sources": ["safecast"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_safecast: {exc}")
+
+async def _tick_ofac():
+    if not C.ENABLE_OFAC:
+        return
+    try:
+        from ingestors import ofac_sanctions
+        await ofac_sanctions.refresh()
+    except Exception as exc:
+        log_err(f"tick_ofac: {exc}")
+
+async def _tick_ucdp():
+    if not C.ENABLE_UCDP or not C.UCDP_TOKEN:
+        return
+    try:
+        from ingestors import ucdp
+        events = await ucdp.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["ucdp"], limit=300)
+            await _broadcast({"type": "events", "sources": ["ucdp"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_ucdp: {exc}")
+
 async def _tick_intel_brief():
     if not C.ENABLE_INTEL_BRIEF or not C.ANTHROPIC_API_KEY:
         return
@@ -473,6 +533,11 @@ async def start():
         asyncio.create_task(_run_every(_tick_shodan,       C.SHODAN_INTERVAL_SEC,      "shodan")),
         asyncio.create_task(_run_every(_tick_ioda,          C.IODA_INTERVAL_SEC,        "ioda")),
         asyncio.create_task(_run_every(_tick_intel_brief,  C.INTEL_BRIEF_INTERVAL_SEC, "intel_brief")),
+        asyncio.create_task(_run_every(_tick_mil_aircraft, C.MIL_AIRCRAFT_INTERVAL_SEC,"mil_aircraft")),
+        asyncio.create_task(_run_every(_tick_warspot,      C.WARSPOT_INTERVAL_SEC,     "warspot")),
+        asyncio.create_task(_run_every(_tick_safecast,     C.SAFECAST_INTERVAL_SEC,    "safecast")),
+        asyncio.create_task(_run_every(_tick_ofac,         C.OFAC_INTERVAL_SEC,        "ofac")),
+        asyncio.create_task(_run_every(_tick_ucdp,         C.UCDP_INTERVAL_SEC,        "ucdp")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks
