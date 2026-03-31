@@ -564,6 +564,40 @@ body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(
 .watch-btn.watching{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red)}
 .watch-btn.watching:hover{background:rgba(239,68,68,.2)}
 
+/* ── PHASE 8: ANNOTATIONS ── */
+.ann-section{border-top:1px solid var(--border);margin-top:.4rem;padding-top:.35rem}
+.ann-hdr{font-size:.44rem;letter-spacing:.1em;color:var(--purple);padding:.2rem 0;
+  display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.ann-hdr:hover{color:#c4b5fd}
+.ann-body{display:none}
+.ann-body.open{display:block}
+.ann-item{padding:.35rem 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.5rem;
+  line-height:1.6;color:var(--text)}
+.ann-item:last-child{border-bottom:none}
+.ann-meta{font-size:.42rem;color:var(--dim2);margin-top:.15rem;display:flex;gap:.5rem;align-items:center}
+.ann-vote{background:none;border:1px solid var(--border);color:var(--dim2);
+  font-family:var(--font);font-size:.42rem;cursor:pointer;padding:.05rem .25rem;
+  letter-spacing:.06em;transition:color .15s}
+.ann-vote:hover{color:var(--cyan);border-color:var(--cyan)}
+.ann-add-btn{width:100%;margin-top:.25rem;padding:.18rem .4rem;
+  background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);
+  color:#a78bfa;font-family:var(--font);font-size:.46rem;
+  letter-spacing:.09em;cursor:pointer;text-align:center}
+.ann-add-btn:hover{background:rgba(167,139,250,.2)}
+.ann-form{margin-top:.3rem;display:none}
+.ann-form.open{display:block}
+.ann-textarea{width:100%;background:#0b0b14;border:1px solid var(--border);
+  color:var(--text);font-family:var(--font);font-size:.48rem;
+  padding:.3rem;resize:vertical;min-height:60px;max-height:120px;
+  box-sizing:border-box;line-height:1.5}
+.ann-textarea:focus{outline:none;border-color:#a78bfa}
+.ann-submit{margin-top:.2rem;padding:.18rem .5rem;
+  background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.4);
+  color:#a78bfa;font-family:var(--font);font-size:.46rem;cursor:pointer;
+  letter-spacing:.09em;float:right}
+.ann-submit:hover{background:rgba(167,139,250,.3)}
+.ann-char{font-size:.42rem;color:var(--dim2);margin-top:.15rem}
+
 /* ── SITREP / AI BRIEF PANE ── */
 #sitrep-body{
   flex:1;overflow-y:auto;padding:.75rem;
@@ -2235,6 +2269,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
           <button style="background:none;border:none;color:var(--dim2);font-family:var(--font);font-size:.44rem;cursor:pointer;letter-spacing:.06em" onclick="clearWatchlist()">CLEAR ALL</button>
         </div>
         <div id="wl-list"><div class="wl-empty">NO ENTITIES TRACKED — CLICK WATCH IN POPUP</div></div>
+        <button id="wl-share-btn" onclick="shareWatchlist()" style="width:100%;margin-top:.4rem;padding:.2rem .5rem;
+          background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);color:var(--cyan);
+          font-family:var(--font);font-size:.46rem;letter-spacing:.09em;cursor:pointer">
+          🔗 SHARE WATCHLIST VIA LINK
+        </button>
       </div>
     </div>
   </div>
@@ -3951,6 +3990,23 @@ function buildPopup(p){
       onclick="isWatched('${esc(src)}','${esc(p.callsign||'')}') ? removeFromWatchlist('${esc(src)}','${esc(p.callsign||'')}') : addToWatchlist('${esc(src)}','${esc(p.callsign||'')}','${esc(p.callsign||'')}')">
       ${isWatched(src,p.callsign)?'🔴 UNWATCH':'👁 WATCH ENTITY'}
     </button>
+    <div class="ann-section" id="ann-${esc(src)}-${esc(p.callsign||'')}">
+      <div class="ann-hdr" onclick="toggleAnnotations('${esc(src)}','${esc(p.callsign||'')}')">
+        <span>✍ ANALYST NOTES</span><span id="ann-toggle-${esc(src)}-${esc(p.callsign||'')}">▶ EXPAND</span>
+      </div>
+      <div class="ann-body" id="ann-body-${esc(src)}-${esc(p.callsign||'')}">
+        <div id="ann-list-${esc(src)}-${esc(p.callsign||'')}" style="color:var(--dim2);font-size:.48rem;padding:.3rem 0">LOADING…</div>
+        <button class="ann-add-btn" onclick="toggleAnnotationForm('${esc(src)}','${esc(p.callsign||'')}')">+ ADD ANALYST NOTE</button>
+        <div class="ann-form" id="ann-form-${esc(src)}-${esc(p.callsign||'')}">
+          <textarea class="ann-textarea" id="ann-text-${esc(src)}-${esc(p.callsign||'')}"
+            maxlength="500" placeholder="Add analyst note (max 500 chars)…"
+            oninput="document.getElementById('ann-chr-${esc(src)}-${esc(p.callsign||'')}').textContent=(500-this.value.length)+' left'"></textarea>
+          <div class="ann-char" id="ann-chr-${esc(src)}-${esc(p.callsign||'')}">500 left</div>
+          <button class="ann-submit" onclick="submitAnnotation('${esc(src)}','${esc(p.callsign||'')}')">SUBMIT NOTE ▶</button>
+          <div style="clear:both"></div>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -5637,6 +5693,148 @@ async function loadDigest(){
     console.error('loadDigest:', e);
   }
 }
+
+// ── Phase 8: Entity Annotations ──────────────────────────────────────────────
+
+function toggleAnnotations(src, cs){
+  const bodyId = `ann-body-${src}-${cs}`;
+  const togId  = `ann-toggle-${src}-${cs}`;
+  const body   = document.getElementById(bodyId);
+  const tog    = document.getElementById(togId);
+  if(!body) return;
+  if(body.classList.contains('open')){
+    body.classList.remove('open');
+    if(tog) tog.textContent = '▶ EXPAND';
+  } else {
+    body.classList.add('open');
+    if(tog) tog.textContent = '▼ COLLAPSE';
+    loadAnnotations(src, cs);
+  }
+}
+
+async function loadAnnotations(src, cs){
+  const listEl = document.getElementById(`ann-list-${src}-${cs}`);
+  if(!listEl) return;
+  listEl.innerHTML = '<span style="color:var(--dim2);font-size:.46rem">LOADING…</span>';
+  try{
+    const data = await fetch(`/api/annotations/${encodeURIComponent(src)}/${encodeURIComponent(cs)}`).then(r=>r.json());
+    if(!data.data || !data.data.length){
+      listEl.innerHTML = '<span style="color:var(--dim2);font-size:.48rem">NO ANALYST NOTES YET — BE FIRST TO ANNOTATE</span>';
+      return;
+    }
+    listEl.innerHTML = data.data.map(a=>{
+      const net = (a.upvotes||0)-(a.downvotes||0);
+      const ts  = a.created_at ? a.created_at.slice(0,16).replace('T',' ')+' UTC' : '';
+      return `<div class="ann-item">
+        <div>${esc(a.body)}</div>
+        <div class="ann-meta">
+          <span style="color:${net>=0?'var(--green)':'var(--red)'}">${net>=0?'+':''}${net} net</span>
+          <button class="ann-vote" onclick="voteAnnotation(${a.id},'${esc(src)}','${esc(cs)}',1)">▲ ${a.upvotes||0}</button>
+          <button class="ann-vote" onclick="voteAnnotation(${a.id},'${esc(src)}','${esc(cs)}',-1)">▼ ${a.downvotes||0}</button>
+          <span>${ts}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){
+    listEl.innerHTML = '<span style="color:var(--red);font-size:.46rem">LOAD FAILED</span>';
+    console.error('loadAnnotations:', e);
+  }
+}
+
+function toggleAnnotationForm(src, cs){
+  const form = document.getElementById(`ann-form-${src}-${cs}`);
+  if(!form) return;
+  form.classList.toggle('open');
+}
+
+async function submitAnnotation(src, cs){
+  const ta = document.getElementById(`ann-text-${src}-${cs}`);
+  if(!ta) return;
+  const body = ta.value.trim();
+  if(body.length < 3){ showToast('NOTE TOO SHORT — MIN 3 CHARS'); return; }
+  const token = getAuthorToken();
+  try{
+    const r = await fetch(`/api/annotations/${encodeURIComponent(src)}/${encodeURIComponent(cs)}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({author_token: token, body})
+    });
+    if(!r.ok) throw new Error(r.status);
+    ta.value = '';
+    const chrEl = document.getElementById(`ann-chr-${src}-${cs}`);
+    if(chrEl) chrEl.textContent = '500 left';
+    const form = document.getElementById(`ann-form-${src}-${cs}`);
+    if(form) form.classList.remove('open');
+    showToast('ANNOTATION SUBMITTED');
+    await loadAnnotations(src, cs);
+  } catch(e){
+    showToast('SUBMIT FAILED — CHECK CONSOLE');
+    console.error('submitAnnotation:', e);
+  }
+}
+
+async function voteAnnotation(annId, src, cs, vote){
+  const token = getAuthorToken();
+  try{
+    await fetch(`/api/annotations/${annId}/vote`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({voter_token: token, vote})
+    });
+    await loadAnnotations(src, cs);
+  } catch(e){ console.error('voteAnnotation:', e); }
+}
+
+// ── Phase 8: Shared Watchlists ────────────────────────────────────────────────
+
+async function shareWatchlist(){
+  const wl = _getWatchlist();
+  if(!wl.length){ showToast('WATCHLIST EMPTY — ADD ENTITIES FIRST'); return; }
+  const token = getAuthorToken();
+  const name  = `Watchlist ${new Date().toISOString().slice(0,10)}`;
+  try{
+    const r = await fetch('/api/watchlists/share', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, owner_token: token, entities: wl})
+    });
+    const data = await r.json();
+    const url = data.url || `${location.origin}/?wl=${data.share_token}`;
+    await navigator.clipboard.writeText(url).catch(()=>{});
+    showToast(`SHARE LINK COPIED — ${wl.length} ENTITIES · TOKEN: ${data.share_token}`);
+  } catch(e){
+    showToast('SHARE FAILED — CHECK CONSOLE');
+    console.error('shareWatchlist:', e);
+  }
+}
+
+async function _loadSharedWatchlistFromUrl(){
+  const params = new URLSearchParams(location.search);
+  const token  = params.get('wl');
+  if(!token) return;
+  try{
+    const r = await fetch(`/api/watchlists/${encodeURIComponent(token)}`);
+    if(!r.ok) return;
+    const data = await r.json();
+    const entities = data.entities || [];
+    if(!entities.length) return;
+    // Merge into local watchlist
+    let wl = _getWatchlist();
+    let added = 0;
+    for(const e of entities){
+      if(!wl.find(x=>x.source===e.source&&x.callsign===e.callsign)){
+        wl.push(e);
+        added++;
+      }
+    }
+    _saveWatchlist(wl);
+    renderWatchlist();
+    showToast(`SHARED WATCHLIST LOADED — ${added} ENTITIES MERGED FROM "${esc(data.name||'')}"`);
+  } catch(e){ console.error('_loadSharedWatchlistFromUrl:', e); }
+}
+
+// Run on boot — load shared watchlist if ?wl= param present
+setTimeout(_loadSharedWatchlistFromUrl, 1500);
 
 // ── Choke points ──────────────────────────────────────────────────────────────
 const _THREAT_COLS = {CRITICAL:'#ef4444',HIGH:'#f97316',MODERATE:'#eab308',LOW:'#22c55e'};

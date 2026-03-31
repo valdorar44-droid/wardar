@@ -128,6 +128,33 @@ _MIGRATIONS: list[str] = [
     )""",
     """CREATE INDEX IF NOT EXISTS idx_brief_ts ON intel_briefs(generated_at DESC)""",
 
+    # v10 — Phase 8: entity annotations + shared watchlists
+    """CREATE TABLE IF NOT EXISTS entity_annotations (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        source       TEXT NOT NULL,
+        callsign     TEXT NOT NULL,
+        author_token TEXT NOT NULL,
+        body         TEXT NOT NULL,
+        upvotes      INTEGER DEFAULT 0,
+        downvotes    INTEGER DEFAULT 0,
+        hidden       INTEGER DEFAULT 0,
+        created_at   TEXT NOT NULL
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_ann_entity ON entity_annotations(source, callsign, created_at)""",
+    """CREATE INDEX IF NOT EXISTS idx_ann_hidden ON entity_annotations(hidden)""",
+
+    """CREATE TABLE IF NOT EXISTS shared_watchlists (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        share_token TEXT UNIQUE NOT NULL,
+        name        TEXT NOT NULL,
+        owner_token TEXT NOT NULL,
+        entities    TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        last_viewed TEXT
+    )""",
+    """CREATE UNIQUE INDEX IF NOT EXISTS idx_swl_token ON shared_watchlists(share_token)""",
+    """CREATE INDEX        IF NOT EXISTS idx_swl_owner ON shared_watchlists(owner_token)""",
+
     # v9 — Phase 5 position history (separate from upsert positions table)
     # Stores a throttled time-series of each entity's positions for track/biography.
     # One row per entity per ~2 min (throttled in engine.py to keep DB lean).
@@ -691,6 +718,71 @@ def get_latest_brief() -> dict | None:
         "SELECT * FROM intel_briefs ORDER BY generated_at DESC LIMIT 1"
     ).fetchone()
     return dict(row) if row else None
+
+# ── Phase 8: Entity Annotations ──────────────────────────────────────────────
+
+def insert_annotation(source: str, callsign: str, author_token: str, body: str) -> int:
+    now = _utcnow()
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute(
+            "INSERT INTO entity_annotations (source,callsign,author_token,body,created_at) VALUES (?,?,?,?,?)",
+            (source, callsign, author_token, body, now)
+        )
+        conn.commit()
+        return cur.lastrowid
+
+def get_annotations(source: str, callsign: str, limit: int = 20) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM entity_annotations WHERE source=? AND callsign=? AND hidden=0 "
+        "ORDER BY (upvotes-downvotes) DESC, created_at DESC LIMIT ?",
+        (source, callsign, limit)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+def vote_annotation(ann_id: int, delta_up: int, delta_down: int) -> dict | None:
+    """Increment upvotes or downvotes. delta_up/delta_down should be +1."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "UPDATE entity_annotations SET upvotes=upvotes+?, downvotes=downvotes+?, "
+            "hidden=CASE WHEN (upvotes+?-downvotes-?)<=(-3) THEN 1 ELSE 0 END WHERE id=?",
+            (delta_up, delta_down, delta_up, delta_down, ann_id)
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM entity_annotations WHERE id=?", (ann_id,)).fetchone()
+        return dict(row) if row else None
+
+# ── Phase 8: Shared Watchlists ────────────────────────────────────────────────
+
+def create_shared_watchlist(name: str, owner_token: str, entities_json: str) -> str:
+    import secrets
+    token = secrets.token_urlsafe(12)
+    now = _utcnow()
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO shared_watchlists (share_token,name,owner_token,entities,created_at) VALUES (?,?,?,?,?)",
+            (token, name, owner_token, entities_json, now)
+        )
+        conn.commit()
+    return token
+
+def get_shared_watchlist(share_token: str) -> dict | None:
+    with _lock:
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT * FROM shared_watchlists WHERE share_token=?", (share_token,)
+        ).fetchone()
+        if not row:
+            return None
+        conn.execute(
+            "UPDATE shared_watchlists SET last_viewed=? WHERE share_token=?",
+            (_utcnow(), share_token)
+        )
+        conn.commit()
+    return dict(row)
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

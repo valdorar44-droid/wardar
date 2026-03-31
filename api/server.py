@@ -393,6 +393,129 @@ async def upload_media(file: UploadFile = File(...)):
         "backend":  storage_backend(),
     })
 
+# ── Phase 8: Entity Annotations ──────────────────────────────────────────────
+
+class AnnotationIn(BaseModel):
+    author_token: str = Field(..., min_length=8, max_length=128)
+    body:         str = Field(..., min_length=3, max_length=500)
+
+@app.get("/api/annotations/{source}/{callsign}")
+async def get_annotations(source: str, callsign: str, limit: int = 20, response: Response = None):
+    """Return analyst annotations for a tracked entity."""
+    if response:
+        response.headers["Cache-Control"] = "public, max-age=30"
+    data = DB.get_annotations(source, callsign, limit=min(limit, 50))
+    return JSONResponse({"source": source, "callsign": callsign, "count": len(data), "data": data})
+
+@app.post("/api/annotations/{source}/{callsign}", status_code=201)
+async def post_annotation(source: str, callsign: str, body: AnnotationIn):
+    """Submit an analyst annotation for a tracked entity."""
+    ann_id = DB.insert_annotation(source, callsign, body.author_token, body.body)
+    return JSONResponse({"id": ann_id}, status_code=201)
+
+@app.post("/api/annotations/{ann_id}/vote")
+async def vote_annotation(ann_id: int, body: VoteIn):
+    """Vote on an annotation (+1 upvote, -1 downvote)."""
+    up   = 1 if body.vote == 1  else 0
+    down = 1 if body.vote == -1 else 0
+    result = DB.vote_annotation(ann_id, up, down)
+    if result is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return JSONResponse(result)
+
+# ── Phase 8: Shared Watchlists ────────────────────────────────────────────────
+
+class WatchlistShareIn(BaseModel):
+    name:        str = Field(..., min_length=1, max_length=100)
+    owner_token: str = Field(..., min_length=8, max_length=128)
+    entities:    list[dict] = Field(...)
+
+@app.post("/api/watchlists/share", status_code=201)
+async def share_watchlist(body: WatchlistShareIn, request: Request):
+    """Persist a named watchlist and return a share token."""
+    if len(body.entities) > 200:
+        raise HTTPException(status_code=400, detail="max 200 entities per shared list")
+    entities_json = json.dumps(body.entities)
+    token = DB.create_shared_watchlist(body.name, body.owner_token, entities_json)
+    base = str(request.base_url).rstrip("/")
+    return JSONResponse({"share_token": token, "url": f"{base}/?wl={token}"}, status_code=201)
+
+@app.get("/api/watchlists/{share_token}")
+async def get_shared_watchlist(share_token: str):
+    """Return a shared watchlist by token."""
+    wl = DB.get_shared_watchlist(share_token)
+    if not wl:
+        raise HTTPException(status_code=404, detail="watchlist not found")
+    try:
+        wl["entities"] = json.loads(wl.get("entities") or "[]")
+    except Exception:
+        wl["entities"] = []
+    return JSONResponse(wl)
+
+# ── Phase 8: Public API v1 ────────────────────────────────────────────────────
+# Same data as the private endpoints with delay policy enforced.
+# Future: X-API-Key header will unlock real-time tier (currently no-op).
+
+_V1_DESCRIPTION = "Wardar Public API v1 — delayed release, same data as dashboard."
+
+@app.get("/api/v1/positions", summary="Live positions (delayed)", tags=["Public API v1"],
+         description=_V1_DESCRIPTION)
+async def v1_positions(
+    response: Response,
+    sources: str = "",
+    w: float = -180, s: float = -90, e: float = 180, n: float = 90,
+    limit: int = 1000,
+):
+    """Delayed-release positions. Max 1000 rows. Filter by source (comma-separated) or bbox."""
+    response.headers["Cache-Control"] = "public, max-age=30"
+    src_list = [x.strip() for x in sources.split(",") if x.strip()] if sources else None
+    bbox     = (w, s, e, n)
+    if src_list:
+        data = DB.get_released_positions(bbox=bbox, sources=src_list, limit=min(limit, 1000))
+    else:
+        data = get_released_positions_sampled(per_source=200, limit=min(limit, 1000))
+    return JSONResponse({"count": len(data), "data": data, "api_version": "v1"})
+
+@app.get("/api/v1/events", summary="Events (delayed)", tags=["Public API v1"],
+         description=_V1_DESCRIPTION)
+async def v1_events(
+    response: Response,
+    sources: str = "",
+    w: float = -180, s: float = -90, e: float = 180, n: float = 90,
+    limit: int = 500,
+):
+    """Delayed-release events. Max 500 rows."""
+    response.headers["Cache-Control"] = "public, max-age=30"
+    src_list = [x.strip() for x in sources.split(",") if x.strip()] if sources else None
+    bbox     = (w, s, e, n)
+    data     = DB.get_released_events(bbox=bbox, sources=src_list, limit=min(limit, 500))
+    return JSONResponse({"count": len(data), "data": data, "api_version": "v1"})
+
+@app.get("/api/v1/alerts", summary="Recent alerts", tags=["Public API v1"],
+         description=_V1_DESCRIPTION)
+async def v1_alerts(response: Response, hours: int = 24, limit: int = 100):
+    """Recent triggered alerts (dark vessels, spoofing, route deviation, etc.)."""
+    response.headers["Cache-Control"] = "public, max-age=30"
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=min(hours, 168))).isoformat()
+    db = DB.get_conn()
+    rows = db.execute(
+        "SELECT source, title, description, lat, lon, raw_ts_utc FROM events "
+        "WHERE source='alert' AND raw_ts_utc >= ? ORDER BY raw_ts_utc DESC LIMIT ?",
+        (cutoff, min(limit, 100))
+    ).fetchall()
+    data = [dict(r) for r in rows]
+    return JSONResponse({"count": len(data), "data": data, "api_version": "v1"})
+
+@app.get("/api/v1/annotations/{source}/{callsign}", summary="Entity annotations",
+         tags=["Public API v1"], description=_V1_DESCRIPTION)
+async def v1_annotations(source: str, callsign: str, response: Response):
+    """Analyst annotations for a specific tracked entity."""
+    response.headers["Cache-Control"] = "public, max-age=60"
+    data = DB.get_annotations(source, callsign, limit=50)
+    return JSONResponse({"source": source, "callsign": callsign, "count": len(data),
+                         "data": data, "api_version": "v1"})
+
 # ── Static Infrastructure Layers ─────────────────────────────────────────────
 
 @app.get("/api/layers/{layer}")
