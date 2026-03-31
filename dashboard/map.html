@@ -2564,7 +2564,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         <div class="setting-row">
           <div>
             <div class="setting-label">Browser notifications</div>
-            <div class="setting-desc">Desktop alerts for critical events</div>
+            <div class="setting-desc">Desktop alerts for dark vessels, nuclear threats, convergence events, emergency squawks</div>
           </div>
           <button class="setting-btn" id="st-notif-btn" onclick="requestNotifPermission()">REQUEST PERMISSION</button>
         </div>
@@ -7474,8 +7474,34 @@ function pushAlert(e){
   if(alertBuffer.length > 50) alertBuffer.pop();
   renderAlerts();
   showAlertBar(e);
+  // Browser notification for critical alerts
+  _maybeSendBrowserNotif(e);
   // Also push to SIGINT feed
   pushFeed({...e, source: e.source});
+}
+
+/* Browser notification for high-priority alerts */
+const _NOTIF_SOURCES = new Set(['dark_vessel','convergence','nuclear_threat','pipeline_threat','route_deviation','emergency_squawk']);
+let _lastNotifTs = 0;
+
+function _maybeSendBrowserNotif(e){
+  if(Notification.permission !== 'granted') return;
+  if(!_NOTIF_SOURCES.has(e.source) && (e.category||'') !== 'threat') return;
+  // Rate-limit: max 1 notification per 30 seconds
+  const now = Date.now();
+  if(now - _lastNotifTs < 30000) return;
+  _lastNotifTs = now;
+  const meta = ALERT_META[e.source] || {icon:'⚠', label:'ALERT'};
+  const body = [e.country, e.description].filter(Boolean).join(' — ').substring(0,120);
+  try{
+    const n = new Notification(`${meta.icon} WARDAR ${meta.label}`, {
+      body: `${e.title||''}${body?' | '+body:''}`,
+      tag: `wardar_alert_${e.source}`,
+      silent: false,
+      requireInteraction: false,
+    });
+    n.onclick = ()=>{ window.focus(); switchTab('alerts'); n.close(); };
+  }catch(_){}
 }
 
 function renderAlerts(){
