@@ -5549,6 +5549,9 @@ function toggleLayer(key){
 function initMap(){
   // Default: start in 2D Leaflet mode
   initMap2D();
+  // Watchzone init — must run after const _WZ_KEY is initialized (can't call top-level before line 6471)
+  _loadWatchzones();
+  setTimeout(_restoreWzLayers, 1000);
   loadInitialData();
   connectWS();
   initTimeline();
@@ -6071,10 +6074,6 @@ function _checkWatchlistMatch(positions){
 }
 
 setTimeout(renderWatchlist, 1000);
-
-// ── Watchzone init ─────────────────────────────────────────────────────────────
-_loadWatchzones();
-setTimeout(_restoreWzLayers, 2000);
 
 // ── WW3 Risk Meter ────────────────────────────────────────────────────────────
 
