@@ -1260,11 +1260,44 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 .sb-count{color:var(--dim2)}
 .sb-count span{color:var(--text);font-weight:500}
 .sb-delay{
-  margin-left:auto;font-size:.5rem;letter-spacing:.08em;
+  flex-shrink:0;font-size:.5rem;letter-spacing:.08em;
   color:var(--amber);border:1px solid rgba(245,158,11,.2);
-  padding:.15rem .5rem;background:rgba(245,158,11,.04);flex-shrink:0;
+  padding:.15rem .5rem;background:rgba(245,158,11,.04);
 }
 #sb-conntext{font-size:.58rem;letter-spacing:.06em}
+/* ── Crisis Ticker ── */
+#crisis-ticker-wrap{
+  flex:1;overflow:hidden;position:relative;
+  border-left:1px solid var(--border);
+  margin-left:.5rem;padding-left:.5rem;
+  height:100%;display:flex;align-items:center;
+  min-width:0;
+}
+#crisis-ticker-wrap::before{
+  content:'INTEL:';font-size:.48rem;letter-spacing:.12em;
+  color:var(--amber);flex-shrink:0;margin-right:.4rem;
+  white-space:nowrap;
+}
+#crisis-ticker{
+  display:flex;align-items:center;
+  white-space:nowrap;font-size:.55rem;letter-spacing:.05em;
+  animation:tickerScroll 40s linear infinite;
+  animation-play-state:running;
+}
+#crisis-ticker:hover{ animation-play-state:paused; }
+@keyframes tickerScroll{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-50%)}
+}
+.ticker-item{
+  color:var(--dim2);margin-right:2.5rem;cursor:pointer;
+  transition:color .15s;
+}
+.ticker-item:hover{color:var(--text)}
+.ticker-icon{ margin-right:.2rem; }
+.ticker-loc{ color:var(--amber);font-size:.5rem; }
+.ticker-sep{ color:var(--border2);margin:0 .8rem; }
+@media(max-width:768px){#crisis-ticker-wrap{display:none}}
 
 /* ── POPUP OVERRIDE ── */
 .leaflet-popup-content-wrapper{
@@ -2657,7 +2690,10 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <span class="sb-count">⚑ <span id="sb-ev">0</span></span>
     <span class="sb-sep">│</span>
     <span id="sb-ts" style="color:var(--dim2)">--:--:-- UTC</span>
-    <span class="sb-delay">DELAYED — CIVILIAN 30s / MILITARY 5MIN / CONFLICT 10MIN</span>
+    <div id="crisis-ticker-wrap">
+      <div id="crisis-ticker"><!-- populated by JS --></div>
+    </div>
+    <span class="sb-delay">▸ 30s DELAY</span>
   </div>
 
 </div><!-- /shell -->
@@ -8377,6 +8413,51 @@ function closeMobPanels(){
     if(mapEl) mapEl.addEventListener('click', ()=>{ if(_isMobile()) closeMobPanels(); });
   });
 })();
+
+/* ── CRISIS TICKER ──────────────────────────────────────────────────────── */
+const _TICKER_SOURCES = 'acled,osint,osint_geo,breaking_news,dark_vessel,convergence,nuclear_threat,pipeline_threat,warspot,pikud_haoref';
+const _TICKER_ICONS = {
+  acled:'💥', osint:'📡', osint_geo:'📡', breaking_news:'📰',
+  dark_vessel:'⛵', convergence:'⚡', nuclear_threat:'☢', pipeline_threat:'⊸',
+  warspot:'⚔', pikud_haoref:'🚨', default:'•'
+};
+let _tickerData = [];
+
+async function _refreshTicker(){
+  try{
+    const r = await fetch(`/api/events?sources=${_TICKER_SOURCES}&limit=60`);
+    const j = await r.json();
+    const items = (j.data||[]).filter(e=>e.title&&e.lat!=null).slice(0,30);
+    if(!items.length) return;
+    _tickerData = items;
+    _renderTicker();
+  }catch(_){}
+}
+
+function _renderTicker(){
+  const el = document.getElementById('crisis-ticker');
+  if(!el || !_tickerData.length) return;
+  // Duplicate for seamless loop
+  const html = [..._tickerData, ..._tickerData].map((e,i)=>{
+    const icon = _TICKER_ICONS[e.source] || _TICKER_ICONS.default;
+    const loc = e.country ? `<span class="ticker-loc"> [${esc(e.country.toUpperCase())}]</span>` : '';
+    const onclick = (e.lat!=null&&e.lon!=null) ? `onclick="flyTo(${e.lat},${e.lon},.7);closeMobPanels()"` : '';
+    const sep = (i < _tickerData.length*2-1) ? '<span class="ticker-sep">◇</span>' : '';
+    return `<span class="ticker-item" ${onclick}><span class="ticker-icon">${icon}</span>${esc((e.title||'').substring(0,80))}${loc}</span>${sep}`;
+  }).join('');
+  el.innerHTML = html;
+  // Reset animation so new content plays from start
+  el.style.animation = 'none';
+  el.offsetHeight; // reflow
+  const dur = Math.max(30, _tickerData.length * 4); // ~4s per item
+  el.style.animation = `tickerScroll ${dur}s linear infinite`;
+}
+
+// Initialize ticker after map loads
+setTimeout(()=>{
+  _refreshTicker();
+  setInterval(_refreshTicker, 120000); // refresh every 2 min
+}, 8000);
 
 /* PWA service worker registration */
 if('serviceWorker' in navigator){
