@@ -1667,6 +1667,15 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   font-size:.72rem;color:var(--text);line-height:1.75;
   white-space:pre-wrap;word-break:break-word;
 }
+/* Watchzone label tooltip */
+.wz-label{
+  background:rgba(8,8,12,.88)!important;border:1px solid rgba(245,158,11,.4)!important;
+  color:var(--amber)!important;font-family:var(--font)!important;
+  font-size:.55rem!important;letter-spacing:.1em!important;
+  padding:.15rem .4rem!important;white-space:nowrap!important;
+  border-radius:0!important;box-shadow:none!important;
+}
+.wz-label::before{ display:none!important; }
 
 /* ══════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE + PWA
@@ -2596,6 +2605,15 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         </div>
         <div class="setting-row">
           <button class="setting-btn" onclick="jumpToSavedView()">↩ JUMP TO SAVED VIEW</button>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">WATCHZONES / GEOFENCE ALERTS</div>
+        <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:.4rem">
+          <div class="setting-desc">Draw a polygon or circle on the map (DRAW / ANNOTATE layer) to create a watchzone. Events occurring inside the zone trigger alerts.</div>
+          <div id="wz-list" style="width:100%;margin-top:.3rem"></div>
+          <button class="setting-btn" onclick="toggleDrawTools();toggleSettings()">✏ OPEN DRAW TOOLS</button>
         </div>
       </div>
 
@@ -5292,6 +5310,7 @@ function updateEvent(e, isNew){
   if(_ALERT_SOURCES.has(e.source)){
     if(isNew) pushAlert(e);
   }
+  if(isNew && e.lat!=null && e.lon!=null) checkWatchzoneHit(e);
   if(e.lat!=null&&e.lon!=null) updatePosition(e,isNew);
   else if(isNew&&e.title) pushFeed(e);
   if(e.title) pushNews(e);
@@ -6053,6 +6072,10 @@ function _checkWatchlistMatch(positions){
 
 setTimeout(renderWatchlist, 1000);
 
+// ── Watchzone init ─────────────────────────────────────────────────────────────
+_loadWatchzones();
+setTimeout(_restoreWzLayers, 2000);
+
 // ── WW3 Risk Meter ────────────────────────────────────────────────────────────
 
 const _WW3_COLORS = {
@@ -6444,11 +6467,103 @@ function toggleSamCoverage(show){
 }
 
 // ── Draw / annotate tools ─────────────────────────────────────────────────────
+// ── WATCHZONE / GEOFENCE SYSTEM ────────────────────────────────────────────────
+const _WZ_KEY = 'wardar_watchzones_v1';
+let _watchzones = []; // [{id,name,type:'polygon'|'circle'|'rectangle',data,layer}]
+let _wzLayer = null;  // Separate featureGroup for watchzones (always visible)
+let _wzHitLog = new Set(); // deduplicate alerts
+
+function _loadWatchzones(){
+  try{ _watchzones = JSON.parse(localStorage.getItem(_WZ_KEY)||'[]'); }catch(_){ _watchzones=[]; }
+}
+function _saveWatchzones(){
+  const saved = _watchzones.map(z=>({id:z.id,name:z.name,type:z.type,data:z.data}));
+  localStorage.setItem(_WZ_KEY, JSON.stringify(saved));
+}
+
+function _makeWzLayer(){
+  if(!_wzLayer && _map2d){
+    _wzLayer = new L.FeatureGroup().addTo(_map2d);
+  }
+}
+
+function _restoreWzLayers(){
+  if(!_map2d||typeof L.Draw==='undefined') return;
+  _makeWzLayer();
+  _watchzones.forEach(z=>{
+    try{
+      let layer;
+      if(z.type==='circle'){
+        layer = L.circle([z.data.lat,z.data.lng],{radius:z.data.radius,..._wzStyle()});
+      } else if(z.type==='polygon'||z.type==='rectangle'){
+        const pts = z.data.latlngs.map(p=>L.latLng(p.lat,p.lng));
+        layer = (z.type==='rectangle'?L.rectangle:L.polygon)(pts,_wzStyle());
+      }
+      if(layer){
+        _addWzLabel(layer,z.name);
+        _wzLayer.addLayer(layer);
+        z.layer = layer;
+      }
+    }catch(_){}
+  });
+}
+
+function _wzStyle(){ return {color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.08,weight:1.5,dashArray:'4,4'}; }
+
+function _addWzLabel(layer, name){
+  if(!name) return;
+  layer.bindTooltip(`⊡ ${name}`, {permanent:true,direction:'center',className:'wz-label'});
+}
+
+function _pointInWatchzone(lat, lng, zone){
+  if(!zone.layer) return false;
+  const latlng = L.latLng(lat, lng);
+  if(zone.type==='circle'){
+    return zone.layer.getLatLng().distanceTo(latlng) <= zone.layer.getRadius();
+  }
+  if(zone.type==='polygon'||zone.type==='rectangle'){
+    return _pip(lat, lng, zone.layer.getLatLngs()[0]);
+  }
+  return false;
+}
+
+function _pip(lat, lng, verts){
+  // Ray-casting point-in-polygon
+  let inside = false;
+  for(let i=0,j=verts.length-1;i<verts.length;j=i++){
+    const xi=verts[i].lng,yi=verts[i].lat,xj=verts[j].lng,yj=verts[j].lat;
+    if(((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+
+function checkWatchzoneHit(event){
+  if(!_watchzones.length||event.lat==null||event.lon==null) return;
+  _watchzones.forEach(z=>{
+    if(!z.layer) return;
+    const hitKey = `${z.id}|${(event.title||'').substring(0,40)}`;
+    if(_wzHitLog.has(hitKey)) return;
+    if(_pointInWatchzone(event.lat, event.lon, z)){
+      _wzHitLog.add(hitKey);
+      if(_wzHitLog.size > 500) _wzHitLog = new Set([..._wzHitLog].slice(-200)); // trim
+      const alertEvt = {
+        ...event,
+        source: 'watchzone',
+        title: `⊡ WATCHZONE "${z.name}": ${event.title||''}`,
+        _wz: z.name,
+      };
+      pushAlert(alertEvt);
+      showToast(`⊡ WATCHZONE HIT: ${z.name}`);
+    }
+  });
+}
+
 function toggleDrawTools(){
   const cb = document.getElementById('cb-draw');
   _drawOn = !_drawOn;
   if(cb) cb.checked = _drawOn;
   if(!_map2d||typeof L.Draw==='undefined') return;
+  _makeWzLayer();
   if(_drawOn){
     if(!_drawLayer){
       _drawLayer = new L.FeatureGroup().addTo(_map2d);
@@ -6456,20 +6571,71 @@ function toggleDrawTools(){
         position:'topright',
         edit:{featureGroup:_drawLayer,remove:true},
         draw:{
-          polygon:{shapeOptions:{color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.1}},
-          polyline:{shapeOptions:{color:'#22c55e',weight:2}},
-          circle:{shapeOptions:{color:'#ef4444',fillColor:'#ef4444',fillOpacity:.06}},
-          rectangle:{shapeOptions:{color:'#3b82f6',fillOpacity:.06}},
+          polygon:{shapeOptions:{color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.12}},
+          polyline:false,
+          circle:{shapeOptions:{color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.08}},
+          rectangle:{shapeOptions:{color:'#f59e0b',fillColor:'#f59e0b',fillOpacity:.08}},
           marker:false, circlemarker:false
         }
       });
       _map2d.addControl(_drawControl);
-      _map2d.on(L.Draw.Event.CREATED, e=>{ _drawLayer.addLayer(e.layer); });
+      _map2d.on(L.Draw.Event.CREATED, e=>{
+        const layer = e.layer;
+        const ltype = e.layerType; // polygon|circle|rectangle
+        // Prompt for zone name
+        const name = (prompt('Name this watchzone (leave blank to cancel):') || '').trim();
+        if(!name) return;
+        // Convert to storable data
+        let data = {};
+        if(ltype==='circle'){
+          data = {lat:layer.getLatLng().lat, lng:layer.getLatLng().lng, radius:layer.getRadius()};
+        } else {
+          data = {latlngs: layer.getLatLngs()[0].map(ll=>({lat:ll.lat,lng:ll.lng}))};
+        }
+        const zone = {id: Date.now().toString(), name, type:ltype, data, layer:null};
+        // Add to watchzone layer (not draw layer)
+        const wl = (ltype==='circle')
+          ? L.circle([data.lat,data.lng],{radius:data.radius,..._wzStyle()})
+          : (ltype==='rectangle'?L.rectangle:L.polygon)(layer.getLatLngs()[0],_wzStyle());
+        _addWzLabel(wl, name);
+        _wzLayer.addLayer(wl);
+        zone.layer = wl;
+        _watchzones.push(zone);
+        _saveWatchzones();
+        _renderWatchzoneList();
+        showToast(`⊡ Watchzone "${name}" saved`);
+      });
     }
   } else {
     if(_drawControl){ _map2d.removeControl(_drawControl); _drawControl=null; }
     if(_drawLayer){ _map2d.removeLayer(_drawLayer); _drawLayer=null; }
   }
+}
+
+function deleteWatchzone(id){
+  const idx = _watchzones.findIndex(z=>z.id===id);
+  if(idx<0) return;
+  const z = _watchzones[idx];
+  if(z.layer && _wzLayer) _wzLayer.removeLayer(z.layer);
+  _watchzones.splice(idx,1);
+  _saveWatchzones();
+  _renderWatchzoneList();
+}
+
+function _renderWatchzoneList(){
+  const el = document.getElementById('wz-list');
+  if(!el) return;
+  if(!_watchzones.length){
+    el.innerHTML=`<div style="color:var(--dim2);font-size:.63rem;padding:.4rem .6rem">No watchzones. Draw a polygon or circle to create one.</div>`;
+    return;
+  }
+  el.innerHTML = _watchzones.map(z=>`
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .6rem;border-bottom:1px solid var(--border)">
+      <span style="color:var(--amber);font-size:.66rem">⊡ ${esc(z.name)}</span>
+      <span style="color:var(--dim2);font-size:.55rem;text-transform:uppercase">${z.type}</span>
+      <button onclick="deleteWatchzone('${z.id}')" style="margin-left:auto;background:none;border:1px solid var(--border2);color:var(--dim2);font-size:.55rem;padding:.1rem .35rem;cursor:pointer;font-family:var(--font)">✕</button>
+    </div>
+  `).join('');
 }
 
 // ── Movement trails in 2D ─────────────────────────────────────────────────────
@@ -7565,6 +7731,9 @@ const ALERT_META = {
   convergence:     {label:'CONVERGENCE', color:'var(--amber)',  icon:'⚡'},
   nuclear_threat:  {label:'NUCLEAR',     color:'var(--yellow)', icon:'☢'},
   pipeline_threat: {label:'PIPELINE',    color:'var(--orange)', icon:'⊸'},
+  watchzone:       {label:'WATCHZONE',   color:'var(--amber)',  icon:'⊡'},
+  route_deviation: {label:'ROUTE DEV',   color:'#fb923c',       icon:'↯'},
+  emergency_squawk:{label:'SQUAWK',      color:'var(--red)',    icon:'🆘'},
 };
 
 function pushAlert(e){
