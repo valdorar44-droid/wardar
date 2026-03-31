@@ -1,12 +1,12 @@
 """Wardar — FastAPI server + WebSocket endpoint"""
 from __future__ import annotations
-import asyncio, json, os, time
+import asyncio, json, os, time, hashlib, hmac, secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
 import shutil, uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Request, Response, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field, field_validator
@@ -882,3 +882,182 @@ async def websocket_endpoint(ws: WebSocket):
         log_warn(f"ws: error: {exc}")
     finally:
         unregister_ws_client(_send)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+_DEFAULT_ADMIN_HASH = hashlib.sha256(b"wardar-admin").hexdigest()
+_admin_tokens: dict[str, float] = {}   # token → expiry (monotonic)
+
+def _get_password_hash() -> str:
+    return C.ADMIN_PASSWORD_HASH or _DEFAULT_ADMIN_HASH
+
+def _make_token() -> str:
+    tok = secrets.token_hex(32)
+    _admin_tokens[tok] = time.monotonic() + C.ADMIN_TOKEN_TTL_SEC
+    return tok
+
+def _validate_token(tok: str) -> bool:
+    exp = _admin_tokens.get(tok)
+    if exp is None: return False
+    if time.monotonic() > exp:
+        _admin_tokens.pop(tok, None)
+        return False
+    return True
+
+def _require_admin(request: Request):
+    auth = request.headers.get("Authorization", "")
+    tok = auth.removeprefix("Bearer ").strip()
+    if not tok or not _validate_token(tok):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+class AdminLoginIn(BaseModel):
+    password: str
+
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
+async def admin_page():
+    html_path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "admin.html")
+    if not os.path.exists(html_path):
+        return HTMLResponse("<h1>admin.html not found</h1>", status_code=404)
+    with open(html_path) as f:
+        return HTMLResponse(f.read())
+
+@app.post("/admin/api/login")
+async def admin_login(body: AdminLoginIn):
+    given = hashlib.sha256(body.password.encode()).hexdigest()
+    expected = _get_password_hash()
+    if not hmac.compare_digest(given, expected):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    using_default = expected == _DEFAULT_ADMIN_HASH
+    tok = _make_token()
+    return {"token": tok, "ttl": C.ADMIN_TOKEN_TTL_SEC, "default_password": using_default}
+
+@app.post("/admin/api/logout")
+async def admin_logout(request: Request):
+    auth = request.headers.get("Authorization", "")
+    tok = auth.removeprefix("Bearer ").strip()
+    _admin_tokens.pop(tok, None)
+    return {"ok": True}
+
+@app.get("/admin/api/stats")
+async def admin_stats(request: Request, _=Depends(_require_admin)):
+    from core.engine import _ws_clients  # type: ignore
+    counts = DB.get_counts()
+    conn = DB.get_conn()
+    # DB file size
+    db_size_mb = 0.0
+    try:
+        db_size_mb = round(os.path.getsize(C.DB_PATH) / 1e6, 2)
+    except Exception:
+        pass
+    # WW3 meter
+    ww3 = DB.get_ww3_meter() or {}
+    # Recent event counts by source (last 24h)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cutoff = datetime.fromtimestamp(time.time() - 86400, tz=timezone.utc).isoformat()
+    src_rows = conn.execute(
+        "SELECT source, COUNT(*) as cnt FROM events WHERE raw_ts_utc >= ? GROUP BY source ORDER BY cnt DESC",
+        (cutoff,)
+    ).fetchall()
+    sources_24h = [{"source": r["source"], "count": r["cnt"]} for r in src_rows]
+    # Position counts by source
+    pos_rows = conn.execute(
+        "SELECT source, COUNT(*) as cnt FROM positions GROUP BY source ORDER BY cnt DESC"
+    ).fetchall()
+    pos_by_source = [{"source": r["source"], "count": r["cnt"]} for r in pos_rows]
+    return {
+        "ts": now_iso,
+        "db_size_mb": db_size_mb,
+        "ws_clients": len(_ws_clients),
+        "counts": counts,
+        "ww3": {"score": ww3.get("score"), "level": ww3.get("level"), "generated_at": ww3.get("generated_at")},
+        "sources_24h": sources_24h,
+        "pos_by_source": pos_by_source,
+        "using_default_password": _get_password_hash() == _DEFAULT_ADMIN_HASH,
+    }
+
+@app.get("/admin/api/config")
+async def admin_config(_=Depends(_require_admin)):
+    """Show which API keys / integrations are configured."""
+    def _set(val: str) -> bool: return bool(val and val.strip())
+    return {
+        "ANTHROPIC_API_KEY":       _set(C.ANTHROPIC_API_KEY),
+        "ADSB_EXCHANGE_API_KEY":   _set(C.ADSB_EXCHANGE_API_KEY),
+        "AISSTREAM_API_KEY":       _set(C.AISSTREAM_API_KEY),
+        "ACLED_API_KEY":           _set(C.ACLED_API_KEY),
+        "CHECKWX_API_KEY":         _set(C.CHECKWX_API_KEY),
+        "CESIUM_ION_TOKEN":        _set(C.CESIUM_ION_TOKEN),
+        "BRAVE_API_KEY":           _set(C.BRAVE_API_KEY),
+        "SHODAN_API_KEY":          _set(C.SHODAN_API_KEY),
+        "OPENSANCTIONS_API_KEY":   _set(C.OPENSANCTIONS_API_KEY),
+        "UCDP_TOKEN":              _set(C.UCDP_TOKEN),
+        "OPENSKY_USERNAME":        _set(C.OPENSKY_USERNAME),
+        "S3_ENDPOINT_URL":         _set(C.S3_ENDPOINT_URL),
+        "ALERT_WEBHOOK_URL":       _set(C.ALERT_WEBHOOK_URL),
+        "ADMIN_PASSWORD_HASH":     _set(C.ADMIN_PASSWORD_HASH),
+        "SECRET_KEY_custom":       C.SECRET_KEY != "change-me-in-production",
+        "features": {
+            "ENABLE_ADSB":            C.ENABLE_ADSB,
+            "ENABLE_OPENSKY":         C.ENABLE_OPENSKY,
+            "ENABLE_MIL_AIRCRAFT":    C.ENABLE_MIL_AIRCRAFT,
+            "ENABLE_AIS":             C.ENABLE_AIS,
+            "ENABLE_ACLED":           C.ENABLE_ACLED,
+            "ENABLE_GDELT":           C.ENABLE_GDELT,
+            "ENABLE_FIRMS":           C.ENABLE_FIRMS,
+            "ENABLE_USGS":            C.ENABLE_USGS,
+            "ENABLE_GPSJAM":          C.ENABLE_GPSJAM,
+            "ENABLE_BREAKING_NEWS":   C.ENABLE_BREAKING_NEWS,
+            "ENABLE_TELEGRAM_OSINT":  C.ENABLE_TELEGRAM_OSINT,
+            "ENABLE_WW3_METER":       C.ENABLE_WW3_METER,
+            "ENABLE_INTEL_BRIEF":     C.ENABLE_INTEL_BRIEF,
+            "ENABLE_ALERTS":          C.ENABLE_ALERTS,
+            "ENABLE_POLYMARKET":      C.ENABLE_POLYMARKET,
+            "ENABLE_ISW":             C.ENABLE_ISW,
+            "ENABLE_WARSPOT":         C.ENABLE_WARSPOT,
+            "ENABLE_SAFECAST":        C.ENABLE_SAFECAST,
+            "ENABLE_OFAC":            C.ENABLE_OFAC,
+            "ENABLE_IODA":            C.ENABLE_IODA,
+        }
+    }
+
+@app.get("/admin/api/recent-events")
+async def admin_recent_events(_=Depends(_require_admin), limit: int = 50):
+    conn = DB.get_conn()
+    rows = conn.execute(
+        "SELECT source, title, country, raw_ts_utc FROM events ORDER BY raw_ts_utc DESC LIMIT ?",
+        (min(limit, 200),)
+    ).fetchall()
+    return {"events": [dict(r) for r in rows]}
+
+@app.get("/admin/api/recent-alerts")
+async def admin_recent_alerts(_=Depends(_require_admin), limit: int = 30):
+    conn = DB.get_conn()
+    rows = conn.execute(
+        "SELECT source, title, description, country, raw_ts_utc FROM events "
+        "WHERE source IN ('dark_vessel','convergence','nuclear_threat','pipeline_threat',"
+        "'vessel_spoof','transponder_loss','proximity','gpsjam_dark','route_dev') "
+        "ORDER BY raw_ts_utc DESC LIMIT ?",
+        (min(limit, 100),)
+    ).fetchall()
+    return {"alerts": [dict(r) for r in rows]}
+
+@app.post("/admin/api/ww3/regenerate")
+async def admin_ww3_regen(_=Depends(_require_admin)):
+    from core.ww3_meter import generate_ww3_score
+    result = await generate_ww3_score()
+    return result
+
+@app.delete("/admin/api/events/old")
+async def admin_purge_old_events(_=Depends(_require_admin), days: int = 30):
+    conn = DB.get_conn()
+    cutoff = datetime.fromtimestamp(time.time() - days * 86400, tz=timezone.utc).isoformat()
+    res = conn.execute("DELETE FROM events WHERE raw_ts_utc < ?", (cutoff,))
+    conn.commit()
+    return {"deleted": res.rowcount, "cutoff": cutoff}
+
+@app.get("/admin/api/ww3/history")
+async def admin_ww3_history(_=Depends(_require_admin)):
+    return {"history": DB.get_ww3_history(days=60)}

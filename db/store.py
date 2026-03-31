@@ -698,11 +698,18 @@ def get_counts() -> dict:
     by_source   = conn.execute(
         "SELECT source, COUNT(*) as n FROM positions GROUP BY source"
     ).fetchall()
+    try:
+        ann_total = conn.execute("SELECT COUNT(*) FROM entity_annotations").fetchone()[0]
+    except Exception:
+        ann_total = 0
     return {
         "positions_total": pos_total,
         "positions_live":  pos_live,
         "events_total":    evt_total,
         "events_live":     evt_live,
+        "positions":       pos_live,   # alias for admin dashboard
+        "events":          evt_total,  # alias for admin dashboard
+        "annotations":     ann_total,
         "by_source":       {r["source"]: r["n"] for r in by_source},
     }
 

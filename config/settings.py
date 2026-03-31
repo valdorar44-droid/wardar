@@ -245,3 +245,9 @@ DIGEST_CONV_RADIUS_KM   = _i("DIGEST_CONV_RADIUS_KM",  200)   # convergence radi
 # Updates once per calendar day UTC at midnight; uses ANTHROPIC_API_KEY.
 ENABLE_WW3_METER         = _b("ENABLE_WW3_METER",         True)
 WW3_METER_CHECK_SEC      = _i("WW3_METER_CHECK_SEC",       3600)  # check hourly, update if date rolled
+
+# ── Admin Dashboard ────────────────────────────────────────────────────────────
+# Set ADMIN_PASSWORD in Railway env vars. Default is "wardar-admin" (change it!).
+# Stored as SHA-256 hex digest. To generate: python3 -c "import hashlib; print(hashlib.sha256(b'yourpassword').hexdigest())"
+ADMIN_PASSWORD_HASH = _s("ADMIN_PASSWORD_HASH", "")  # if blank, defaults to hash of "wardar-admin"
+ADMIN_TOKEN_TTL_SEC = _i("ADMIN_TOKEN_TTL_SEC", 28800)  # 8 hours
