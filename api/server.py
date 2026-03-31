@@ -1061,3 +1061,12 @@ async def admin_purge_old_events(_=Depends(_require_admin), days: int = 30):
 @app.get("/admin/api/ww3/history")
 async def admin_ww3_history(_=Depends(_require_admin)):
     return {"history": DB.get_ww3_history(days=60)}
+
+@app.get("/admin/api/ww3/current")
+async def admin_ww3_current(_=Depends(_require_admin)):
+    row = DB.get_ww3_meter()
+    if row and row.get("key_factors"):
+        import json as _json
+        try: row["key_factors"] = _json.loads(row["key_factors"])
+        except Exception: pass
+    return row or {}

@@ -768,10 +768,18 @@ def get_ww3_history(days: int = 30) -> list[dict]:
     cutoff = _utcnow_minus_hours(days * 24)
     conn = get_conn()
     rows = conn.execute(
-        "SELECT score,level,generated_at FROM ww3_meter WHERE generated_at>=? ORDER BY generated_at ASC",
+        "SELECT score,level,assessment,key_factors,generated_at,model FROM ww3_meter "
+        "WHERE generated_at>=? ORDER BY generated_at DESC",
         (cutoff,)
     ).fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get("key_factors"):
+            try: d["key_factors"] = _json.loads(d["key_factors"])
+            except Exception: pass
+        result.append(d)
+    return result
 
 # ── Phase 8: Entity Annotations ──────────────────────────────────────────────
 

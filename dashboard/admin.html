@@ -608,8 +608,11 @@ async function loadConfig(){
 // ── WW3 ────────────────────────────────────────────────────────────────────
 async function loadWW3Admin(){
   try{
-    const d = await _api('/admin/api/stats');
-    const w = d.ww3 || {};
+    // Load full current reading
+    const [w, hd] = await Promise.all([
+      _api('/admin/api/ww3/current'),
+      _api('/admin/api/ww3/history'),
+    ]);
     const tc = _WW3_COLORS[w.level]||_WW3_COLORS.UNKNOWN;
     _setText('w-score', w.score??'--');
     _setText('w-level', w.level||'—');
@@ -620,33 +623,28 @@ async function loadWW3Admin(){
     document.getElementById('w-fill').style.background = tc.col;
     document.getElementById('ww3-admin-card').style.borderTopColor = tc.col;
 
-    // Load history
-    const hd = await _api('/admin/api/ww3/history');
+    // Assessment + key factors from current reading
+    document.getElementById('w-assess').textContent = w.assessment || 'No assessment yet — click REGENERATE NOW.';
+    const factors = Array.isArray(w.key_factors) ? w.key_factors
+      : (typeof w.key_factors === 'string' ? (()=>{ try{ return JSON.parse(w.key_factors); }catch{ return []; } })() : []);
+    document.getElementById('w-factors').innerHTML = factors.map(f=>
+      `<div style="font-size:.65rem;color:var(--dim2);padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="color:${tc.col}">▸</span> ${esc(f)}
+      </div>`
+    ).join('');
+
+    // History table
     const tbody = document.getElementById('ww3-hist-tbody');
     tbody.innerHTML = (hd.history||[]).map(h=>{
       const htc = _WW3_COLORS[h.level]||_WW3_COLORS.UNKNOWN;
+      const assess = (h.assessment||'').slice(0,100);
       return `<tr>
         <td>${h.generated_at.slice(0,10)}</td>
         <td style="color:${htc.col};font-weight:700">${h.score}</td>
         <td><span class="badge" style="background:${htc.col}22;color:${htc.col};border:1px solid ${htc.col}44">${h.level}</span></td>
-        <td style="color:var(--dim2)">${esc((h.assessment||'').slice(0,120))}</td>
+        <td style="color:var(--dim2);font-size:.6rem">${esc(assess)}${assess.length===100?'…':''}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="4" style="color:var(--dim2)">No history yet</td></tr>';
-
-    // Load assessment from history[0] if available
-    if(hd.history && hd.history.length > 0){
-      const latest = hd.history[0];
-      document.getElementById('w-assess').textContent = latest.assessment || '—';
-      if(latest.key_factors){
-        try{
-          const factors = typeof latest.key_factors === 'string'
-            ? JSON.parse(latest.key_factors) : latest.key_factors;
-          document.getElementById('w-factors').innerHTML = (factors||[]).map(f=>
-            `<div style="font-size:.65rem;color:var(--dim2);padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.04)">▸ ${esc(f)}</div>`
-          ).join('');
-        }catch{}
-      }
-    }
   }catch(e){
     toast('WW3 LOAD ERROR: '+e.message);
   }
