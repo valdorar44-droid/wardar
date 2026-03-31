@@ -1,5 +1,5 @@
 /* WARDAR Service Worker — PWA offline support */
-const CACHE_NAME = 'wardar-pwa-v1';
+const CACHE_NAME = 'wardar-pwa-v2';
 const STATIC_ASSETS = [
   '/',
   'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap',
