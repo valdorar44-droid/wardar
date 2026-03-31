@@ -1720,13 +1720,17 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   .leaflet-marker-icon{ touch-action:manipulation; }
 }
 
+@media (max-width:540px) {
+  /* Small phones — icon-only buttons to save header space */
+  .mob-btn-lbl{ display:none; }
+  button[onclick*="toggleSettings"]{ display:none; }
+}
 @media (max-width:480px) {
   /* Very small phones — even more compact */
   #ww3-hdr{ padding:0 .3rem;gap:.3rem; }
   #ww3-bar-wrap{ width:40px;min-width:40px; }
   #ww3-score{ font-size:.9rem!important; }
   .hdr-logo{ font-size:.8rem; }
-  #mob-left-btn,#mob-right-btn{ font-size:.65rem;padding:.4rem .55rem; }
 }
 </style>
 </head>
@@ -1848,8 +1852,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <button id="cinema-btn"   class="mapmode-btn" onclick="toggleCinema()"   title="Map-only mode — hide all panels">⊞ MAP</button>
     <button id="fullscreen-toggle" class="mapmode-btn" onclick="toggleFullscreen()" title="Browser fullscreen">⛶ FULL</button>
     <button class="mapmode-btn" onclick="toggleSettings()" title="User settings &amp; preferences" style="letter-spacing:.05em">⚙ SETTINGS</button>
-    <button id="mob-left-btn" onclick="toggleMobLeft()" title="Sensor feeds &amp; layers">☰ FEEDS</button>
-    <button id="mob-right-btn" onclick="toggleMobRight()" title="Intelligence panel">⌇ INTEL</button>
+    <button id="mob-left-btn" onclick="toggleMobLeft()" title="Sensor feeds &amp; layers">☰<span class="mob-btn-lbl"> FEEDS</span></button>
+    <button id="mob-right-btn" onclick="toggleMobRight()" title="Intelligence panel">⌇<span class="mob-btn-lbl"> INTEL</span></button>
     <div id="hdr-clock">--:--:-- UTC</div>
     <div class="threat-badge" id="threat-badge">
       <div class="threat-dot" id="threat-dot" style="background:var(--green)"></div>
@@ -8133,6 +8137,13 @@ function openCountryIntelFromPopup(country){
 /* ── MOBILE PANEL TOGGLING ─────────────────────────────────────── */
 function _isMobile(){ return window.innerWidth<=768; }
 
+function _mobBtnLabel(id, icon, label){
+  const btn=document.getElementById(id);
+  if(!btn) return;
+  const lbl=btn.querySelector('.mob-btn-lbl');
+  btn.innerHTML=icon+(lbl?`<span class="mob-btn-lbl"> ${label}</span>`:'');
+}
+
 function toggleMobLeft(){
   if(!_isMobile()) return;
   const p=document.getElementById('panel');
@@ -8140,10 +8151,10 @@ function toggleMobLeft(){
   const o=document.getElementById('mob-overlay');
   const btn=document.getElementById('mob-left-btn');
   const open=p.classList.toggle('mobile-open');
-  if(open){ r.classList.remove('mobile-open'); document.getElementById('mob-right-btn')?.classList.remove('panel-open'); }
+  if(open){ r.classList.remove('mobile-open'); document.getElementById('mob-right-btn')?.classList.remove('panel-open'); _mobBtnLabel('mob-right-btn','⌇','INTEL'); }
   o.classList.toggle('active',open);
   btn.classList.toggle('panel-open',open);
-  btn.textContent=open?'✕ FEEDS':'☰ FEEDS';
+  _mobBtnLabel('mob-left-btn', open?'✕':'☰', 'FEEDS');
 }
 
 function toggleMobRight(){
@@ -8153,10 +8164,10 @@ function toggleMobRight(){
   const o=document.getElementById('mob-overlay');
   const btn=document.getElementById('mob-right-btn');
   const open=r.classList.toggle('mobile-open');
-  if(open){ p.classList.remove('mobile-open'); document.getElementById('mob-left-btn')?.classList.remove('panel-open'); document.getElementById('mob-left-btn').textContent='☰ FEEDS'; }
+  if(open){ p.classList.remove('mobile-open'); document.getElementById('mob-left-btn')?.classList.remove('panel-open'); _mobBtnLabel('mob-left-btn','☰','FEEDS'); }
   o.classList.toggle('active',open);
   btn.classList.toggle('panel-open',open);
-  btn.textContent=open?'✕ INTEL':'⌇ INTEL';
+  _mobBtnLabel('mob-right-btn', open?'✕':'⌇', 'INTEL');
 }
 
 function closeMobPanels(){
@@ -8165,8 +8176,8 @@ function closeMobPanels(){
   document.getElementById('mob-overlay')?.classList.remove('active');
   const lb=document.getElementById('mob-left-btn');
   const rb=document.getElementById('mob-right-btn');
-  if(lb){ lb.classList.remove('panel-open'); lb.textContent='☰ FEEDS'; }
-  if(rb){ rb.classList.remove('panel-open'); rb.textContent='⌇ INTEL'; }
+  if(lb){ lb.classList.remove('panel-open'); _mobBtnLabel('mob-left-btn','☰','FEEDS'); }
+  if(rb){ rb.classList.remove('panel-open'); _mobBtnLabel('mob-right-btn','⌇','INTEL'); }
 }
 
 /* Close mobile panels when map is clicked */
