@@ -239,3 +239,9 @@ WEBHOOK_MIN_INTERVAL_SEC = _i("WEBHOOK_MIN_INTERVAL_SEC", 30)  # flush webhooks 
 DIGEST_HOURS            = _i("DIGEST_HOURS",            24)    # daily digest lookback window
 DIGEST_LIMIT            = _i("DIGEST_LIMIT",            10)    # top N events
 DIGEST_CONV_RADIUS_KM   = _i("DIGEST_CONV_RADIUS_KM",  200)   # convergence radius
+
+# ── WW3 Risk Meter (Phase 8+) ─────────────────────────────────────────────────
+# AI-generated daily global escalation index (0-100).
+# Updates once per calendar day UTC at midnight; uses ANTHROPIC_API_KEY.
+ENABLE_WW3_METER         = _b("ENABLE_WW3_METER",         True)
+WW3_METER_CHECK_SEC      = _i("WW3_METER_CHECK_SEC",       3600)  # check hourly, update if date rolled

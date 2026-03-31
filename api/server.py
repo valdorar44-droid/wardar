@@ -393,6 +393,42 @@ async def upload_media(file: UploadFile = File(...)):
         "backend":  storage_backend(),
     })
 
+# ── WW3 Risk Meter ───────────────────────────────────────────────────────────
+
+@app.get("/api/ww3")
+async def get_ww3(response: Response):
+    """Return the latest WW3 escalation index. Updates once per UTC calendar day."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    data = DB.get_ww3_meter()
+    history = DB.get_ww3_history(days=30)
+    if not data:
+        return JSONResponse({
+            "score": None, "level": "UNKNOWN",
+            "assessment": "First analysis runs at midnight UTC — check back soon.",
+            "key_factors": [], "generated_at": None, "history": []
+        })
+    try:
+        data["key_factors"] = json.loads(data.get("key_factors") or "[]")
+    except Exception:
+        data["key_factors"] = []
+    data["history"] = history
+    return JSONResponse(data)
+
+@app.post("/api/ww3/generate", status_code=202)
+async def trigger_ww3():
+    """Force-regenerate the WW3 meter now (bypasses daily gate — for testing)."""
+    if not C.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+    import asyncio
+    from core.ww3_meter import generate_ww3_score
+    from core.engine import _broadcast
+    async def _run():
+        result = await generate_ww3_score()
+        if result.get("score") is not None:
+            await _broadcast({"type": "ww3_meter", "data": result})
+    asyncio.create_task(_run())
+    return JSONResponse({"status": "generating"}, status_code=202)
+
 # ── Phase 8: Entity Annotations ──────────────────────────────────────────────
 
 class AnnotationIn(BaseModel):

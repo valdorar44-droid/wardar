@@ -128,6 +128,18 @@ _MIGRATIONS: list[str] = [
     )""",
     """CREATE INDEX IF NOT EXISTS idx_brief_ts ON intel_briefs(generated_at DESC)""",
 
+    # v11 — WW3 Risk Meter
+    """CREATE TABLE IF NOT EXISTS ww3_meter (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        score        INTEGER NOT NULL,
+        level        TEXT NOT NULL,
+        assessment   TEXT NOT NULL,
+        key_factors  TEXT NOT NULL DEFAULT '[]',
+        generated_at TEXT NOT NULL,
+        model        TEXT NOT NULL DEFAULT ''
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_ww3_ts ON ww3_meter(generated_at DESC)""",
+
     # v10 — Phase 8: entity annotations + shared watchlists
     """CREATE TABLE IF NOT EXISTS entity_annotations (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -718,6 +730,41 @@ def get_latest_brief() -> dict | None:
         "SELECT * FROM intel_briefs ORDER BY generated_at DESC LIMIT 1"
     ).fetchone()
     return dict(row) if row else None
+
+# ── WW3 Risk Meter ───────────────────────────────────────────────────────────
+
+def upsert_ww3_meter(score: int, level: str, assessment: str,
+                      key_factors: list, model: str) -> None:
+    import json as _json
+    now = _utcnow()
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO ww3_meter (score,level,assessment,key_factors,generated_at,model) VALUES (?,?,?,?,?,?)",
+            (score, level, assessment, _json.dumps(key_factors), now, model)
+        )
+        # Keep only last 30 readings (30 days)
+        conn.execute(
+            "DELETE FROM ww3_meter WHERE id NOT IN "
+            "(SELECT id FROM ww3_meter ORDER BY generated_at DESC LIMIT 30)"
+        )
+        conn.commit()
+
+def get_ww3_meter() -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM ww3_meter ORDER BY generated_at DESC LIMIT 1"
+    ).fetchone()
+    return dict(row) if row else None
+
+def get_ww3_history(days: int = 30) -> list[dict]:
+    cutoff = _utcnow_minus_hours(days * 24)
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT score,level,generated_at FROM ww3_meter WHERE generated_at>=? ORDER BY generated_at ASC",
+        (cutoff,)
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 # ── Phase 8: Entity Annotations ──────────────────────────────────────────────
 

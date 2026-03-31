@@ -163,6 +163,144 @@ body.cinema #cinema-exit { opacity:1; pointer-events:all; }
 /* ── TIMELINE HIDDEN ── */
 body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(60px); }
 
+/* ── WW3 RISK METER ── */
+#ww3-meter{
+  position:fixed;
+  bottom:52px;right:12px;
+  z-index:600;
+  width:108px;
+  background:rgba(4,4,8,.92);
+  border:1px solid var(--ww3-col,#22c55e);
+  box-shadow:0 0 14px var(--ww3-glow,rgba(34,197,94,.18)),inset 0 0 20px rgba(0,0,0,.4);
+  font-family:var(--font);
+  cursor:pointer;
+  user-select:none;
+  transition:border-color .6s ease,box-shadow .6s ease,opacity .3s ease,transform .3s ease;
+}
+#ww3-meter:hover{ box-shadow:0 0 22px var(--ww3-glow,rgba(34,197,94,.35)),inset 0 0 20px rgba(0,0,0,.4); }
+body.cinema #ww3-meter{ opacity:0;pointer-events:none;transform:translateX(130px); }
+
+/* top strip with scan-line texture */
+#ww3-top{
+  padding:.28rem .4rem .22rem;
+  border-bottom:1px solid var(--ww3-col,#22c55e);
+  background:rgba(0,0,0,.3);
+  display:flex;align-items:center;justify-content:space-between;
+}
+#ww3-label{
+  font-size:.38rem;letter-spacing:.15em;color:var(--ww3-col,#22c55e);
+  text-shadow:0 0 6px var(--ww3-glow,rgba(34,197,94,.6));
+}
+#ww3-pulse{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--ww3-col,#22c55e);
+  box-shadow:0 0 4px var(--ww3-col,#22c55e);
+}
+
+/* gauge body */
+#ww3-body{
+  display:flex;align-items:center;gap:6px;
+  padding:.35rem .45rem .3rem;
+}
+#ww3-spine-wrap{
+  position:relative;
+  width:10px;flex-shrink:0;height:56px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:2px;overflow:hidden;
+}
+/* colour zone bands painted top-to-bottom inside spine (critical at top) */
+#ww3-spine-wrap::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,
+    #dc2626 0% 14%,
+    #ef4444 14% 28%,
+    #f97316 28% 44%,
+    #eab308 44% 62%,
+    #84cc16 62% 78%,
+    #22c55e 78% 100%
+  );
+  opacity:.18;
+}
+#ww3-fill{
+  position:absolute;bottom:0;left:0;right:0;
+  background:var(--ww3-col,#22c55e);
+  box-shadow:0 -3px 8px var(--ww3-glow,rgba(34,197,94,.5));
+  transition:height .9s cubic-bezier(.22,.68,0,1.2),background .6s ease;
+  height:0%;
+}
+/* tick marks */
+#ww3-spine-wrap::after{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(to bottom,
+    transparent 0px,transparent 10.4px,
+    rgba(255,255,255,.12) 10.4px,rgba(255,255,255,.12) 11px
+  );
+  pointer-events:none;
+}
+
+#ww3-right{flex:1;min-width:0}
+#ww3-score{
+  font-size:1.35rem;font-weight:700;line-height:1;
+  color:var(--ww3-col,#22c55e);
+  text-shadow:0 0 12px var(--ww3-glow,rgba(34,197,94,.5));
+  letter-spacing:-.03em;
+  transition:color .6s ease,text-shadow .6s ease;
+}
+#ww3-score-unit{
+  font-size:.35rem;letter-spacing:.08em;color:var(--dim2);
+  margin-left:.15rem;
+}
+#ww3-level-lbl{
+  font-size:.42rem;letter-spacing:.12em;margin-top:.18rem;
+  color:var(--ww3-col,#22c55e);font-weight:700;
+  transition:color .6s ease;
+}
+#ww3-foot{
+  padding:.2rem .45rem .25rem;border-top:1px solid rgba(255,255,255,.05);
+  font-size:.36rem;letter-spacing:.08em;color:var(--dim2);
+  display:flex;align-items:center;justify-content:space-between;
+}
+#ww3-foot-ts{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px}
+
+/* expand drawer */
+#ww3-drawer{
+  display:none;
+  border-top:1px solid var(--ww3-col,#22c55e);
+  padding:.4rem .5rem .45rem;
+  background:rgba(0,0,0,.25);
+}
+#ww3-drawer.open{ display:block; }
+#ww3-assess{
+  font-size:.48rem;line-height:1.6;color:var(--text);
+  letter-spacing:.01em;margin-bottom:.35rem;
+}
+#ww3-factors{ }
+.ww3-factor{
+  font-size:.42rem;color:var(--dim2);letter-spacing:.04em;
+  padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.04);
+  line-height:1.45;
+}
+.ww3-factor:last-child{border-bottom:none}
+.ww3-factor::before{ content:'⊹ ';color:var(--ww3-col,#22c55e); }
+#ww3-history-wrap{margin-top:.4rem;display:flex;align-items:flex-end;gap:1px;height:22px}
+.ww3-bar{flex:1;background:var(--dim);border-radius:1px 1px 0 0;min-height:2px;transition:height .4s ease}
+#ww3-regen{
+  margin-top:.35rem;width:100%;padding:.15rem;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  color:var(--dim2);font-family:var(--font);font-size:.38rem;
+  letter-spacing:.08em;cursor:pointer;
+}
+#ww3-regen:hover{ border-color:var(--ww3-col,#22c55e);color:var(--ww3-col,#22c55e); }
+
+/* critical pulse animation */
+@keyframes ww3crit{
+  0%,100%{ box-shadow:0 0 14px rgba(220,38,38,.25),inset 0 0 20px rgba(0,0,0,.4); }
+  50%{     box-shadow:0 0 28px rgba(220,38,38,.6), inset 0 0 20px rgba(0,0,0,.4); }
+}
+#ww3-meter.critical{ animation:ww3crit 2s ease-in-out infinite; }
+@keyframes ww3dot{ 0%,100%{opacity:1} 50%{opacity:.25} }
+#ww3-pulse.live{ animation:ww3dot 2s ease-in-out infinite; }
+
 /* ── CINEMA EXIT BUTTON ── */
 #cinema-exit{
   position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
@@ -2326,6 +2464,31 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
 </div><!-- /shell -->
 
+<!-- ══ WW3 RISK METER ══════════════════════════════════════════════════════════ -->
+<div id="ww3-meter" onclick="toggleWW3Drawer()" title="WW3 Escalation Index — AI daily analysis">
+  <div id="ww3-top">
+    <span id="ww3-label">⚠ WW3 RISK</span>
+    <span id="ww3-pulse"></span>
+  </div>
+  <div id="ww3-body">
+    <div id="ww3-spine-wrap"><div id="ww3-fill"></div></div>
+    <div id="ww3-right">
+      <div><span id="ww3-score">--</span><span id="ww3-score-unit">/ 100</span></div>
+      <div id="ww3-level-lbl">LOADING</div>
+    </div>
+  </div>
+  <div id="ww3-foot">
+    <span id="ww3-foot-ts">AI · DAILY UTC</span>
+    <span>▼</span>
+  </div>
+  <div id="ww3-drawer">
+    <div id="ww3-assess">Awaiting first AI analysis…</div>
+    <div id="ww3-factors"></div>
+    <div id="ww3-history-wrap" title="30-day score history"></div>
+    <button id="ww3-regen" onclick="event.stopPropagation();triggerWW3Regen()">↻ REGENERATE NOW</button>
+  </div>
+</div>
+
 <!-- COUNTRY INTEL CHAT PANEL -->
 <div id="chat-panel">
   <div id="chat-hd">
@@ -2782,7 +2945,7 @@ async function getCountryBrief(country){
     const r = await fetch('/api/brief/country/' + encodeURIComponent(country));
     const data = await r.json();
     if(data.error){ el.innerHTML = '<span style="color:var(--red);font-size:.55rem">'+esc(data.error)+'</span>'; }
-    else { el.innerHTML = '<span style="font-size:.57rem;line-height:1.65;color:var(--text)">'+esc(data.text||'').replace(/\n/g,'<br>')+'</span>'; }
+    else { el.innerHTML = '<span style="font-size:.74rem;line-height:1.75;color:var(--text)">'+esc(data.text||'').replace(/\n/g,'<br>')+'</span>'; }
   } catch(e){
     el.innerHTML = '<span style="color:var(--red);font-size:.55rem">ERROR: '+esc(String(e))+'</span>';
   }
@@ -5656,6 +5819,109 @@ function _checkWatchlistMatch(positions){
 
 setTimeout(renderWatchlist, 1000);
 
+// ── WW3 Risk Meter ────────────────────────────────────────────────────────────
+
+const _WW3_COLORS = {
+  CRITICAL:  { col:'#dc2626', glow:'rgba(220,38,38,.35)'  },
+  SEVERE:    { col:'#ef4444', glow:'rgba(239,68,68,.3)'   },
+  HIGH:      { col:'#f97316', glow:'rgba(249,115,22,.28)' },
+  ELEVATED:  { col:'#eab308', glow:'rgba(234,179,8,.28)'  },
+  LOW:       { col:'#84cc16', glow:'rgba(132,204,22,.25)' },
+  NOMINAL:   { col:'#22c55e', glow:'rgba(34,197,94,.22)'  },
+  UNKNOWN:   { col:'#52566a', glow:'rgba(82,86,106,.2)'   },
+};
+
+function _applyWW3Theme(level){
+  const t = _WW3_COLORS[level] || _WW3_COLORS.UNKNOWN;
+  const m = document.getElementById('ww3-meter');
+  if(!m) return;
+  m.style.setProperty('--ww3-col',  t.col);
+  m.style.setProperty('--ww3-glow', t.glow);
+  m.classList.toggle('critical', level==='CRITICAL');
+}
+
+function renderWW3(data){
+  const score = data.score ?? null;
+  const level = data.level || 'UNKNOWN';
+  const el = {
+    score:   document.getElementById('ww3-score'),
+    level:   document.getElementById('ww3-level-lbl'),
+    fill:    document.getElementById('ww3-fill'),
+    foot:    document.getElementById('ww3-foot-ts'),
+    assess:  document.getElementById('ww3-assess'),
+    factors: document.getElementById('ww3-factors'),
+    hist:    document.getElementById('ww3-history-wrap'),
+    pulse:   document.getElementById('ww3-pulse'),
+  };
+  if(el.score)  el.score.textContent  = score !== null ? score : '--';
+  if(el.level)  el.level.textContent  = level;
+  if(el.fill)   el.fill.style.height  = score !== null ? score+'%' : '0%';
+  _applyWW3Theme(level);
+  if(el.pulse)  el.pulse.classList.toggle('live', score !== null);
+
+  if(data.generated_at && el.foot){
+    const d = data.generated_at.slice(0,10);
+    const t = data.generated_at.slice(11,16);
+    el.foot.textContent = `${d} ${t} UTC`;
+  }
+  if(data.assessment && el.assess){
+    el.assess.textContent = data.assessment;
+  }
+  if(data.key_factors && el.factors){
+    el.factors.innerHTML = (data.key_factors||[]).map(f=>
+      `<div class="ww3-factor">${esc(f)}</div>`
+    ).join('');
+  }
+  // 30-day history mini-bar chart
+  if(data.history && el.hist && data.history.length){
+    const max = 100;
+    el.hist.innerHTML = data.history.map(h=>{
+      const t = _WW3_COLORS[h.level]||_WW3_COLORS.UNKNOWN;
+      const pct = Math.max(4, Math.round((h.score/max)*100));
+      return `<div class="ww3-bar" style="height:${pct}%;background:${t.col};opacity:.7"
+        title="${h.generated_at.slice(0,10)} — ${h.score}/100 ${h.level}"></div>`;
+    }).join('');
+  }
+}
+
+async function loadWW3(){
+  try{
+    const data = await fetch('/api/ww3').then(r=>r.json());
+    renderWW3(data);
+  }catch(e){ console.warn('loadWW3:', e); }
+}
+
+function toggleWW3Drawer(){
+  const d = document.getElementById('ww3-drawer');
+  const f = document.getElementById('ww3-foot');
+  if(!d) return;
+  const open = d.classList.toggle('open');
+  if(f){
+    const arrow = f.querySelector('span:last-child');
+    if(arrow) arrow.textContent = open ? '▲' : '▼';
+  }
+}
+
+async function triggerWW3Regen(){
+  const btn = document.getElementById('ww3-regen');
+  if(btn){ btn.disabled=true; btn.textContent='↻ GENERATING…'; }
+  try{
+    await fetch('/api/ww3/generate', {method:'POST'});
+    showToast('WW3 METER — REGENERATING VIA AI (30s)');
+    setTimeout(loadWW3, 35000);
+  }catch(e){
+    showToast('WW3 REGEN FAILED');
+  } finally {
+    setTimeout(()=>{ if(btn){ btn.disabled=false; btn.textContent='↻ REGENERATE NOW'; } }, 36000);
+  }
+}
+
+// Handle live WW3 push from WebSocket
+function _onWW3Push(data){ renderWW3(data); showToast(`WW3 METER UPDATED — ${data.score}/100 ${data.level}`); }
+
+// Load on boot + listen for WS push
+setTimeout(loadWW3, 3000);
+
 // ── Phase 7: Daily Digest ─────────────────────────────────────────────────────
 async function loadDigest(){
   const btn = document.getElementById('digest-btn');
@@ -6291,6 +6557,8 @@ function connectWS(){
             setTimeout(()=>{ tab.style.color='var(--amber)'; }, 3000);
           }
         }
+      } else if(msg.type==='ww3_meter'){
+        if(msg.data) _onWW3Push(msg.data);
       }
       refreshCounts();
       if(TL.isLive&&TL.summary) refreshTimelineBounds();
@@ -7692,12 +7960,12 @@ async function loadCipSitrep(){
   const out=document.getElementById('cip-sitrep-out');
   btn.disabled=true;
   btn.textContent='⟳ GENERATING BRIEF...';
-  out.innerHTML='<div style="color:var(--dim2);font-size:.48rem">QUERYING INTELLIGENCE DATABASE...<br>CONTACTING AI ANALYSIS UNIT...<br>ETA ~15-30s</div>';
+  out.innerHTML='<div style="color:var(--dim2);font-size:.62rem">QUERYING INTELLIGENCE DATABASE...<br>CONTACTING AI ANALYSIS UNIT...<br>ETA ~15-30s</div>';
   try{
     const data=await fetch(`/api/brief/country/${encodeURIComponent(country)}`).then(r=>r.json());
     const text=data.text||data.error||'No brief generated.';
-    out.innerHTML=`<div id="cip-sitrep-out" style="font-size:.5rem;color:var(--text);line-height:1.7;white-space:pre-wrap">${esc(text)}</div>
-      <div style="margin-top:.5rem;font-size:.38rem;color:var(--dim2)">GENERATED ${new Date().toISOString().slice(0,16).replace('T',' ')} UTC · MODEL: ${esc(data.model||'—')}</div>`;
+    out.innerHTML=`<div style="font-size:.72rem;color:var(--text);line-height:1.75;white-space:pre-wrap">${esc(text)}</div>
+      <div style="margin-top:.5rem;font-size:.48rem;color:var(--dim2)">GENERATED ${new Date().toISOString().slice(0,16).replace('T',' ')} UTC · MODEL: ${esc(data.model||'—')}</div>`;
     btn.textContent='⟳ REGENERATE';
     btn.disabled=false;
   }catch(e){

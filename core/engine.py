@@ -610,6 +610,26 @@ async def _tick_intel_brief():
         log_err(f"tick_intel_brief: {exc}")
 
 
+async def _tick_ww3_meter():
+    """Run once per UTC calendar day. Checks if today's reading exists; if not, generates."""
+    if not C.ENABLE_WW3_METER or not C.ANTHROPIC_API_KEY:
+        return
+    try:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        last  = DB.get_ww3_meter()
+        if last and last.get("generated_at", "")[:10] == today:
+            return  # already done today
+        from core.ww3_meter import generate_ww3_score
+        result = await generate_ww3_score()
+        if result.get("score") is not None:
+            log(f"ww3_meter: score={result['score']} level={result['level']}")
+            await _broadcast({"type": "ww3_meter", "data": result})
+        elif result.get("error"):
+            log_warn(f"ww3_meter: {result['error']}")
+    except Exception as exc:
+        log_err(f"tick_ww3_meter: {exc}")
+
+
 async def _tick_webhook_flush():
     if not C.ALERT_WEBHOOK_URL:
         return
@@ -688,7 +708,8 @@ async def start():
         asyncio.create_task(_run_every(_tick_telegram_osint,  C.TELEGRAM_OSINT_INTERVAL_SEC,  "telegram_osint")),
         asyncio.create_task(_run_every(_tick_breaking_news,   C.BREAKING_NEWS_INTERVAL_SEC,   "breaking_news")),
         asyncio.create_task(_run_every(_tick_route_deviation, C.ROUTE_DEV_INTERVAL_SEC,       "route_deviation")),
-        asyncio.create_task(_run_every(_tick_webhook_flush, C.WEBHOOK_MIN_INTERVAL_SEC, "webhook_flush")),
+        asyncio.create_task(_run_every(_tick_webhook_flush,  C.WEBHOOK_MIN_INTERVAL_SEC,      "webhook_flush")),
+        asyncio.create_task(_run_every(_tick_ww3_meter,      C.WW3_METER_CHECK_SEC,           "ww3_meter")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks
