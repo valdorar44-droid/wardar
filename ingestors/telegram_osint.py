@@ -19,26 +19,18 @@ import httpx
 
 from config import settings as C
 
-# ── Telegram OSINT channels (public, English-primary or English-mixed) ─────────
+# ── Telegram OSINT channels — trimmed to highest signal/noise ratio ────────────
+# Removed: UkraineNow, GazaAlaan, MiddleEastSpectator, Flash_news_ua, AirAlerts_ua, warnewsua
+# Reason: heavy overlap with remaining channels; fingerprint dedup was suppressing most of their
+# unique posts anyway. Keeping the 7 highest-signal, lowest-overlap channels.
 _CHANNELS = [
-    # Ukraine / Russia — highest volume conflict OSINT
+    ("osintdefender",    "OSINT Defender — global incidents & strikes"),
     ("intelslava",       "Intel Slava Z — Ukraine frontline reports"),
     ("wartranslated",    "War Translated — Russian mil blog translations"),
-    ("UkraineNow",       "Ukraine Now — real-time events"),
-    # Middle East / Gaza / Iran
-    ("GazaAlaan",        "Gaza Now — Palestine/Israel"),
     ("Conflictnews",     "Conflict News — global incidents"),
-    ("MiddleEastSpectator", "Middle East Spectator"),
-    # Global OSINT analysts
-    ("osintdefender",    "OSINT Defender — global incidents & strikes"),
     ("intelcrab",        "Intel Crab — global intelligence"),
-    # Africa
-    ("SahelIntelligence","Sahel Intelligence — Mali/Niger/Burkina"),
-    # Yemen / Houthi
     ("YemenWatch",       "Yemen Watch — Houthi/coalition activity"),
-    ("Flash_news_ua",    "Flash: Ukraine Breaking News"),
-    ("AirAlerts_ua",     "Ukraine Air Raid Alerts"),
-    ("warnewsua",        "War News Ukraine"),
+    ("SahelIntelligence","Sahel Intelligence — Mali/Niger/Burkina"),
 ]
 
 # Pre-filter keywords (same as Reddit ingestor)

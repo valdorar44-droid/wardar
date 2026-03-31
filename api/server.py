@@ -849,17 +849,26 @@ async def get_country_stats(country: str, response: Response):
     })
 
 
+_COUNTRY_BRIEF_CACHE: dict[str, dict] = {}   # country → {result, ts}
+_COUNTRY_BRIEF_TTL = 21600.0                  # 6 hours — same as global brief
+
 @app.get("/api/brief/country/{country}")
 async def get_country_brief(country: str):
-    """Generate an on-demand AI brief for a specific country."""
+    """Generate an on-demand AI brief for a specific country. Cached 6h per country."""
     if not C.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
-    if not country.strip():
+    key = country.strip().lower()
+    if not key:
         raise HTTPException(status_code=400, detail="country required")
+    now = time.monotonic()
+    cached = _COUNTRY_BRIEF_CACHE.get(key)
+    if cached and (now - cached["ts"]) < _COUNTRY_BRIEF_TTL:
+        return JSONResponse(cached["result"])
     from core.intel_brief import generate_country_brief
     result = await generate_country_brief(country)
     if result.get("error"):
         raise HTTPException(status_code=503, detail=result["error"])
+    _COUNTRY_BRIEF_CACHE[key] = {"result": result, "ts": now}
     return JSONResponse(result)
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
