@@ -5263,6 +5263,12 @@ function sourceToLayerKey(source, category){
 }
 
 function markerKey(p){
+  // Moving entities (aircraft/ships): key on callsign+source only so the marker
+  // moves in-place rather than creating a new marker at every position update.
+  const src = (p.source||'').toLowerCase();
+  if(p.callsign && (src==='adsb'||src==='opensky'||src==='airplaneslive'||src==='ais'||src==='tle'))
+    return p.callsign+'_'+src;
+  // Static events: include lat/lon so multiple events at different locations get distinct markers.
   return (p.callsign||p.title||p.id||'')+'_'+(p.source||'')+'_'+(p.lat||0).toFixed(2)+'_'+(p.lon||0).toFixed(2);
 }
 
@@ -6673,16 +6679,23 @@ function _renderWatchzoneList(){
 // ── Movement trails in 2D ─────────────────────────────────────────────────────
 function setTrails2D(on){ _trails2dOn = on; if(!on) _clearTrails2D(); }
 function _clearTrails2D(){
-  Object.values(_trails2dLines).forEach(l=>{ if(_map2d) _map2d.removeLayer(l); });
+  Object.values(_trails2dLines).forEach(t=>{
+    if(!_map2d) return;
+    if(t && t.line){ _map2d.removeLayer(t.line); _map2d.removeLayer(t.dots); }
+    else if(t && t.removeFrom) _map2d.removeLayer(t); // legacy single-layer
+  });
   _trails2dLines = {};
 }
 function _updateTrail2D(callsign, pts, color){
   if(!_map2d||!_trails2dOn||pts.length<2) return;
-  if(_trails2dLines[callsign]) _map2d.removeLayer(_trails2dLines[callsign]);
-  _trails2dLines[callsign] = L.polyline(
-    pts.map(p=>[p.lat,p.lon]),
-    {color,weight:1.5,opacity:.45,dashArray:'3 6'}
-  ).addTo(_map2d);
+  const prev = _trails2dLines[callsign];
+  if(prev){ if(prev.line){ _map2d.removeLayer(prev.line); _map2d.removeLayer(prev.dots); } else if(prev.removeFrom) _map2d.removeLayer(prev); }
+  const coords = pts.map(p=>[p.lat,p.lon]);
+  // Solid connecting line
+  const line = L.polyline(coords,{color,weight:1.5,opacity:0.5}).addTo(_map2d);
+  // Round dot at each waypoint — dashArray '1 N' with lineCap round = evenly-spaced dots
+  const dots = L.polyline(coords,{color,weight:5,opacity:0.65,dashArray:'1 12',lineCap:'round'}).addTo(_map2d);
+  _trails2dLines[callsign] = {line, dots};
 }
 
 // ── REST initial load ─────────────────────────────────────────────────────────
