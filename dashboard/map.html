@@ -2153,16 +2153,16 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">AEROSOL/SMOKE</span>
               <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">MODIS</span>
             </label>
-            <label class="layer-item" title="MODIS thermal anomalies (Terra) — fire/heat hotspots from satellite. Overlaps with FIRMS ground-truth; use together for corroboration. NASA GIBS, daily.">
+            <label class="layer-item" title="MODIS Terra daily true-color satellite imagery (~2-day lag). Use for visual corroboration of conflict zone activity — smoke columns, fires, flooding.">
               <input type="checkbox" class="layer-cb" id="cb-atm-fire" style="color:#ef4444" onchange="toggleAtmLayer('fire',this.checked)">
-              <span class="layer-icon" style="color:#ef4444">🌡</span>
-              <span class="layer-name">THERMAL ANOMALY</span>
+              <span class="layer-icon" style="color:#ef4444">🛰</span>
+              <span class="layer-name">DAILY IMAGERY</span>
               <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">MODIS</span>
             </label>
-            <label class="layer-item" title="VIIRS true-color daily satellite imagery (NOAA-20) — cloud-free composite. Useful for visual verification of conflict-zone activity. NASA GIBS, daily.">
+            <label class="layer-item" title="VIIRS Night Lights composite (2012 baseline) — shows economic activity and population density. Useful for assessing conflict impact on civilian infrastructure.">
               <input type="checkbox" class="layer-cb" id="cb-atm-rgb" style="color:#a3e635" onchange="toggleAtmLayer('rgb',this.checked)">
-              <span class="layer-icon" style="color:#a3e635">🛰</span>
-              <span class="layer-name">SATELLITE IMAGERY</span>
+              <span class="layer-icon" style="color:#a3e635">🌙</span>
+              <span class="layer-name">NIGHT LIGHTS</span>
               <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">VIIRS</span>
             </label>
           </div>
@@ -6669,28 +6669,32 @@ const _atmLayers = {}; // key → L.tileLayer or null
 
 const _ATM_LAYER_DEFS = {
   no2: {
-    // OMI Aura — Tropospheric NO₂ Column Density (daily)
-    tpl: d => `${_GIBS_BASE}/TROPOPMI_L3_NO2/default/${d}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`,
-    maxNativeZoom: 7, opacity: 0.75,
-    label: 'NO₂ column (OMI)',
+    // TEMPO — Tropospheric NO₂ Column Density (daily, ~1-day lag)
+    // Detects vehicle exhaust, industrial fires, rocket plumes
+    tpl: d => `${_GIBS_BASE}/TEMPO_L3_NO2_Vertical_Column_Troposphere/default/${d}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`,
+    maxNativeZoom: 7, opacity: 0.72, daysBack: 1,
+    label: 'NO₂ column (TEMPO)',
   },
   aod: {
-    // MODIS Terra — Aerosol Optical Depth (daily composite)
+    // MODIS Terra — Aerosol Optical Depth (daily composite, ~2-day lag)
+    // Detects smoke from oil fires, burning vehicles, explosions
     tpl: d => `${_GIBS_BASE}/MODIS_Terra_Aerosol/default/${d}/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png`,
-    maxNativeZoom: 6, opacity: 0.7,
-    label: 'Aerosol depth (MODIS)',
+    maxNativeZoom: 6, opacity: 0.7, daysBack: 2,
+    label: 'Aerosol/smoke (MODIS)',
   },
   fire: {
-    // MODIS Terra — Thermal Anomalies (fire hotspots, daily)
-    tpl: d => `${_GIBS_BASE}/MODIS_Terra_Thermal_Anomalies_All/default/${d}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`,
-    maxNativeZoom: 8, opacity: 0.85,
-    label: 'Thermal anomaly (MODIS)',
+    // MODIS Terra — True Color daily satellite imagery (~2-day lag)
+    // Use for visual corroboration of conflict zone activity
+    tpl: d => `${_GIBS_BASE}/MODIS_Terra_CorrectedReflectance_TrueColor/default/${d}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    maxNativeZoom: 9, opacity: 0.88, daysBack: 2,
+    label: 'Daily imagery (MODIS)',
   },
   rgb: {
-    // VIIRS NOAA-20 — True Color corrected reflectance (daily)
-    tpl: d => `${_GIBS_BASE}/VIIRS_NOAA20_CorrectedReflectance_TrueColor/default/${d}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
-    maxNativeZoom: 9, opacity: 0.9,
-    label: 'True color (VIIRS)',
+    // VIIRS Night Lights composite (2012 reference baseline)
+    // Shows economic activity/population density — useful for conflict impact analysis
+    tpl: () => `${_GIBS_BASE}/VIIRS_Night_Lights/default/2012-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg`,
+    maxNativeZoom: 8, opacity: 0.65, daysBack: 0,
+    label: 'Night lights (VIIRS)',
   },
 };
 
