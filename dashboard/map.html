@@ -1643,17 +1643,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   background:rgba(0,0,0,.6);backdrop-filter:blur(2px);
   transition:opacity .25s;
 }
-/* Floating mobile panel buttons */
+/* Mobile header panel buttons (inside header bar, desktop-hidden) */
 #mob-left-btn,#mob-right-btn{
-  display:none;position:fixed;z-index:510;
-  background:rgba(8,8,12,.94);border:1px solid var(--border2);
-  color:var(--amber);font-family:var(--font);font-size:.72rem;
-  letter-spacing:.08em;padding:.45rem .7rem;cursor:pointer;
+  display:none;background:none;border:1px solid var(--border2);
+  color:var(--amber);font-family:var(--font);font-size:.75rem;
+  letter-spacing:.08em;padding:.22rem .5rem;cursor:pointer;
   transition:color .15s,border-color .15s,background .15s;
-  box-shadow:0 2px 12px rgba(0,0,0,.5);
+  flex-shrink:0;
 }
-#mob-left-btn{ left:.6rem;bottom:60px; }
-#mob-right-btn{ right:.6rem;bottom:60px; }
 #mob-left-btn:hover,#mob-right-btn:hover{
   color:var(--text);border-color:var(--amber);background:rgba(245,158,11,.08);
 }
@@ -1695,7 +1692,10 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   /* ── Overlay + mobile nav buttons ── */
   #mob-overlay{ display:block;opacity:0;pointer-events:none; }
   #mob-overlay.active{ opacity:1;pointer-events:all; }
-  #mob-left-btn,#mob-right-btn{ display:block; }
+  #mob-left-btn,#mob-right-btn{ display:inline-block; }
+  /* Don't auto-open video bar on mobile — hides below statusbar */
+  #videobar.open{ display:none!important; }
+  body.vbar-open #panel,body.vbar-open #rpanel,body.vbar-open #timeline{ bottom:44px!important; }
 
   /* ── Panel tab: hidden (use mob-left-btn instead) ── */
   #panel-tab{ display:none!important; }
@@ -1732,10 +1732,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 </head>
 <body>
 
-<!-- ══ MOBILE: panel overlay + floating nav buttons ══════════════════════════ -->
+<!-- ══ MOBILE: panel overlay ══════════════════════════════════════════════════ -->
 <div id="mob-overlay" onclick="closeMobPanels()"></div>
-<button id="mob-left-btn" onclick="toggleMobLeft()" title="Sensor feeds &amp; layers">☰ FEEDS</button>
-<button id="mob-right-btn" onclick="toggleMobRight()" title="Intelligence panel">⌇ INTEL</button>
 
 <!-- ══ BOOT SEQUENCE ══════════════════════════════════════════════════════════ -->
 <div id="boot">
@@ -1850,6 +1848,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <button id="cinema-btn"   class="mapmode-btn" onclick="toggleCinema()"   title="Map-only mode — hide all panels">⊞ MAP</button>
     <button id="fullscreen-toggle" class="mapmode-btn" onclick="toggleFullscreen()" title="Browser fullscreen">⛶ FULL</button>
     <button class="mapmode-btn" onclick="toggleSettings()" title="User settings &amp; preferences" style="letter-spacing:.05em">⚙ SETTINGS</button>
+    <button id="mob-left-btn" onclick="toggleMobLeft()" title="Sensor feeds &amp; layers">☰ FEEDS</button>
+    <button id="mob-right-btn" onclick="toggleMobRight()" title="Intelligence panel">⌇ INTEL</button>
     <div id="hdr-clock">--:--:-- UTC</div>
     <div class="threat-badge" id="threat-badge">
       <div class="threat-dot" id="threat-dot" style="background:var(--green)"></div>
