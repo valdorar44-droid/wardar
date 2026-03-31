@@ -498,6 +498,46 @@ body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .alert-item-ts{font-size:.43rem;color:var(--dim2);letter-spacing:.05em;margin-top:.2rem}
 
+/* ── PHASE 5: CHOKEPOINT THROUGHPUT ── */
+#choke-section{border-bottom:1px solid var(--border);flex-shrink:0}
+#choke-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.4rem .75rem;cursor:pointer;font-size:.5rem;letter-spacing:.1em;
+  color:var(--cyan);user-select:none;
+}
+#choke-hdr:hover{background:rgba(6,182,212,.04)}
+#choke-body{padding:.3rem .75rem .5rem;display:none}
+#choke-section.open #choke-body{display:block}
+.choke-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.18rem 0;border-bottom:1px solid rgba(22,22,31,.8);
+  font-size:.5rem;letter-spacing:.04em;
+}
+.choke-row:last-of-type{border-bottom:none}
+.choke-name{color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.choke-counts{display:flex;gap:.3rem;flex-shrink:0}
+.choke-cnt{
+  font-size:.44rem;padding:.08rem .28rem;
+  border-radius:2px;font-weight:700;letter-spacing:.04em;
+}
+.choke-cnt.h1{background:rgba(6,182,212,.18);color:var(--cyan)}
+.choke-cnt.h6{background:rgba(6,182,212,.1);color:var(--cyan);opacity:.8}
+.choke-cnt.h24{background:rgba(6,182,212,.06);color:var(--dim2)}
+#choke-legend{
+  display:flex;gap:.5rem;margin-bottom:.3rem;
+  font-size:.42rem;color:var(--dim2);letter-spacing:.06em;
+}
+#choke-ts{font-size:.4rem;color:var(--dim2);margin-top:.3rem;letter-spacing:.05em}
+
+/* ── PHASE 5: BIOGRAPHY TRACK BUTTON ── */
+.track-btn{
+  width:100%;margin-top:.4rem;padding:.25rem .5rem;
+  background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);
+  color:var(--cyan);font-family:var(--font);font-size:.5rem;
+  letter-spacing:.09em;cursor:pointer;text-align:center;
+}
+.track-btn:hover{background:rgba(6,182,212,.2)}
+
 /* ── SITREP / AI BRIEF PANE ── */
 #sitrep-body{
   flex:1;overflow-y:auto;padding:.75rem;
@@ -1912,6 +1952,22 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         <div class="rp-pane active" id="pane-feed">
           <div class="rp-head">
             LIVE EVENTS <span id="feed-count">0</span> IN BUFFER
+          </div>
+          <!-- Phase 5: Chokepoint Throughput -->
+          <div id="choke-section" class="open">
+            <div id="choke-hdr" onclick="toggleChokeSection()">
+              ⚓ CHOKEPOINT FLOW
+              <span id="choke-badge" style="font-size:.44rem;color:var(--dim2)">LOADING…</span>
+            </div>
+            <div id="choke-body">
+              <div id="choke-legend">
+                <span style="color:var(--cyan)">1H</span>
+                <span style="color:var(--cyan);opacity:.8">6H</span>
+                <span>24H</span>
+              </div>
+              <div id="choke-list"><div style="color:var(--dim2);font-size:.5rem">LOADING…</div></div>
+              <div id="choke-ts"></div>
+            </div>
           </div>
           <!-- Temporal event filter -->
           <div id="time-filter">
@@ -3840,6 +3896,9 @@ function buildPopup(p){
       ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>`:''}
       <button class="pvote-btn" style="flex:1;text-align:center;color:#a78bfa" onclick="predictPath(_lastPopupData)">🎯 PREDICT PATH</button>
     </div>
+    <button class="track-btn" onclick="showTrack('${esc(src)}','${esc(p.callsign||'')}')">
+      📍 SHOW TRACK (24H BIOGRAPHY)
+    </button>
   </div>`;
 }
 
@@ -4515,6 +4574,114 @@ async function predictPath(d){
     inner.appendChild(sec);
   }
 }
+
+// ── Phase 5: Track Biography ──────────────────────────────────────────────────
+let _trackLayer = null;
+
+async function showTrack(source, callsign){
+  if(!_map2d){ showToast('MAP NOT READY'); return; }
+  if(_trackLayer){ _map2d.removeLayer(_trackLayer); _trackLayer = null; }
+  if(!callsign){ showToast('NO CALLSIGN'); return; }
+
+  showToast('FETCHING TRACK…');
+  try{
+    const data = await fetch(
+      `/api/track/${encodeURIComponent(source)}/${encodeURIComponent(callsign)}?hours=24`
+    ).then(r=>r.json());
+
+    if(!data.track || data.track.length < 2){
+      showToast('NO TRACK DATA — HISTORY ACCUMULATING');
+      return;
+    }
+
+    _trackLayer = L.layerGroup();
+
+    // Polyline — amber dashed
+    const pts = data.track.map(p=>[p.lat, p.lon]);
+    L.polyline(pts, {color:'#f59e0b', weight:2, opacity:0.85, dashArray:'5,4'})
+      .addTo(_trackLayer);
+
+    // Start marker (green)
+    const first = data.track[0];
+    L.circleMarker([first.lat, first.lon], {
+      radius:5, color:'#22c55e', fillColor:'#22c55e', fillOpacity:1, weight:1.5
+    }).bindTooltip(`TRACK START\n${first.raw_ts_utc.slice(0,16)} UTC`, {direction:'top'})
+      .addTo(_trackLayer);
+
+    // End marker (current — red)
+    const last = data.track[data.track.length-1];
+    L.circleMarker([last.lat, last.lon], {
+      radius:5, color:'#ef4444', fillColor:'#ef4444', fillOpacity:1, weight:1.5
+    }).bindTooltip(`LAST FIX\n${last.raw_ts_utc.slice(0,16)} UTC`, {direction:'top'})
+      .addTo(_trackLayer);
+
+    _trackLayer.addTo(_map2d);
+    _map2d.fitBounds(L.polyline(pts).getBounds(), {padding:[40,40], maxZoom:8});
+    showToast(`TRACK: ${data.count} pts · ${data.hours}h · ${esc(callsign)}`);
+  } catch(e){
+    showToast('TRACK ERROR');
+    console.error('showTrack:', e);
+  }
+}
+
+function clearTrack(){
+  if(_trackLayer && _map2d){ _map2d.removeLayer(_trackLayer); _trackLayer = null; }
+}
+
+// ── Phase 5: Chokepoint Throughput ────────────────────────────────────────────
+let _chokeData = null;
+
+function toggleChokeSection(){
+  document.getElementById('choke-section').classList.toggle('open');
+}
+
+async function loadChokepoints(){
+  try{
+    const data = await fetch('/api/chokepoints').then(r=>r.json());
+    _chokeData = data.chokepoints;
+    renderChokepoints();
+  } catch(e){ console.warn('chokepoints fetch:', e); }
+}
+
+function renderChokepoints(){
+  const list = document.getElementById('choke-list');
+  const badge = document.getElementById('choke-badge');
+  const tsEl  = document.getElementById('choke-ts');
+  if(!list || !_chokeData) return;
+
+  // Badge: sum of 1h counts across all chokepoints
+  const total1h = _chokeData.reduce((a,c)=>a+c.last1h, 0);
+  if(badge) badge.textContent = `${total1h} VESSELS/AIRCRAFT 1H`;
+
+  list.innerHTML = '';
+  _chokeData.forEach(c=>{
+    const row = document.createElement('div');
+    row.className = 'choke-row';
+    // Truncate name to keep layout tight
+    const name = c.name.length > 22 ? c.name.slice(0,20)+'…' : c.name;
+    row.innerHTML = `
+      <span class="choke-name" title="${esc(c.name)}">${esc(name)}</span>
+      <div class="choke-counts">
+        <span class="choke-cnt h1">${c.last1h}</span>
+        <span class="choke-cnt h6">${c.last6h}</span>
+        <span class="choke-cnt h24">${c.last24h}</span>
+      </div>`;
+    // Click: fly to chokepoint
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', ()=>{
+      if(_map2d) _map2d.setView([(c.bbox[1]+c.bbox[3])/2, (c.bbox[0]+c.bbox[2])/2], 6);
+    });
+    list.appendChild(row);
+  });
+
+  if(tsEl) tsEl.textContent = 'UPDATED ' + new Date().toISOString().slice(11,16) + ' UTC';
+}
+
+// Load on boot, then refresh every 30 min
+setTimeout(()=>{
+  loadChokepoints();
+  setInterval(loadChokepoints, 1800000);
+}, 5000);  // 5s after boot so map is ready
 
 // ── Layer helpers ─────────────────────────────────────────────────────────────
 function sourceToLayerKey(source, category){

@@ -149,6 +149,14 @@ TRANSPONDER_LOSS_INTERVAL_SEC = _i("TRANSPONDER_LOSS_INTERVAL_SEC", 600)   # eve
 FIRMS_USGS_INTERVAL_SEC       = _i("FIRMS_USGS_INTERVAL_SEC",       1800)  # every 30 min
 GPSJAM_DARK_INTERVAL_SEC      = _i("GPSJAM_DARK_INTERVAL_SEC",      900)   # every 15 min
 
+# ── Phase 5 Temporal Intelligence ──────────────────────
+HISTORY_RETAIN_HOURS     = _i("HISTORY_RETAIN_HOURS",     72)   # 3 days of track history
+MIN_HIST_INTERVAL_SEC    = _i("MIN_HIST_INTERVAL_SEC",    120)  # ≥2 min between history writes per entity
+ENABLE_ROUTE_DEV         = _b("ENABLE_ROUTE_DEV",         True)
+ROUTE_DEV_INTERVAL_SEC   = _i("ROUTE_DEV_INTERVAL_SEC",  1800)  # route deviation check every 30 min
+ROUTE_DEV_THRESHOLD_KM   = _i("ROUTE_DEV_THRESHOLD_KM",  300)   # km off baseline before alerting
+CHOKEPOINT_INTERVAL_SEC  = _i("CHOKEPOINT_INTERVAL_SEC", 1800)  # chokepoint stats every 30 min
+
 # ── Pikud HaOref (Israel rocket alerts) ────────────────
 ENABLE_PIKUD_HAOREF        = _b("ENABLE_PIKUD_HAOREF",        True)
 PIKUD_HAOREF_INTERVAL_SEC  = _i("PIKUD_HAOREF_INTERVAL_SEC",  15)    # poll every 15s

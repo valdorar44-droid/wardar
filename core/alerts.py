@@ -843,3 +843,77 @@ def run_gpsjam_dark_vessel() -> int:
             fired += 1
 
     return fired
+
+
+# ── 9. ROUTE DEVIATION DETECTOR ───────────────────────────────────────────────
+# Compares recent 1h centroid to the 24-72h baseline centroid for each tracked
+# entity. If the two centroids are >ROUTE_DEV_THRESHOLD_KM apart, fire an alert.
+# Requires at least MIN_POINTS in each window to reduce false positives.
+
+_ROUTE_DEV_MIN_POINTS = 3   # minimum track points needed in each window
+
+def run_route_deviation_check() -> int:
+    """
+    Scan all entities with enough position history.
+    Fire route_dev alert when current track centroid deviates significantly
+    from the baseline centroid.  Returns count of new alerts fired.
+    """
+    fired  = 0
+    now    = datetime.now(timezone.utc)
+    thresh = float(C.ROUTE_DEV_THRESHOLD_KM)
+
+    candidates = DB.get_active_callsigns_in_history(min_points=_ROUTE_DEV_MIN_POINTS * 2)
+
+    for c in candidates:
+        src      = c["source"]
+        callsign = c["callsign"]
+
+        recent, baseline = DB.get_position_track_for_deviation(
+            src, callsign,
+            recent_hours=1.0,
+            baseline_hours_min=24.0,
+            baseline_hours_max=72.0,
+        )
+
+        if len(recent) < _ROUTE_DEV_MIN_POINTS or len(baseline) < _ROUTE_DEV_MIN_POINTS:
+            continue
+
+        # Compute centroids
+        r_lat = sum(p["lat"] for p in recent)   / len(recent)
+        r_lon = sum(p["lon"] for p in recent)   / len(recent)
+        b_lat = sum(p["lat"] for p in baseline) / len(baseline)
+        b_lon = sum(p["lon"] for p in baseline) / len(baseline)
+
+        dist_km = _hav(r_lat, r_lon, b_lat, b_lon)
+        if dist_km < thresh:
+            continue
+
+        # Deduplicate — fire at most once per 12h per callsign
+        if _already_fired("route_dev", callsign, hours=12):
+            continue
+
+        title = (
+            f"↗ ROUTE DEVIATION: {callsign} — {dist_km:.0f}km off baseline"
+        )
+        desc = (
+            f"{callsign} ({src.upper()}) is currently tracked ~{dist_km:.0f}km from its "
+            f"24-72h baseline corridor.  Recent centroid: ({r_lat:.3f}, {r_lon:.3f}). "
+            f"Baseline centroid: ({b_lat:.3f}, {b_lon:.3f}).  "
+            f"This may indicate route change, divert, or evasive manoeuvre."
+        )
+        saved = _save_alert(
+            "route_dev", title, desc, r_lat, r_lon,
+            extra={
+                "callsign":  callsign,
+                "source":    src,
+                "dist_km":   round(dist_km, 1),
+                "recent_n":  len(recent),
+                "baseline_n": len(baseline),
+                "recent_centroid":   [round(r_lat, 4), round(r_lon, 4)],
+                "baseline_centroid": [round(b_lat, 4), round(b_lon, 4)],
+            },
+        )
+        if saved:
+            fired += 1
+
+    return fired

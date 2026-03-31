@@ -170,6 +170,51 @@ async def playback_frame(
     data     = DB.get_positions_at(ts=ts, window_sec=window, sources=src_list, bbox=bbox, limit=limit)
     return JSONResponse({"ts": ts, "count": len(data), "data": data})
 
+# ── Phase 5: Track / Biography endpoints ─────────────────────────────────────
+
+@app.get("/api/track/{source}/{callsign}")
+async def get_track(source: str, callsign: str, hours: int = 24):
+    """
+    Return the throttled position history for a single entity.
+    Delay policy enforced — military positions held back 300s.
+    Max `hours` capped at HISTORY_RETAIN_HOURS.
+    """
+    hours = min(hours, C.HISTORY_RETAIN_HOURS)
+    data  = DB.get_position_track(source, callsign, hours=hours)
+    return JSONResponse({"source": source, "callsign": callsign,
+                         "hours": hours, "count": len(data), "track": data})
+
+# Chokepoint definitions: (name, west, south, east, north)
+_CHOKEPOINTS = [
+    ("Strait of Hormuz",     55.8, 25.6, 57.0, 27.0),
+    ("Strait of Malacca",   100.0,  1.0,104.5,  6.0),
+    ("Suez Canal",           31.0, 30.0, 33.0, 32.5),
+    ("Bab-el-Mandeb",        42.5, 11.0, 44.0, 13.5),
+    ("GIUK Gap",            -30.0, 56.0,  0.0, 66.0),
+    ("Gibraltar",            -6.0, 35.5, -4.5, 36.5),
+    ("Taiwan Strait",       119.5, 22.0,122.5, 26.5),
+    ("English Channel",      -2.5, 49.0,  2.5, 52.0),
+    ("Danish Straits",        9.5, 54.5, 13.5, 58.0),
+    ("Luzon Strait",        119.5, 18.5,123.0, 21.5),
+]
+
+@app.get("/api/chokepoints")
+async def get_chokepoints():
+    """
+    Return entity counts for each strategic chokepoint over the last 1h, 6h, and 24h.
+    Derived from position_history (Phase 5).
+    """
+    results = []
+    for name, w, s, e, n in _CHOKEPOINTS:
+        results.append({
+            "name":   name,
+            "bbox":   [w, s, e, n],
+            "last1h":  DB.get_chokepoint_count(w, s, e, n, hours=1),
+            "last6h":  DB.get_chokepoint_count(w, s, e, n, hours=6),
+            "last24h": DB.get_chokepoint_count(w, s, e, n, hours=24),
+        })
+    return JSONResponse({"chokepoints": results})
+
 # ── Community Intel ───────────────────────────────────────────────────────────
 
 _VALID_REPORT_TYPES = {

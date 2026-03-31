@@ -127,6 +127,26 @@ _MIGRATIONS: list[str] = [
         sources_used  TEXT NOT NULL DEFAULT '[]'
     )""",
     """CREATE INDEX IF NOT EXISTS idx_brief_ts ON intel_briefs(generated_at DESC)""",
+
+    # v9 — Phase 5 position history (separate from upsert positions table)
+    # Stores a throttled time-series of each entity's positions for track/biography.
+    # One row per entity per ~2 min (throttled in engine.py to keep DB lean).
+    """CREATE TABLE IF NOT EXISTS position_history (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        source        TEXT NOT NULL,
+        callsign      TEXT NOT NULL,
+        lat           REAL NOT NULL,
+        lon           REAL NOT NULL,
+        altitude_ft   REAL,
+        speed_kts     REAL,
+        heading_deg   REAL,
+        military_flag INTEGER DEFAULT 0,
+        raw_ts_utc    TEXT NOT NULL
+    )""",
+    """CREATE UNIQUE INDEX IF NOT EXISTS idx_hist_dedup  ON position_history(source, callsign, raw_ts_utc)""",
+    """CREATE INDEX        IF NOT EXISTS idx_hist_track  ON position_history(source, callsign, raw_ts_utc)""",
+    """CREATE INDEX        IF NOT EXISTS idx_hist_ts     ON position_history(raw_ts_utc)""",
+    """CREATE INDEX        IF NOT EXISTS idx_hist_bbox   ON position_history(lat, lon, raw_ts_utc)""",
 ]
 
 def get_conn() -> sqlite3.Connection:
@@ -406,6 +426,113 @@ def purge_old_events() -> int:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=cutoff_days)).isoformat()
     with _lock:
         cur = conn.execute("DELETE FROM events WHERE raw_ts_utc < ?", (cutoff,))
+        conn.commit()
+        return cur.rowcount
+
+# ── Phase 5: Position History ────────────────────────────────────────────────
+
+def insert_position_history(p: dict) -> None:
+    """Insert a history snapshot for an entity. IGNORE on exact duplicate ts."""
+    with _lock:
+        conn = get_conn()
+        conn.execute("""
+            INSERT OR IGNORE INTO position_history
+              (source, callsign, lat, lon, altitude_ft, speed_kts, heading_deg,
+               military_flag, raw_ts_utc)
+            VALUES
+              (:source,:callsign,:lat,:lon,:altitude_ft,:speed_kts,:heading_deg,
+               :military_flag,:raw_ts_utc)
+        """, p)
+        conn.commit()
+
+def get_position_track(source: str, callsign: str, hours: int = 24) -> list[dict]:
+    """
+    Return the throttled position history for (source, callsign) over the last `hours`.
+    Delay policy enforced: military positions held back 300s, civilian 30s.
+    Returns points in chronological order.
+    """
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    cutoff_old = (now - timedelta(hours=hours)).isoformat()
+    # Apply release delay: military = 300s, civilian = 30s
+    # We don't know military_flag without querying, so use a conservative 30s for civilian
+    # and look it up per-row below.
+    rows = get_conn().execute("""
+        SELECT lat, lon, altitude_ft, speed_kts, heading_deg, military_flag, raw_ts_utc
+        FROM position_history
+        WHERE source = ? AND callsign = ? AND raw_ts_utc >= ?
+        ORDER BY raw_ts_utc ASC
+    """, (source, callsign, cutoff_old)).fetchall()
+
+    now_iso = now.isoformat()
+    result = []
+    for r in rows:
+        delay_s = 300 if r["military_flag"] else 30
+        cutoff_ts = (now - timedelta(seconds=delay_s)).isoformat()
+        if r["raw_ts_utc"] <= cutoff_ts:
+            result.append(dict(r))
+    return result
+
+def get_position_track_for_deviation(source: str, callsign: str,
+                                      recent_hours: float = 1.0,
+                                      baseline_hours_min: float = 24.0,
+                                      baseline_hours_max: float = 72.0) -> tuple[list, list]:
+    """
+    Returns (recent_points, baseline_points) for route deviation analysis.
+    recent_points:   last `recent_hours` hours of positions
+    baseline_points: positions between `baseline_hours_min` and `baseline_hours_max` ago
+    """
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    recent_cutoff   = (now - timedelta(hours=recent_hours)).isoformat()
+    baseline_start  = (now - timedelta(hours=baseline_hours_max)).isoformat()
+    baseline_end    = (now - timedelta(hours=baseline_hours_min)).isoformat()
+
+    conn = get_conn()
+    recent = conn.execute("""
+        SELECT lat, lon FROM position_history
+        WHERE source=? AND callsign=? AND raw_ts_utc >= ?
+        ORDER BY raw_ts_utc ASC
+    """, (source, callsign, recent_cutoff)).fetchall()
+
+    baseline = conn.execute("""
+        SELECT lat, lon FROM position_history
+        WHERE source=? AND callsign=? AND raw_ts_utc BETWEEN ? AND ?
+        ORDER BY raw_ts_utc ASC
+    """, (source, callsign, baseline_start, baseline_end)).fetchall()
+
+    return [dict(r) for r in recent], [dict(r) for r in baseline]
+
+def get_active_callsigns_in_history(min_points: int = 5) -> list[dict]:
+    """Return (source, callsign) pairs with enough history for deviation analysis."""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT source, callsign, COUNT(*) as n
+        FROM position_history
+        GROUP BY source, callsign
+        HAVING n >= ?
+    """, (min_points,)).fetchall()
+    return [dict(r) for r in rows]
+
+def get_chokepoint_count(bbox_w: float, bbox_s: float, bbox_e: float, bbox_n: float,
+                          hours: int = 24) -> int:
+    """Count distinct callsigns seen in a bounding box over the last `hours`."""
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT COUNT(DISTINCT callsign) as n
+        FROM position_history
+        WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? AND raw_ts_utc >= ?
+    """, (bbox_s, bbox_n, bbox_w, bbox_e, cutoff)).fetchone()
+    return row["n"] if row else 0
+
+def purge_old_history() -> int:
+    """Delete position_history rows older than HISTORY_RETAIN_HOURS."""
+    cutoff = _utcnow_minus_hours(C.HISTORY_RETAIN_HOURS)
+    with _lock:
+        conn = get_conn()
+        cur = conn.execute("DELETE FROM position_history WHERE raw_ts_utc < ?", (cutoff,))
         conn.commit()
         return cur.rowcount
 

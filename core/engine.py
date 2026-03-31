@@ -88,16 +88,21 @@ async def _broadcast(msg: dict):
 def _now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+# Phase 5: throttle history writes — dict mapping (source, callsign) → last write monotonic time
+_last_hist_write: dict[tuple, float] = {}
+
 def _save_positions(positions: list[dict]) -> int:
     saved = 0
+    now_mono = time.monotonic()
     for p in positions:
         try:
             raw_ts = p.get("raw_ts_utc") or _now_utc()
             mil    = int(p.get("military_flag") or 0)
             src    = p.get("source", "")
+            callsign = p.get("callsign", "")
             record = {
                 "source":       src,
-                "callsign":     p.get("callsign", ""),
+                "callsign":     callsign,
                 "type":         p.get("type", ""),
                 "lat":          p.get("lat"),
                 "lon":          p.get("lon"),
@@ -112,6 +117,27 @@ def _save_positions(positions: list[dict]) -> int:
             }
             DB.upsert_position(record)
             saved += 1
+            # Phase 5: throttled history write — at most once per MIN_HIST_INTERVAL_SEC per entity
+            key = (src, callsign)
+            if callsign and (now_mono - _last_hist_write.get(key, 0)) >= C.MIN_HIST_INTERVAL_SEC:
+                lat = p.get("lat")
+                lon = p.get("lon")
+                if lat is not None and lon is not None:
+                    try:
+                        DB.insert_position_history({
+                            "source":       src,
+                            "callsign":     callsign,
+                            "lat":          lat,
+                            "lon":          lon,
+                            "altitude_ft":  p.get("altitude_ft"),
+                            "speed_kts":    p.get("speed_kts"),
+                            "heading_deg":  p.get("heading_deg"),
+                            "military_flag": mil,
+                            "raw_ts_utc":   raw_ts,
+                        })
+                        _last_hist_write[key] = now_mono
+                    except Exception:
+                        pass  # non-fatal — history is best-effort
         except Exception as exc:
             log_err(f"save_position: {exc}")
     return saved
@@ -261,10 +287,23 @@ async def _tick_purge():
     try:
         p = DB.purge_old_positions()
         e = DB.purge_old_events()
-        if p or e:
-            log(f"purge: removed {p} positions, {e} events")
+        h = DB.purge_old_history()
+        if p or e or h:
+            log(f"purge: removed {p} positions, {e} events, {h} history rows")
     except Exception as exc:
         log_err(f"tick_purge: {exc}")
+
+async def _tick_route_deviation():
+    if not C.ENABLE_ROUTE_DEV or not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_route_deviation_check
+        n = run_route_deviation_check()
+        if n:
+            released = DB.get_released_events(sources=["route_dev"], limit=50)
+            await _broadcast({"type": "events", "sources": ["route_dev"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_route_deviation: {exc}")
 
 async def _tick_dark_vessel():
     if not C.ENABLE_ALERTS:
@@ -636,6 +675,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_reddit_osint,    C.REDDIT_OSINT_INTERVAL_SEC,    "reddit_osint")),
         asyncio.create_task(_run_every(_tick_telegram_osint,  C.TELEGRAM_OSINT_INTERVAL_SEC,  "telegram_osint")),
         asyncio.create_task(_run_every(_tick_breaking_news,   C.BREAKING_NEWS_INTERVAL_SEC,   "breaking_news")),
+        asyncio.create_task(_run_every(_tick_route_deviation, C.ROUTE_DEV_INTERVAL_SEC,       "route_deviation")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks
