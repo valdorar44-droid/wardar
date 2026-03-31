@@ -2132,6 +2132,42 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
           </div>
         </div>
 
+        <!-- ── ATMOSPHERIC INTELLIGENCE (closed by default) ── -->
+        <div class="layer-group" id="grp-atm">
+          <div class="layer-group-hdr" onclick="toggleGroup(this)">
+            <span class="grp-arrow">▶</span>
+            <span class="grp-dot" style="background:#22d3ee"></span>
+            <span class="grp-label">ATMOSPHERIC</span>
+            <span class="grp-badge" id="grp-atm-badge"></span>
+          </div>
+          <div class="layer-group-body">
+            <label class="layer-item" title="NO₂ column density (OMI/Aura) — detects vehicle exhaust concentrations, industrial fires, rocket plumes. High values = military activity or industrial anomaly. NASA GIBS, ~2-day lag.">
+              <input type="checkbox" class="layer-cb" id="cb-atm-no2" style="color:#22d3ee" onchange="toggleAtmLayer('no2',this.checked)">
+              <span class="layer-icon" style="color:#22d3ee">⊗</span>
+              <span class="layer-name">NO₂ COLUMN</span>
+              <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">OMI</span>
+            </label>
+            <label class="layer-item" title="Aerosol optical depth (MODIS/Terra) — detects smoke from burning vehicles, oil fires, explosions. High values = active burning. NASA GIBS, ~2-day lag.">
+              <input type="checkbox" class="layer-cb" id="cb-atm-aod" style="color:#fb923c" onchange="toggleAtmLayer('aod',this.checked)">
+              <span class="layer-icon" style="color:#fb923c">☁</span>
+              <span class="layer-name">AEROSOL/SMOKE</span>
+              <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">MODIS</span>
+            </label>
+            <label class="layer-item" title="MODIS thermal anomalies (Terra) — fire/heat hotspots from satellite. Overlaps with FIRMS ground-truth; use together for corroboration. NASA GIBS, daily.">
+              <input type="checkbox" class="layer-cb" id="cb-atm-fire" style="color:#ef4444" onchange="toggleAtmLayer('fire',this.checked)">
+              <span class="layer-icon" style="color:#ef4444">🌡</span>
+              <span class="layer-name">THERMAL ANOMALY</span>
+              <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">MODIS</span>
+            </label>
+            <label class="layer-item" title="VIIRS true-color daily satellite imagery (NOAA-20) — cloud-free composite. Useful for visual verification of conflict-zone activity. NASA GIBS, daily.">
+              <input type="checkbox" class="layer-cb" id="cb-atm-rgb" style="color:#a3e635" onchange="toggleAtmLayer('rgb',this.checked)">
+              <span class="layer-icon" style="color:#a3e635">🛰</span>
+              <span class="layer-name">SATELLITE IMAGERY</span>
+              <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">VIIRS</span>
+            </label>
+          </div>
+        </div>
+
         <!-- ── HUMAN TERRAIN (closed by default) ── -->
         <div class="layer-group" id="grp-human">
           <div class="layer-group-hdr" onclick="toggleGroup(this)">
@@ -6624,6 +6660,64 @@ function togglePipelineLayer(on){
     if(_pipelineLayer2d&&_map2d){ _map2d.removeLayer(_pipelineLayer2d); _pipelineLayer2d=null; }
     _scheduleRebuild();
   }
+}
+
+// ── ATMOSPHERIC INTELLIGENCE — NASA GIBS tile overlays ───────────────────────
+// NASA GIBS WMTS tiles (no key needed, free, ~2-day processing lag)
+const _GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
+const _atmLayers = {}; // key → L.tileLayer or null
+
+const _ATM_LAYER_DEFS = {
+  no2: {
+    // OMI Aura — Tropospheric NO₂ Column Density (daily)
+    tpl: d => `${_GIBS_BASE}/TROPOPMI_L3_NO2/default/${d}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`,
+    maxNativeZoom: 7, opacity: 0.75,
+    label: 'NO₂ column (OMI)',
+  },
+  aod: {
+    // MODIS Terra — Aerosol Optical Depth (daily composite)
+    tpl: d => `${_GIBS_BASE}/MODIS_Terra_Aerosol/default/${d}/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png`,
+    maxNativeZoom: 6, opacity: 0.7,
+    label: 'Aerosol depth (MODIS)',
+  },
+  fire: {
+    // MODIS Terra — Thermal Anomalies (fire hotspots, daily)
+    tpl: d => `${_GIBS_BASE}/MODIS_Terra_Thermal_Anomalies_All/default/${d}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`,
+    maxNativeZoom: 8, opacity: 0.85,
+    label: 'Thermal anomaly (MODIS)',
+  },
+  rgb: {
+    // VIIRS NOAA-20 — True Color corrected reflectance (daily)
+    tpl: d => `${_GIBS_BASE}/VIIRS_NOAA20_CorrectedReflectance_TrueColor/default/${d}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    maxNativeZoom: 9, opacity: 0.9,
+    label: 'True color (VIIRS)',
+  },
+};
+
+function _gibsDate(daysBack=2){
+  const d = new Date(Date.now() - daysBack*86400000);
+  return d.toISOString().slice(0,10);
+}
+
+function toggleAtmLayer(key, on){
+  if(!_map2d) return;
+  if(!on){
+    if(_atmLayers[key]){ _map2d.removeLayer(_atmLayers[key]); _atmLayers[key]=null; }
+    return;
+  }
+  const def = _ATM_LAYER_DEFS[key];
+  if(!def) return;
+  if(_atmLayers[key]){ _map2d.removeLayer(_atmLayers[key]); _atmLayers[key]=null; }
+  const date = _gibsDate(def.daysBack||2);
+  _atmLayers[key] = L.tileLayer(def.tpl(date), {
+    attribution: `<a href="https://worldview.earthdata.nasa.gov/" target="_blank">NASA Earthdata</a>`,
+    maxNativeZoom: def.maxNativeZoom,
+    maxZoom: 19,
+    opacity: def.opacity,
+    errorTileUrl: 'data:image/png;base64,iVBORw0KGgo=', // transparent on 404
+  }).addTo(_map2d);
+  // Send to back but keep above base tiles
+  _atmLayers[key].setZIndex(2);
 }
 
 // ── EEZ Boundaries ───────────────────────────────────────────────────────────
