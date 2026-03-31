@@ -175,11 +175,7 @@ async def _tick_adsb():
         positions = await adsb.fetch()
         n = _save_positions(positions)
         if positions:
-            # Delta broadcast: send only current-tick positions (non-military).
-            # Clients already have full state from snapshot; we just push updates.
-            delta = [p for p in positions if not p.get("military_flag", 0)]
-            if delta:
-                await _broadcast({"type": "positions", "sources": ["adsb", "opensky", "adsb_emergency"], "data": delta})
+            await _broadcast({"type": "positions", "sources": ["adsb", "opensky", "adsb_emergency"], "data": positions})
     except Exception as exc:
         log_err(f"tick_adsb: {exc}")
 
@@ -189,9 +185,7 @@ async def _tick_ais():
         positions = await ais.fetch()
         n = _save_positions(positions)
         if positions:
-            delta = [p for p in positions if not p.get("military_flag", 0)]
-            if delta:
-                await _broadcast({"type": "positions", "sources": ["ais"], "data": delta})
+            await _broadcast({"type": "positions", "sources": ["ais"], "data": positions})
     except Exception as exc:
         log_err(f"tick_ais: {exc}")
 
@@ -201,9 +195,7 @@ async def _tick_tle():
         positions = await tle.fetch()
         n = _save_positions(positions)
         if positions:
-            delta = [p for p in positions if not p.get("military_flag", 0)]
-            if delta:
-                await _broadcast({"type": "positions", "sources": ["tle"], "data": delta})
+            await _broadcast({"type": "positions", "sources": ["tle"], "data": positions})
     except Exception as exc:
         log_err(f"tick_tle: {exc}")
 
