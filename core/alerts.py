@@ -479,3 +479,367 @@ async def run_pipeline_proximity_check() -> int:
             break  # one alert per ACLED event (nearest pipeline)
 
     return fired
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. VESSEL SPEED SPOOFING DETECTION
+# AIS-reported speed > physics max for vessel class → GPS spoof or data injection
+# ══════════════════════════════════════════════════════════════════════════════
+
+_MAX_SPEED_BY_TYPE: dict[str, float] = {
+    "fishing":        15.0,   # trawlers, seiners
+    "cargo":          25.0,   # container, bulk carrier
+    "tanker":         16.0,   # oil, LNG, chemical
+    "passenger":      28.0,   # ferries, cruise
+    "government":     35.0,   # coast guard, SAR, navy
+    "high_speed":     55.0,   # hydrofoil, patrol boat
+    "wing_in_ground": 100.0,  # WIG craft (can fly)
+    "other":          25.0,
+    "ship":           30.0,   # unknown type — conservative threshold
+}
+
+
+def run_vessel_spoofing_check() -> int:
+    """
+    Detect AIS positions reporting speed_kts above the physics max for vessel class.
+    Returns number of new alerts fired.
+    """
+    if not C.ENABLE_AIS:
+        return 0
+    conn = DB.get_conn()
+    rows = conn.execute("""
+        SELECT callsign, lat, lon, speed_kts, type, country, raw_ts_utc
+        FROM positions
+        WHERE source = 'ais'
+          AND speed_kts IS NOT NULL
+          AND speed_kts > 0
+          AND raw_ts_utc > datetime('now', '-1 hour')
+          AND lat IS NOT NULL AND lon IS NOT NULL
+        ORDER BY speed_kts DESC
+        LIMIT 300
+    """).fetchall()
+
+    fired = 0
+    for r in rows:
+        vessel_type = (r["type"] or "ship").lower()
+        max_kts = _MAX_SPEED_BY_TYPE.get(vessel_type, 30.0)
+        speed   = r["speed_kts"]
+        if speed <= max_kts:
+            continue
+
+        callsign = r["callsign"] or "UNKNOWN"
+        title = (
+            f"⚡ AIS SPOOF: {callsign} — {speed:.0f}kts "
+            f"({vessel_type} max {max_kts:.0f}kts)"
+        )
+        desc = (
+            f"AIS-reported speed {speed:.1f} kts far exceeds {vessel_type} class "
+            f"maximum of {max_kts:.0f} kts. Possible GPS spoofing or AIS data "
+            f"injection. Position: ({r['lat']:.3f}, {r['lon']:.3f})."
+        )
+        saved = _save_alert(
+            "vessel_spoof", title, desc, r["lat"], r["lon"],
+            country=r["country"] or "",
+            extra={"callsign": callsign, "speed_kts": round(speed, 1),
+                   "vessel_type": vessel_type, "max_kts": max_kts},
+        )
+        if saved:
+            fired += 1
+    return fired
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. ADS-B TRANSPONDER LOSS NEAR SENSITIVE AIRSPACE
+# Aircraft goes dark (>15 min ADS-B gap) while near a conflict/restricted zone
+# ══════════════════════════════════════════════════════════════════════════════
+
+_SENSITIVE_AIRSPACE: list[dict] = [
+    {"name": "Ukraine",          "bbox": (22, 44, 40, 52)},
+    {"name": "Gaza / West Bank", "bbox": (34, 29, 36, 33)},
+    {"name": "Syria",            "bbox": (35, 32, 42, 37)},
+    {"name": "Iran",             "bbox": (44, 25, 63, 39)},
+    {"name": "North Korea",      "bbox": (124, 37, 130, 43)},
+    {"name": "Taiwan Strait",    "bbox": (119, 21, 123, 27)},
+    {"name": "South China Sea",  "bbox": (105,  0, 125, 25)},
+    {"name": "Yemen",            "bbox": (42, 12, 54, 20)},
+    {"name": "Sudan / Sahel",    "bbox": (22, 10, 38, 22)},
+    {"name": "Venezuela",        "bbox": (-73, 1, -60, 13)},
+]
+
+_TRANSPONDER_LOSS_MIN = 15    # minutes gap before flagging
+_TRANSPONDER_LOSS_MAX_H = 48  # ignore gaps older than this
+
+
+def run_transponder_loss_check() -> int:
+    """
+    Find aircraft that went dark (ADS-B gap >15 min) near sensitive airspaces.
+    With upsert model, one row per callsign = last known position.
+    Returns number of new alerts fired.
+    """
+    conn = DB.get_conn()
+    now       = datetime.now(timezone.utc)
+    cutoff_hi = (now - timedelta(minutes=_TRANSPONDER_LOSS_MIN)).isoformat()
+    cutoff_lo = (now - timedelta(hours=_TRANSPONDER_LOSS_MAX_H)).isoformat()
+
+    rows = conn.execute("""
+        SELECT callsign, lat, lon, country, type, military_flag, raw_ts_utc
+        FROM positions
+        WHERE source IN ('adsb', 'opensky', 'airplaneslive')
+          AND callsign != ''
+          AND raw_ts_utc < ?
+          AND raw_ts_utc > ?
+          AND lat IS NOT NULL AND lon IS NOT NULL
+        ORDER BY raw_ts_utc DESC
+        LIMIT 500
+    """, (cutoff_hi, cutoff_lo)).fetchall()
+
+    fired = 0
+    for r in rows:
+        lat, lon = r["lat"], r["lon"]
+        zone_hit = None
+        for z in _SENSITIVE_AIRSPACE:
+            w, s, e, n = z["bbox"]
+            if w <= lon <= e and s <= lat <= n:
+                zone_hit = z["name"]
+                break
+        if not zone_hit:
+            continue
+
+        callsign = r["callsign"]
+        try:
+            ls_dt      = datetime.fromisoformat(r["raw_ts_utc"].replace("Z", "+00:00"))
+            mins_dark  = (now - ls_dt.replace(tzinfo=timezone.utc)).total_seconds() / 60
+        except Exception:
+            continue
+
+        is_mil  = r["military_flag"]
+        mil_tag = "MIL " if is_mil else ""
+        title   = f"✈ TRANSPONDER LOSS: {mil_tag}{callsign} — {zone_hit}"
+        desc    = (
+            f"ADS-B signal lost {mins_dark:.0f} min ago near {zone_hit}. "
+            f"Last position: ({lat:.3f}, {lon:.3f}), {r['raw_ts_utc'][:16]} UTC. "
+            f"Type: {r['type'] or 'unknown'}. "
+            f"Possible transponder switch-off, jamming, or shoot-down."
+        )
+        saved = _save_alert(
+            "transponder_loss", title, desc, lat, lon,
+            country=r["country"] or zone_hit,
+            extra={"callsign": callsign, "minutes_dark": round(mins_dark, 1),
+                   "airspace": zone_hit, "military": bool(is_mil),
+                   "type": r["type"] or ""},
+        )
+        if saved:
+            fired += 1
+    return fired
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. FIRMS + USGS CROSS-CORRELATION
+# Thermal anomaly + seismic event within 50km / 4h → possible explosion or strike
+# ══════════════════════════════════════════════════════════════════════════════
+
+_CROSS_RADIUS_KM    = 50.0  # spatial threshold
+_CROSS_WINDOW_H     = 4     # temporal threshold in hours
+_FIRMS_MIN_FRP      = 20.0  # minimum fire radiative power (MW)
+_USGS_MIN_MAG_CROSS = 3.0   # minimum magnitude for cross-correlation
+
+
+def run_firms_usgs_correlation() -> int:
+    """
+    Find FIRMS thermal + USGS seismic pairs within 50km and 4h.
+    Fires compound alert — possible explosion, strike, or industrial incident.
+    Returns number of new alerts fired.
+    """
+    if not (C.ENABLE_FIRMS and C.ENABLE_USGS):
+        return 0
+
+    conn = DB.get_conn()
+    window_ts = (datetime.now(timezone.utc) - timedelta(hours=_CROSS_WINDOW_H * 2)).isoformat()
+
+    firms_rows = conn.execute("""
+        SELECT lat, lon, raw_ts_utc, title, extra
+        FROM events
+        WHERE source = 'firms'
+          AND raw_ts_utc > ?
+          AND lat IS NOT NULL AND lon IS NOT NULL
+        ORDER BY raw_ts_utc DESC
+        LIMIT 500
+    """, (window_ts,)).fetchall()
+
+    firms = []
+    for r in firms_rows:
+        try:
+            ex  = json.loads(r["extra"] or "{}")
+            frp = float(ex.get("frp") or 0)
+            if frp >= _FIRMS_MIN_FRP:
+                firms.append({"lat": r["lat"], "lon": r["lon"],
+                               "ts": r["raw_ts_utc"], "frp": frp,
+                               "title": r["title"]})
+        except Exception:
+            continue
+
+    if not firms:
+        return 0
+
+    usgs_rows = conn.execute("""
+        SELECT lat, lon, raw_ts_utc, title, extra
+        FROM events
+        WHERE source = 'usgs'
+          AND raw_ts_utc > ?
+          AND lat IS NOT NULL AND lon IS NOT NULL
+        ORDER BY raw_ts_utc DESC
+        LIMIT 300
+    """, (window_ts,)).fetchall()
+
+    usgs = []
+    for r in usgs_rows:
+        try:
+            ex  = json.loads(r["extra"] or "{}")
+            mag = float(ex.get("mag") or 0)
+            if mag >= _USGS_MIN_MAG_CROSS:
+                usgs.append({"lat": r["lat"], "lon": r["lon"],
+                             "ts": r["raw_ts_utc"], "mag": mag,
+                             "title": r["title"]})
+        except Exception:
+            continue
+
+    if not usgs:
+        return 0
+
+    fired = 0
+    for f in firms:
+        for q in usgs:
+            km = _hav(f["lat"], f["lon"], q["lat"], q["lon"])
+            if km > _CROSS_RADIUS_KM:
+                continue
+            try:
+                ft = datetime.fromisoformat(f["ts"].replace("Z", "+00:00"))
+                qt = datetime.fromisoformat(q["ts"].replace("Z", "+00:00"))
+                hours_apart = abs((ft - qt).total_seconds()) / 3600
+                if hours_apart > _CROSS_WINDOW_H:
+                    continue
+            except Exception:
+                continue
+
+            mid_lat = (f["lat"] + q["lat"]) / 2
+            mid_lon = (f["lon"] + q["lon"]) / 2
+            title   = (
+                f"💥 COMPOUND SIGNAL: Thermal+Seismic {km:.0f}km apart — "
+                f"M{q['mag']:.1f} + {f['frp']:.0f}MW FRP"
+            )
+            desc = (
+                f"NASA FIRMS thermal anomaly ({f['frp']:.0f}MW FRP) and USGS M{q['mag']:.1f} "
+                f"seismic event within {km:.0f}km / {hours_apart:.1f}h. "
+                f"Thermal: ({f['lat']:.3f}, {f['lon']:.3f}). "
+                f"Seismic: ({q['lat']:.3f}, {q['lon']:.3f}). "
+                f"Compound signature may indicate explosion, strike, or industrial incident."
+            )
+            saved = _save_alert(
+                "firms_usgs", title, desc, mid_lat, mid_lon,
+                extra={"frp": f["frp"], "magnitude": q["mag"],
+                       "distance_km": round(km, 1),
+                       "hours_apart": round(hours_apart, 2),
+                       "firms_title": (f["title"] or "")[:100],
+                       "usgs_title":  (q["title"] or "")[:100]},
+            )
+            if saved:
+                fired += 1
+            break  # one alert per FIRMS event (nearest USGS match)
+
+    return fired
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 8. GPSJAM + DARK VESSEL COMPOUND
+# Vessel goes dark (AIS gap >2h) inside an active GPS jamming zone
+# ══════════════════════════════════════════════════════════════════════════════
+
+_JAM_VESSEL_RADIUS_KM = 200.0  # vessel must be within this radius of jamming
+_JAM_VESSEL_DARK_H    = 2      # vessel must be dark at least this long
+
+
+def run_gpsjam_dark_vessel() -> int:
+    """
+    Find AIS vessels that went dark (>2h) while inside an active GPS jamming zone.
+    Returns number of new alerts fired.
+    """
+    if not (C.ENABLE_AIS and C.ENABLE_GPSJAM):
+        return 0
+
+    conn = DB.get_conn()
+    now  = datetime.now(timezone.utc)
+
+    jam_rows = conn.execute("""
+        SELECT lat, lon, title
+        FROM events
+        WHERE source = 'gpsjam'
+          AND lat IS NOT NULL AND lon IS NOT NULL
+          AND raw_ts_utc > datetime('now', '-6 hours')
+        ORDER BY raw_ts_utc DESC
+        LIMIT 300
+    """).fetchall()
+
+    if not jam_rows:
+        return 0
+
+    cutoff_dark  = (now - timedelta(hours=_JAM_VESSEL_DARK_H)).isoformat()
+    cutoff_stale = (now - timedelta(hours=48)).isoformat()
+
+    vessel_rows = conn.execute("""
+        SELECT callsign, lat, lon, country, raw_ts_utc
+        FROM positions
+        WHERE source = 'ais'
+          AND callsign != ''
+          AND raw_ts_utc < ?
+          AND raw_ts_utc > ?
+          AND lat IS NOT NULL AND lon IS NOT NULL
+        ORDER BY raw_ts_utc DESC
+        LIMIT 300
+    """, (cutoff_dark, cutoff_stale)).fetchall()
+
+    if not vessel_rows:
+        return 0
+
+    fired = 0
+    for vessel in vessel_rows:
+        vlat, vlon = vessel["lat"], vessel["lon"]
+        nearest_km    = float("inf")
+        nearest_title = ""
+        for jam in jam_rows:
+            km = _hav(vlat, vlon, jam["lat"], jam["lon"])
+            if km < nearest_km:
+                nearest_km    = km
+                nearest_title = jam["title"] or ""
+
+        if nearest_km > _JAM_VESSEL_RADIUS_KM:
+            continue
+
+        callsign = vessel["callsign"]
+        try:
+            ls_dt      = datetime.fromisoformat(vessel["raw_ts_utc"].replace("Z", "+00:00"))
+            hours_dark = (now - ls_dt.replace(tzinfo=timezone.utc)).total_seconds() / 3600
+        except Exception:
+            continue
+
+        title = (
+            f"🛰 DARK+JAMMED: {callsign} — {nearest_km:.0f}km from jamming, "
+            f"{hours_dark:.1f}h dark"
+        )
+        desc  = (
+            f"Vessel {callsign} went dark {hours_dark:.1f}h ago at "
+            f"({vlat:.3f}, {vlon:.3f}), within {nearest_km:.0f}km of active GPS jamming. "
+            f"Last seen: {vessel['raw_ts_utc'][:16]} UTC. "
+            f"Jamming ref: {nearest_title[:100]}. "
+            f"Possible AIS loss due to electronic warfare or deliberate evasion."
+        )
+        saved = _save_alert(
+            "gpsjam_dark", title, desc, vlat, vlon,
+            country=vessel["country"] or "",
+            extra={"callsign": callsign, "hours_dark": round(hours_dark, 1),
+                   "jam_km": round(nearest_km, 1),
+                   "jam_ref": nearest_title[:100]},
+        )
+        if saved:
+            fired += 1
+
+    return fired

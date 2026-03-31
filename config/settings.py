@@ -143,6 +143,12 @@ NUCLEAR_ALERT_KM           = _i("NUCLEAR_ALERT_KM",           10)    # km radius
 PIPELINE_ALERT_KM          = _i("PIPELINE_ALERT_KM",          5)     # km radius
 CONVERGENCE_SCORE_THRESHOLD= _i("CONVERGENCE_SCORE_THRESHOLD", 4)    # min score
 
+# ── Phase 4 Dark Signal Detectors ─────────────────────
+VESSEL_SPOOF_INTERVAL_SEC     = _i("VESSEL_SPOOF_INTERVAL_SEC",     600)   # every 10 min
+TRANSPONDER_LOSS_INTERVAL_SEC = _i("TRANSPONDER_LOSS_INTERVAL_SEC", 600)   # every 10 min
+FIRMS_USGS_INTERVAL_SEC       = _i("FIRMS_USGS_INTERVAL_SEC",       1800)  # every 30 min
+GPSJAM_DARK_INTERVAL_SEC      = _i("GPSJAM_DARK_INTERVAL_SEC",      900)   # every 15 min
+
 # ── Pikud HaOref (Israel rocket alerts) ────────────────
 ENABLE_PIKUD_HAOREF        = _b("ENABLE_PIKUD_HAOREF",        True)
 PIKUD_HAOREF_INTERVAL_SEC  = _i("PIKUD_HAOREF_INTERVAL_SEC",  15)    # poll every 15s

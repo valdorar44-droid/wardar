@@ -2436,11 +2436,11 @@ function runBoot(){
   // Hard failsafe — boot overlay ALWAYS removed after 8s regardless of any error
   const failsafeTimer = setTimeout(_dismissBoot, 8000);
 
-  // Apply persisted user settings on startup
-  _applySettings();
-
   // Defer initMap by one tick so all let/const declarations are initialized (avoids TDZ)
+  // _applySettings() is also deferred here — it reads `_settings` (let, line ~6521) which
+  // would be in the temporal dead zone if called synchronously before that line executes.
   setTimeout(()=>{
+    _applySettings();
     try { initMap(); } catch(e) {
       console.error('initMap failed:', e);
       // Show error in boot output

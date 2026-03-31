@@ -307,6 +307,54 @@ async def _tick_proximity_alerts():
     except Exception as exc:
         log_err(f"tick_proximity_alerts: {exc}")
 
+async def _tick_vessel_spoofing():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_vessel_spoofing_check
+        n = run_vessel_spoofing_check()
+        if n:
+            released = DB.get_released_events(sources=["vessel_spoof"], limit=50)
+            await _broadcast({"type": "events", "sources": ["vessel_spoof"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_vessel_spoofing: {exc}")
+
+async def _tick_transponder_loss():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_transponder_loss_check
+        n = run_transponder_loss_check()
+        if n:
+            released = DB.get_released_events(sources=["transponder_loss"], limit=50)
+            await _broadcast({"type": "events", "sources": ["transponder_loss"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_transponder_loss: {exc}")
+
+async def _tick_firms_usgs():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_firms_usgs_correlation
+        n = run_firms_usgs_correlation()
+        if n:
+            released = DB.get_released_events(sources=["firms_usgs"], limit=50)
+            await _broadcast({"type": "events", "sources": ["firms_usgs"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_firms_usgs: {exc}")
+
+async def _tick_gpsjam_dark():
+    if not C.ENABLE_ALERTS:
+        return
+    try:
+        from core.alerts import run_gpsjam_dark_vessel
+        n = run_gpsjam_dark_vessel()
+        if n:
+            released = DB.get_released_events(sources=["gpsjam_dark"], limit=50)
+            await _broadcast({"type": "events", "sources": ["gpsjam_dark"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_gpsjam_dark: {exc}")
+
 async def _tick_static_layers():
     try:
         from ingestors import static_layers
@@ -569,7 +617,11 @@ async def start():
         asyncio.create_task(_run_every(_tick_views,           C.VIEWS_INTERVAL_SEC,      "views")),
         asyncio.create_task(_run_every(_tick_dark_vessel,     C.DARK_VESSEL_INTERVAL_SEC,"dark_vessel")),
         asyncio.create_task(_run_every(_tick_convergence,     C.CONVERGENCE_INTERVAL_SEC,"convergence")),
-        asyncio.create_task(_run_every(_tick_proximity_alerts,C.PROXIMITY_INTERVAL_SEC,       "proximity")),
+        asyncio.create_task(_run_every(_tick_proximity_alerts,  C.PROXIMITY_INTERVAL_SEC,       "proximity")),
+        asyncio.create_task(_run_every(_tick_vessel_spoofing,  C.VESSEL_SPOOF_INTERVAL_SEC,    "vessel_spoof")),
+        asyncio.create_task(_run_every(_tick_transponder_loss, C.TRANSPONDER_LOSS_INTERVAL_SEC,"transponder_loss")),
+        asyncio.create_task(_run_every(_tick_firms_usgs,       C.FIRMS_USGS_INTERVAL_SEC,      "firms_usgs")),
+        asyncio.create_task(_run_every(_tick_gpsjam_dark,      C.GPSJAM_DARK_INTERVAL_SEC,     "gpsjam_dark")),
         asyncio.create_task(_run_every(_tick_pikud_haoref,   C.PIKUD_HAOREF_INTERVAL_SEC,   "pikud_haoref")),
         asyncio.create_task(_run_every(_tick_wikipedia_spikes,C.WIKIPEDIA_SPIKE_INTERVAL_SEC,"wikipedia_spikes")),
         asyncio.create_task(_run_every(_tick_polymarket,   C.POLYMARKET_INTERVAL_SEC,  "polymarket")),
