@@ -163,143 +163,173 @@ body.cinema #cinema-exit { opacity:1; pointer-events:all; }
 /* ── TIMELINE HIDDEN ── */
 body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(60px); }
 
-/* ── WW3 RISK METER ── */
-#ww3-meter{
-  position:fixed;
-  bottom:52px;right:12px;
-  z-index:600;
-  width:108px;
-  background:rgba(4,4,8,.92);
-  border:1px solid var(--ww3-col,#22c55e);
-  box-shadow:0 0 14px var(--ww3-glow,rgba(34,197,94,.18)),inset 0 0 20px rgba(0,0,0,.4);
-  font-family:var(--font);
-  cursor:pointer;
-  user-select:none;
-  transition:border-color .6s ease,box-shadow .6s ease,opacity .3s ease,transform .3s ease;
+/* ── WW3 RISK METER — HEADER BAR (Pip-Boy style) ── */
+#ww3-hdr{
+  display:flex;align-items:center;gap:.55rem;
+  flex-shrink:0;cursor:pointer;
+  padding:0 .75rem;height:100%;
+  border-left:1px solid var(--border2);
+  border-right:1px solid var(--border2);
+  position:relative;user-select:none;
+  transition:background .15s;
 }
-#ww3-meter:hover{ box-shadow:0 0 22px var(--ww3-glow,rgba(34,197,94,.35)),inset 0 0 20px rgba(0,0,0,.4); }
-body.cinema #ww3-meter{ opacity:0;pointer-events:none;transform:translateX(130px); }
+#ww3-hdr:hover{ background:rgba(255,255,255,.025); }
+body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
 
-/* top strip with scan-line texture */
-#ww3-top{
-  padding:.28rem .4rem .22rem;
-  border-bottom:1px solid var(--ww3-col,#22c55e);
-  background:rgba(0,0,0,.3);
-  display:flex;align-items:center;justify-content:space-between;
+/* ☢ icon — slow spin */
+#ww3-icon{
+  font-size:.75rem;flex-shrink:0;
+  color:var(--ww3-col,#22c55e);
+  text-shadow:0 0 8px var(--ww3-col,#22c55e);
+  display:inline-block;
+  animation:ww3spin 12s linear infinite;
 }
+@keyframes ww3spin{ to{ transform:rotate(360deg); } }
+
+/* left label stack */
+#ww3-label-stack{ display:flex;flex-direction:column;gap:1px;flex-shrink:0; }
 #ww3-label{
-  font-size:.38rem;letter-spacing:.15em;color:var(--ww3-col,#22c55e);
-  text-shadow:0 0 6px var(--ww3-glow,rgba(34,197,94,.6));
+  font-size:.38rem;letter-spacing:.18em;
+  color:var(--ww3-col,#22c55e);
+  text-shadow:0 0 5px var(--ww3-glow,rgba(34,197,94,.5));
+  line-height:1;
 }
-#ww3-pulse{
-  width:5px;height:5px;border-radius:50%;
-  background:var(--ww3-col,#22c55e);
-  box-shadow:0 0 4px var(--ww3-col,#22c55e);
-}
+#ww3-sublabel{ font-size:.32rem;letter-spacing:.1em;color:var(--dim2);line-height:1; }
 
-/* gauge body */
-#ww3-body{
-  display:flex;align-items:center;gap:6px;
-  padding:.35rem .45rem .3rem;
+/* the bar track */
+#ww3-bar-wrap{
+  position:relative;width:160px;height:12px;flex-shrink:0;
+  background:rgba(0,0,0,.55);
+  border:1px solid rgba(255,255,255,.1);
+  overflow:hidden;
 }
-#ww3-spine-wrap{
-  position:relative;
-  width:10px;flex-shrink:0;height:56px;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-  border-radius:2px;overflow:hidden;
-}
-/* colour zone bands painted top-to-bottom inside spine (critical at top) */
-#ww3-spine-wrap::before{
+/* subtle colour-zone hint inside the track (left=safe, right=critical) */
+#ww3-bar-wrap::before{
   content:'';position:absolute;inset:0;
-  background:linear-gradient(to bottom,
-    #dc2626 0% 14%,
-    #ef4444 14% 28%,
-    #f97316 28% 44%,
-    #eab308 44% 62%,
-    #84cc16 62% 78%,
-    #22c55e 78% 100%
+  background:linear-gradient(90deg,
+    rgba(34,197,94,.13)  0%  30%,
+    rgba(234,179,8,.13) 30%  55%,
+    rgba(249,115,22,.13)55%  75%,
+    rgba(239,68,68,.13) 75%  90%,
+    rgba(220,38,38,.18) 90% 100%
   );
-  opacity:.18;
 }
-#ww3-fill{
-  position:absolute;bottom:0;left:0;right:0;
-  background:var(--ww3-col,#22c55e);
-  box-shadow:0 -3px 8px var(--ww3-glow,rgba(34,197,94,.5));
-  transition:height .9s cubic-bezier(.22,.68,0,1.2),background .6s ease;
-  height:0%;
-}
-/* tick marks */
-#ww3-spine-wrap::after{
-  content:'';position:absolute;inset:0;
-  background:repeating-linear-gradient(to bottom,
-    transparent 0px,transparent 10.4px,
-    rgba(255,255,255,.12) 10.4px,rgba(255,255,255,.12) 11px
+/* Fallout-style vertical segment dividers */
+#ww3-bar-wrap::after{
+  content:'';position:absolute;inset:0;z-index:3;
+  background:repeating-linear-gradient(90deg,
+    transparent 0px, transparent 14px,
+    rgba(0,0,0,.5) 14px, rgba(0,0,0,.5) 15px
   );
   pointer-events:none;
 }
+#ww3-bar-fill{
+  position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:var(--ww3-col,#22c55e);
+  box-shadow:4px 0 12px var(--ww3-glow,rgba(34,197,94,.6));
+  transition:width .9s cubic-bezier(.22,.68,0,1.2),background .6s ease,box-shadow .6s ease;
+  z-index:1;
+}
+/* scanlines over the fill */
+#ww3-bar-fill::after{
+  content:'';position:absolute;inset:0;z-index:2;
+  background:repeating-linear-gradient(0deg,
+    transparent,transparent 1px,
+    rgba(0,0,0,.22) 1px,rgba(0,0,0,.22) 2px
+  );
+}
 
-#ww3-right{flex:1;min-width:0}
+/* right side: number + level */
+#ww3-score-stack{ display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex-shrink:0; }
 #ww3-score{
-  font-size:1.35rem;font-weight:700;line-height:1;
+  font-size:.82rem;font-weight:700;line-height:1;letter-spacing:-.02em;
   color:var(--ww3-col,#22c55e);
-  text-shadow:0 0 12px var(--ww3-glow,rgba(34,197,94,.5));
-  letter-spacing:-.03em;
+  text-shadow:0 0 10px var(--ww3-glow,rgba(34,197,94,.5));
   transition:color .6s ease,text-shadow .6s ease;
 }
-#ww3-score-unit{
-  font-size:.35rem;letter-spacing:.08em;color:var(--dim2);
-  margin-left:.15rem;
-}
 #ww3-level-lbl{
-  font-size:.42rem;letter-spacing:.12em;margin-top:.18rem;
-  color:var(--ww3-col,#22c55e);font-weight:700;
+  font-size:.36rem;letter-spacing:.14em;font-weight:700;
+  color:var(--ww3-col,#22c55e);
   transition:color .6s ease;
+  white-space:nowrap;
 }
-#ww3-foot{
-  padding:.2rem .45rem .25rem;border-top:1px solid rgba(255,255,255,.05);
-  font-size:.36rem;letter-spacing:.08em;color:var(--dim2);
-  display:flex;align-items:center;justify-content:space-between;
-}
-#ww3-foot-ts{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px}
 
-/* expand drawer */
+/* live dot */
+#ww3-pulse{
+  width:5px;height:5px;border-radius:50%;flex-shrink:0;
+  background:var(--dim);
+  transition:background .6s;
+}
+#ww3-pulse.live{
+  background:var(--ww3-col,#22c55e);
+  box-shadow:0 0 4px var(--ww3-col,#22c55e);
+  animation:ww3dot 2.5s ease-in-out infinite;
+}
+@keyframes ww3dot{ 0%,100%{opacity:1} 50%{opacity:.2} }
+
+/* ── Drop-down drawer ── */
 #ww3-drawer{
+  position:fixed;top:52px;
+  z-index:699;width:340px;
+  background:rgba(4,4,8,.97);
+  border:1px solid var(--ww3-col,#22c55e);
+  border-top:2px solid var(--ww3-col,#22c55e);
+  box-shadow:0 8px 32px rgba(0,0,0,.7),0 0 20px var(--ww3-glow,rgba(34,197,94,.15));
+  font-family:var(--font);
   display:none;
-  border-top:1px solid var(--ww3-col,#22c55e);
-  padding:.4rem .5rem .45rem;
-  background:rgba(0,0,0,.25);
+  /* left position set by JS when toggled */
 }
 #ww3-drawer.open{ display:block; }
+#ww3-drawer-head{
+  padding:.45rem .65rem .35rem;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:center;justify-content:space-between;
+}
+#ww3-drawer-title{
+  font-size:.44rem;letter-spacing:.16em;color:var(--ww3-col,#22c55e);
+}
+#ww3-drawer-ts{
+  font-size:.38rem;letter-spacing:.07em;color:var(--dim2);
+}
 #ww3-assess{
-  font-size:.48rem;line-height:1.6;color:var(--text);
-  letter-spacing:.01em;margin-bottom:.35rem;
+  padding:.5rem .65rem .35rem;
+  font-size:.62rem;line-height:1.7;color:var(--text);
+  letter-spacing:.01em;
 }
-#ww3-factors{ }
+#ww3-factors{ padding:0 .65rem .1rem; }
 .ww3-factor{
-  font-size:.42rem;color:var(--dim2);letter-spacing:.04em;
-  padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.04);
-  line-height:1.45;
+  font-size:.54rem;color:var(--dim2);letter-spacing:.03em;
+  padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.04);
+  line-height:1.5;display:flex;gap:.4rem;align-items:flex-start;
 }
-.ww3-factor:last-child{border-bottom:none}
-.ww3-factor::before{ content:'⊹ ';color:var(--ww3-col,#22c55e); }
-#ww3-history-wrap{margin-top:.4rem;display:flex;align-items:flex-end;gap:1px;height:22px}
-.ww3-bar{flex:1;background:var(--dim);border-radius:1px 1px 0 0;min-height:2px;transition:height .4s ease}
+.ww3-factor:last-child{ border-bottom:none; }
+.ww3-factor-icon{ color:var(--ww3-col,#22c55e);flex-shrink:0;margin-top:.05rem; }
+#ww3-history-wrap{
+  margin:.3rem .65rem .2rem;display:flex;align-items:flex-end;gap:2px;height:26px;
+  border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:.35rem;
+}
+.ww3-bar{flex:1;border-radius:1px 1px 0 0;min-height:2px;transition:height .4s ease;opacity:.75}
+#ww3-drawer-foot{
+  padding:.3rem .65rem .4rem;
+  display:flex;align-items:center;gap:.5rem;
+}
 #ww3-regen{
-  margin-top:.35rem;width:100%;padding:.15rem;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-  color:var(--dim2);font-family:var(--font);font-size:.38rem;
-  letter-spacing:.08em;cursor:pointer;
+  flex:1;padding:.2rem .4rem;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+  color:var(--dim2);font-family:var(--font);font-size:.42rem;
+  letter-spacing:.09em;cursor:pointer;transition:all .15s;
 }
-#ww3-regen:hover{ border-color:var(--ww3-col,#22c55e);color:var(--ww3-col,#22c55e); }
+#ww3-regen:hover{ border-color:var(--ww3-col,#22c55e);color:var(--ww3-col,#22c55e);background:rgba(255,255,255,.07); }
+#ww3-drawer-note{
+  font-size:.36rem;color:var(--dim2);letter-spacing:.04em;flex:1;text-align:right;
+}
 
-/* critical pulse animation */
+/* critical glow on the bar wrap */
 @keyframes ww3crit{
-  0%,100%{ box-shadow:0 0 14px rgba(220,38,38,.25),inset 0 0 20px rgba(0,0,0,.4); }
-  50%{     box-shadow:0 0 28px rgba(220,38,38,.6), inset 0 0 20px rgba(0,0,0,.4); }
+  0%,100%{ box-shadow:0 0 8px rgba(220,38,38,.25); }
+  50%{     box-shadow:0 0 20px rgba(220,38,38,.7); }
 }
-#ww3-meter.critical{ animation:ww3crit 2s ease-in-out infinite; }
-@keyframes ww3dot{ 0%,100%{opacity:1} 50%{opacity:.25} }
-#ww3-pulse.live{ animation:ww3dot 2s ease-in-out infinite; }
+#ww3-hdr.critical #ww3-bar-wrap{ animation:ww3crit 1.8s ease-in-out infinite; }
 
 /* ── CINEMA EXIT BUTTON ── */
 #cinema-exit{
@@ -1684,6 +1714,21 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <div class="hdr-domains" id="hdr-domains">
       <!-- populated by JS -->
     </div>
+    <!-- ☢ WW3 Pip-Boy meter — always visible in header -->
+    <div id="ww3-hdr" onclick="toggleWW3Drawer()" title="WW3 Escalation Index — click for AI daily analysis">
+      <span id="ww3-icon">☢</span>
+      <div id="ww3-label-stack">
+        <div id="ww3-label">WW3 RISK</div>
+        <div id="ww3-sublabel">ESCALATION INDEX</div>
+      </div>
+      <div id="ww3-bar-wrap">
+        <div id="ww3-bar-fill"></div>
+      </div>
+      <div id="ww3-score-stack">
+        <span id="ww3-score">--</span>
+        <div id="ww3-level-lbl">LOADING</div>
+      </div>
+    </div>
     <div id="search-wrap">
       <input id="search-input" type="text" placeholder="SEARCH LOCATION..."
              autocomplete="off" spellcheck="false"
@@ -2464,28 +2509,20 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
 </div><!-- /shell -->
 
-<!-- ══ WW3 RISK METER ══════════════════════════════════════════════════════════ -->
-<div id="ww3-meter" onclick="toggleWW3Drawer()" title="WW3 Escalation Index — AI daily analysis">
-  <div id="ww3-top">
-    <span id="ww3-label">⚠ WW3 RISK</span>
-    <span id="ww3-pulse"></span>
+<!-- ══ WW3 DRAWER (dropdown from header bar) ══════════════════════════════════ -->
+<div id="ww3-drawer">
+  <div id="ww3-drawer-head">
+    <span id="ww3-drawer-title">☢ WW3 ESCALATION INDEX</span>
+    <span id="ww3-drawer-ts">AI · DAILY UTC</span>
   </div>
-  <div id="ww3-body">
-    <div id="ww3-spine-wrap"><div id="ww3-fill"></div></div>
-    <div id="ww3-right">
-      <div><span id="ww3-score">--</span><span id="ww3-score-unit">/ 100</span></div>
-      <div id="ww3-level-lbl">LOADING</div>
-    </div>
-  </div>
-  <div id="ww3-foot">
-    <span id="ww3-foot-ts">AI · DAILY UTC</span>
-    <span>▼</span>
-  </div>
-  <div id="ww3-drawer">
+  <div id="ww3-drawer-body">
     <div id="ww3-assess">Awaiting first AI analysis…</div>
     <div id="ww3-factors"></div>
-    <div id="ww3-history-wrap" title="30-day score history"></div>
-    <button id="ww3-regen" onclick="event.stopPropagation();triggerWW3Regen()">↻ REGENERATE NOW</button>
+  </div>
+  <div id="ww3-history-wrap" title="30-day score history"></div>
+  <div id="ww3-drawer-foot">
+    <button id="ww3-regen" onclick="triggerWW3Regen()">↻ REGENERATE NOW</button>
+    <span id="ww3-drawer-note">ENTERTAINMENT / AWARENESS ONLY</span>
   </div>
 </div>
 
@@ -5833,11 +5870,14 @@ const _WW3_COLORS = {
 
 function _applyWW3Theme(level){
   const t = _WW3_COLORS[level] || _WW3_COLORS.UNKNOWN;
-  const m = document.getElementById('ww3-meter');
-  if(!m) return;
-  m.style.setProperty('--ww3-col',  t.col);
-  m.style.setProperty('--ww3-glow', t.glow);
-  m.classList.toggle('critical', level==='CRITICAL');
+  const m = document.getElementById('ww3-hdr');
+  const dr = document.getElementById('ww3-drawer');
+  [m, dr].forEach(el => {
+    if(!el) return;
+    el.style.setProperty('--ww3-col',  t.col);
+    el.style.setProperty('--ww3-glow', t.glow);
+  });
+  if(m) m.classList.toggle('critical', level==='CRITICAL');
 }
 
 function renderWW3(data){
@@ -5846,39 +5886,36 @@ function renderWW3(data){
   const el = {
     score:   document.getElementById('ww3-score'),
     level:   document.getElementById('ww3-level-lbl'),
-    fill:    document.getElementById('ww3-fill'),
-    foot:    document.getElementById('ww3-foot-ts'),
+    fill:    document.getElementById('ww3-bar-fill'),
+    ts:      document.getElementById('ww3-drawer-ts'),
     assess:  document.getElementById('ww3-assess'),
     factors: document.getElementById('ww3-factors'),
     hist:    document.getElementById('ww3-history-wrap'),
-    pulse:   document.getElementById('ww3-pulse'),
   };
-  if(el.score)  el.score.textContent  = score !== null ? score : '--';
-  if(el.level)  el.level.textContent  = level;
-  if(el.fill)   el.fill.style.height  = score !== null ? score+'%' : '0%';
+  if(el.score)  el.score.textContent = score !== null ? score : '--';
+  if(el.level)  el.level.textContent = level;
+  if(el.fill)   el.fill.style.width  = score !== null ? score+'%' : '0%';
   _applyWW3Theme(level);
-  if(el.pulse)  el.pulse.classList.toggle('live', score !== null);
 
-  if(data.generated_at && el.foot){
+  if(data.generated_at && el.ts){
     const d = data.generated_at.slice(0,10);
     const t = data.generated_at.slice(11,16);
-    el.foot.textContent = `${d} ${t} UTC`;
+    el.ts.textContent = `${d} ${t} UTC`;
   }
   if(data.assessment && el.assess){
     el.assess.textContent = data.assessment;
   }
   if(data.key_factors && el.factors){
     el.factors.innerHTML = (data.key_factors||[]).map(f=>
-      `<div class="ww3-factor">${esc(f)}</div>`
+      `<div class="ww3-factor"><span class="ww3-factor-icon">▸</span> ${esc(f)}</div>`
     ).join('');
   }
   // 30-day history mini-bar chart
   if(data.history && el.hist && data.history.length){
-    const max = 100;
     el.hist.innerHTML = data.history.map(h=>{
-      const t = _WW3_COLORS[h.level]||_WW3_COLORS.UNKNOWN;
-      const pct = Math.max(4, Math.round((h.score/max)*100));
-      return `<div class="ww3-bar" style="height:${pct}%;background:${t.col};opacity:.7"
+      const tc = _WW3_COLORS[h.level]||_WW3_COLORS.UNKNOWN;
+      const pct = Math.max(4, Math.round((h.score/100)*100));
+      return `<div class="ww3-bar" style="height:${pct}%;background:${tc.col};opacity:.7"
         title="${h.generated_at.slice(0,10)} — ${h.score}/100 ${h.level}"></div>`;
     }).join('');
   }
@@ -5893,12 +5930,16 @@ async function loadWW3(){
 
 function toggleWW3Drawer(){
   const d = document.getElementById('ww3-drawer');
-  const f = document.getElementById('ww3-foot');
   if(!d) return;
   const open = d.classList.toggle('open');
-  if(f){
-    const arrow = f.querySelector('span:last-child');
-    if(arrow) arrow.textContent = open ? '▲' : '▼';
+  if(open){
+    const hdr = document.getElementById('ww3-hdr');
+    if(hdr){
+      const r = hdr.getBoundingClientRect();
+      // Align drawer left edge to header widget, clamp so it doesn't overflow right edge
+      const left = Math.min(r.left, window.innerWidth - 344);
+      d.style.left = Math.max(4, left) + 'px';
+    }
   }
 }
 
