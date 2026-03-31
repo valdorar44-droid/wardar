@@ -119,6 +119,7 @@ ENABLE_NUCLEAR      = _b("ENABLE_NUCLEAR",      True)
 ENABLE_SUBCABLES    = _b("ENABLE_SUBCABLES",     True)
 ENABLE_MIL_BASES    = _b("ENABLE_MIL_BASES",     True)
 ENABLE_PIPELINES    = _b("ENABLE_PIPELINES",     True)
+ENABLE_EEZ          = _b("ENABLE_EEZ",          True)
 STATIC_REFRESH_SEC  = _i("STATIC_REFRESH_SEC",   86400)  # daily
 
 # ── OSINT Geo-Extractor ────────────────────────────────
@@ -231,3 +232,10 @@ TELEGRAM_OSINT_INTERVAL_SEC = _i("TELEGRAM_OSINT_INTERVAL_SEC", 240)  # every 4 
 # ── Breaking News (Google News RSS + wire services) ───────────────────────────
 ENABLE_BREAKING_NEWS        = _b("ENABLE_BREAKING_NEWS",        True)
 BREAKING_NEWS_INTERVAL_SEC  = _i("BREAKING_NEWS_INTERVAL_SEC",  300)   # 5 min
+
+# ── Phase 7 Intelligence Products ─────────────────────────────────────────────
+ALERT_WEBHOOK_URL       = _s("ALERT_WEBHOOK_URL",       "")   # Slack/Discord/custom incoming webhook
+WEBHOOK_MIN_INTERVAL_SEC = _i("WEBHOOK_MIN_INTERVAL_SEC", 30)  # flush webhooks every 30s
+DIGEST_HOURS            = _i("DIGEST_HOURS",            24)    # daily digest lookback window
+DIGEST_LIMIT            = _i("DIGEST_LIMIT",            10)    # top N events
+DIGEST_CONV_RADIUS_KM   = _i("DIGEST_CONV_RADIUS_KM",  200)   # convergence radius

@@ -609,6 +609,18 @@ async def _tick_intel_brief():
     except Exception as exc:
         log_err(f"tick_intel_brief: {exc}")
 
+
+async def _tick_webhook_flush():
+    if not C.ALERT_WEBHOOK_URL:
+        return
+    try:
+        from core import webhooks
+        n = await webhooks.flush()
+        if n:
+            log(f"webhooks: dispatched {n} alerts to {C.ALERT_WEBHOOK_URL[:40]}...")
+    except Exception as exc:
+        log_err(f"tick_webhook_flush: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -676,6 +688,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_telegram_osint,  C.TELEGRAM_OSINT_INTERVAL_SEC,  "telegram_osint")),
         asyncio.create_task(_run_every(_tick_breaking_news,   C.BREAKING_NEWS_INTERVAL_SEC,   "breaking_news")),
         asyncio.create_task(_run_every(_tick_route_deviation, C.ROUTE_DEV_INTERVAL_SEC,       "route_deviation")),
+        asyncio.create_task(_run_every(_tick_webhook_flush, C.WEBHOOK_MIN_INTERVAL_SEC, "webhook_flush")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

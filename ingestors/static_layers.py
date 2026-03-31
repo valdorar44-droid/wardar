@@ -506,6 +506,60 @@ async def _fetch_isw_middle_east() -> dict:
     return {"type": "FeatureCollection", "features": _ISW_ME_ZONES}
 
 
+# EEZ boundaries — Marine Regions (VLIZ public WFS)
+_EEZ_URLS = [
+    "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=MarineRegions:eez_boundaries&maxFeatures=400&outputFormat=application/json",
+    "https://geoserver.vliz.be/geoserver/MarineRegions/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=MarineRegions:eez_boundaries&maxFeatures=400&outputFormat=application/json",
+]
+
+# Hardcoded strategic EEZ zones — contested/high-importance areas
+_EEZ_FALLBACK = [
+    {"name":"South China Sea — PRC 9-Dash Line Claim","dispute":"China vs Philippines/Vietnam/Malaysia/Brunei",
+     "coords":[[[108.0,21.0],[120.0,21.0],[121.0,15.0],[119.0,10.0],[116.0,7.0],[112.0,4.0],[109.5,4.0],[108.0,7.0],[107.0,12.0],[108.0,16.0],[108.0,21.0]]]},
+    {"name":"Black Sea — Contested (Russia/Ukraine/Turkey/Romania/Bulgaria/Georgia)","dispute":"Russia vs Ukraine post-2022",
+     "coords":[[[28.0,41.0],[37.0,41.0],[41.8,41.5],[41.8,43.5],[40.0,43.5],[37.0,43.0],[33.0,46.5],[31.0,46.0],[28.0,45.5],[28.0,41.0]]]},
+    {"name":"Eastern Mediterranean — Disputed EEZ (Greece/Turkey/Cyprus/Libya)","dispute":"Greece vs Turkey continental shelf claim",
+     "coords":[[[19.0,31.0],[36.5,31.0],[36.5,37.0],[28.0,38.0],[19.0,36.0],[19.0,31.0]]]},
+    {"name":"Persian Gulf — Key Maritime Zone","dispute":"Iran vs GCC",
+     "coords":[[[48.0,22.0],[57.0,22.0],[57.0,27.5],[53.0,29.5],[48.0,27.0],[48.0,22.0]]]},
+    {"name":"Red Sea — Contested Access (Houthi/JMTC)","dispute":"Freedom of navigation dispute",
+     "coords":[[[32.5,12.0],[43.5,12.0],[44.0,15.0],[43.0,22.0],[38.0,27.5],[32.5,25.0],[32.5,12.0]]]},
+    {"name":"Caspian Sea — Disputed (Kazakhstan/Russia/Azerbaijan/Iran/Turkmenistan)","dispute":"Legal status unresolved until 2018 Aktau Convention",
+     "coords":[[[49.5,37.0],[54.5,37.0],[54.5,42.5],[50.5,47.0],[50.0,51.5],[49.5,51.5],[49.5,37.0]]]},
+    {"name":"Arctic Ocean — Contested Extended Continental Shelf","dispute":"Russia/Canada/Norway/Denmark overlapping UNCLOS claims",
+     "coords":[[[-180.0,65.0],[180.0,65.0],[180.0,90.0],[-180.0,90.0],[-180.0,65.0]]]},
+    {"name":"East China Sea — Senkaku/Diaoyu Dispute","dispute":"Japan vs China / Taiwan",
+     "coords":[[[121.0,25.0],[130.0,25.0],[130.0,32.0],[121.0,32.0],[121.0,25.0]]]},
+]
+
+async def _fetch_eez() -> dict:
+    """Fetch EEZ boundary GeoJSON from VLIZ Marine Regions WFS. Falls back to hardcoded strategic zones."""
+    from core.engine import log, log_warn
+    async with httpx.AsyncClient(timeout=20, headers={"User-Agent":"Wardar/0.1"}) as client:
+        for url in _EEZ_URLS:
+            try:
+                r = await client.get(url)
+                if r.status_code == 200:
+                    data = r.json()
+                    features = data.get("features", [])
+                    if features:
+                        log(f"eez: loaded {len(features)} boundaries (VLIZ WFS)")
+                        return data
+            except Exception as exc:
+                log_warn(f"eez: {url} failed: {exc}")
+    # Hardcoded fallback
+    log_warn("eez: VLIZ unavailable — using strategic zone fallback")
+    features = []
+    for z in _EEZ_FALLBACK:
+        features.append({
+            "type":"Feature",
+            "geometry":{"type":"Polygon","coordinates":z["coords"]},
+            "properties":{"name":z["name"],"dispute":z.get("dispute","")},
+        })
+    log(f"eez: {len(features)} strategic contested zones (fallback)")
+    return {"type":"FeatureCollection","features":features}
+
+
 async def get_layer(name: str) -> dict:
     """Return cached layer GeoJSON, fetching fresh if TTL expired."""
     cached = _cache.get(name)
@@ -522,6 +576,7 @@ async def get_layer(name: str) -> dict:
         "pipelines":       _fetch_pipelines,
         "isw_ukraine":     _fetch_isw_ukraine,
         "isw_middle_east": _fetch_isw_middle_east,
+        "eez":             _fetch_eez,
     }
     fn = fetchers.get(name)
     if not fn:
@@ -544,5 +599,6 @@ async def refresh_all():
     if C.ENABLE_ISW:
         tasks.append(get_layer("isw_ukraine"))
         tasks.append(get_layer("isw_middle_east"))
+    if C.ENABLE_EEZ: tasks.append(get_layer("eez"))
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)

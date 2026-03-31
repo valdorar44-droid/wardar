@@ -82,6 +82,11 @@ def _save_alert(source: str, title: str, desc: str,
     }
     DB.upsert_event(record)
     log(f"ALERT [{source}] {title[:80]}")
+    try:
+        from core.webhooks import enqueue as _wh_enqueue
+        _wh_enqueue(source, title, desc, lat or 0.0, lon or 0.0)
+    except Exception:
+        pass
     return True
 
 

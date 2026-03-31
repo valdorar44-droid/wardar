@@ -215,6 +215,50 @@ async def get_chokepoints():
         })
     return JSONResponse({"chokepoints": results})
 
+
+@app.get("/api/digest")
+async def get_digest(hours: int = 24, limit: int = 10):
+    """
+    Returns top events ranked by cross-domain convergence score.
+    Convergence score = count of distinct event sources within DIGEST_CONV_RADIUS_KM
+    and the past `hours` window around each event.
+    Only returns released events (delay policy enforced).
+    """
+    import math
+    events = DB.get_released_events(limit=3000)
+    # Filter to events with coordinates and within time window
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=min(hours, 168))).isoformat()
+    geo = [e for e in events if e.get("lat") and e.get("lon") and e.get("raw_ts_utc","") >= cutoff]
+    if not geo:
+        return JSONResponse({"hours": hours, "count": 0, "events": []})
+
+    R_KM = float(C.DIGEST_CONV_RADIUS_KM)
+    def hav(lat1, lon1, lat2, lon2):
+        R = 6371.0
+        p1,p2 = math.radians(lat1), math.radians(lat2)
+        dp = math.radians(lat2-lat1); dl = math.radians(lon2-lon1)
+        a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+        return 2*R*math.asin(min(1.0,a**0.5))
+
+    scored = []
+    for ev in geo:
+        nearby_sources = set()
+        for other in geo:
+            if other is ev: continue
+            if hav(ev["lat"], ev["lon"], other["lat"], other["lon"]) <= R_KM:
+                nearby_sources.add(other.get("source",""))
+        ev["_convergence"] = len(nearby_sources)
+        scored.append(ev)
+
+    scored.sort(key=lambda e: e["_convergence"], reverse=True)
+    top = scored[:min(limit, C.DIGEST_LIMIT)]
+    # Strip internal field
+    for e in top:
+        e.pop("_convergence", None)
+    return JSONResponse({"hours": hours, "count": len(top), "events": top,
+                         "radius_km": R_KM})
+
 # ── Community Intel ───────────────────────────────────────────────────────────
 
 _VALID_REPORT_TYPES = {
@@ -357,7 +401,7 @@ async def get_static_layer(response: Response, layer: str):
     Serve cached GeoJSON for static infrastructure layers:
     nuclear, cables, mil_bases, pipelines
     """
-    valid = {"nuclear", "cables", "mil_bases", "pipelines", "isw_ukraine", "isw_middle_east"}
+    valid = {"nuclear", "cables", "mil_bases", "pipelines", "isw_ukraine", "isw_middle_east", "eez"}
     if layer not in valid:
         raise HTTPException(status_code=404, detail=f"Unknown layer: {layer}")
     try:

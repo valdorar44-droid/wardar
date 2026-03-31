@@ -538,6 +538,32 @@ body.tl-hidden #timeline { opacity:0; pointer-events:none; transform:translateY(
 }
 .track-btn:hover{background:rgba(6,182,212,.2)}
 
+/* ── PHASE 7: WATCHLIST ── */
+.wl-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.3rem .75rem;border-bottom:1px solid var(--border);
+  font-size:.52rem;letter-spacing:.04em;
+}
+.wl-item:last-child{border-bottom:none}
+.wl-callsign{color:var(--amber);font-weight:700;letter-spacing:.1em}
+.wl-source{color:var(--dim2);font-size:.44rem;margin-top:.08rem}
+.wl-remove{background:none;border:none;color:var(--dim2);cursor:pointer;
+  font-size:.6rem;padding:.1rem .3rem;font-family:var(--font);}
+.wl-remove:hover{color:var(--red)}
+.wl-empty{padding:1rem .75rem;color:var(--dim2);font-size:.52rem;letter-spacing:.06em}
+#wl-section{border-top:1px solid var(--border);margin-top:.5rem;padding-top:.4rem}
+#wl-hdr{font-size:.48rem;letter-spacing:.1em;color:var(--cyan);padding:.3rem .75rem;
+  display:flex;align-items:center;justify-content:space-between}
+.watch-btn{
+  width:100%;margin-top:.35rem;padding:.22rem .5rem;
+  background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);
+  color:var(--green);font-family:var(--font);font-size:.5rem;
+  letter-spacing:.09em;cursor:pointer;text-align:center;
+}
+.watch-btn:hover{background:rgba(34,197,94,.2)}
+.watch-btn.watching{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red)}
+.watch-btn.watching:hover{background:rgba(239,68,68,.2)}
+
 /* ── SITREP / AI BRIEF PANE ── */
 #sitrep-body{
   flex:1;overflow-y:auto;padding:.75rem;
@@ -1758,6 +1784,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">OIL/GAS PIPELINES</span>
               <span class="layer-count" id="cnt-pipelines" style="background:var(--orange)">0</span>
             </label>
+            <label class="layer-item" title="Exclusive Economic Zone boundaries — contested maritime zones: South China Sea, Black Sea, Eastern Mediterranean, Persian Gulf, Red Sea, Arctic.">
+              <input type="checkbox" class="layer-cb" id="cb-eez" checked onchange="toggleLayer('eez')">
+              <span class="layer-icon" style="color:#06b6d4">⚓</span>
+              <span class="layer-name">EEZ BOUNDARIES</span>
+              <span class="layer-count" id="cnt-eez" style="background:#06b6d4">0</span>
+            </label>
             <label class="layer-item" title="GPS jamming / electronic warfare signals from GPSJAM.org">
               <input type="checkbox" class="layer-cb" id="cb-ew" checked style="color:var(--fuchsia)" onchange="toggleLayer('ew')">
               <span class="layer-icon" style="color:var(--fuchsia)">⚡</span>
@@ -1950,8 +1982,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <div class="rp-body">
         <!-- SIGINT FEED pane -->
         <div class="rp-pane active" id="pane-feed">
-          <div class="rp-head">
-            LIVE EVENTS <span id="feed-count">0</span> IN BUFFER
+          <div class="rp-head" style="flex-direction:column;gap:.3rem;align-items:flex-start">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+              <span>LIVE EVENTS <span id="feed-count">0</span> IN BUFFER</span>
+              <button id="digest-btn" onclick="loadDigest()" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--amber);font-family:var(--font);font-size:.42rem;padding:.15rem .4rem;cursor:pointer;letter-spacing:.08em">&#x26A1; DIGEST</button>
+            </div>
+            <div id="digest-bar" style="display:none;font-size:.48rem;color:var(--amber);letter-spacing:.06em;width:100%">
+              LOADING TOP EVENTS...
+            </div>
           </div>
           <!-- Phase 5: Chokepoint Throughput -->
           <div id="choke-section" class="open">
@@ -2188,6 +2226,15 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <div style="margin-top:.5rem;font-size:.4rem;color:var(--dim2);line-height:1.6">
         Settings saved locally in your browser.<br>
         No account required — data never leaves your device.
+      </div>
+
+      <!-- WATCHLIST section in settings panel -->
+      <div id="wl-section">
+        <div id="wl-hdr">
+          <span>ENTITY WATCHLIST <span id="wl-count" style="color:var(--amber)">0</span></span>
+          <button style="background:none;border:none;color:var(--dim2);font-family:var(--font);font-size:.44rem;cursor:pointer;letter-spacing:.06em" onclick="clearWatchlist()">CLEAR ALL</button>
+        </div>
+        <div id="wl-list"><div class="wl-empty">NO ENTITIES TRACKED — CLICK WATCH IN POPUP</div></div>
       </div>
     </div>
   </div>
@@ -3899,6 +3946,11 @@ function buildPopup(p){
     <button class="track-btn" onclick="showTrack('${esc(src)}','${esc(p.callsign||'')}')">
       📍 SHOW TRACK (24H BIOGRAPHY)
     </button>
+    <button class="watch-btn ${isWatched(src,p.callsign)?'watching':''}"
+      data-src="${esc(src)}" data-cs="${esc(p.callsign||'')}"
+      onclick="isWatched('${esc(src)}','${esc(p.callsign||'')}') ? removeFromWatchlist('${esc(src)}','${esc(p.callsign||'')}') : addToWatchlist('${esc(src)}','${esc(p.callsign||'')}','${esc(p.callsign||'')}')">
+      ${isWatched(src,p.callsign)?'🔴 UNWATCH':'👁 WATCH ENTITY'}
+    </button>
   </div>`;
 }
 
@@ -5005,6 +5057,11 @@ function toggleLayer(key){
       if(visible.ioda) c.addTo(_map2d); else c.remove();
     });
   }
+  // EEZ layer toggle
+  if(key==='eez' && _map2d){
+    if(visible.eez){ if(_eezLayer) _eezLayer.addTo(_map2d); else _loadEEZLayer(); }
+    else if(_eezLayer) _map2d.removeLayer(_eezLayer);
+  }
   if(_mapMode==='3d') _scheduleRebuild();
 }
 
@@ -5446,6 +5503,141 @@ function _tfCutoff(){
   return null;
 }
 
+// ── Phase 7: Watchlist ────────────────────────────────────────────────────────
+const _WL_KEY = 'wardar_watchlist_v1';
+
+function _getWatchlist(){ try{ return JSON.parse(localStorage.getItem(_WL_KEY)||'[]'); }catch(e){ return []; } }
+function _saveWatchlist(wl){ localStorage.setItem(_WL_KEY, JSON.stringify(wl)); }
+
+function isWatched(source, callsign){
+  return _getWatchlist().some(e=>e.source===source&&e.callsign===callsign);
+}
+
+function addToWatchlist(source, callsign, label){
+  if(!callsign) return;
+  const wl = _getWatchlist();
+  if(!wl.find(e=>e.source===source&&e.callsign===callsign)){
+    wl.unshift({source, callsign, label:label||callsign, added_at:new Date().toISOString()});
+    _saveWatchlist(wl);
+    showToast(`WATCHING: ${callsign}`);
+    renderWatchlist();
+    _refreshPopupWatchBtn(source, callsign, true);
+  }
+}
+
+function removeFromWatchlist(source, callsign){
+  let wl = _getWatchlist().filter(e=>!(e.source===source&&e.callsign===callsign));
+  _saveWatchlist(wl);
+  renderWatchlist();
+  _refreshPopupWatchBtn(source, callsign, false);
+}
+
+function clearWatchlist(){
+  _saveWatchlist([]);
+  renderWatchlist();
+}
+
+function _refreshPopupWatchBtn(source, callsign, watching){
+  document.querySelectorAll('.watch-btn').forEach(btn=>{
+    if(btn.dataset.src===source && btn.dataset.cs===callsign){
+      btn.textContent = watching ? '\uD83D\uDD34 UNWATCH' : '\uD83D\uDC41 WATCH';
+      btn.classList.toggle('watching', watching);
+    }
+  });
+}
+
+function renderWatchlist(){
+  const wl = _getWatchlist();
+  const list = document.getElementById('wl-list');
+  const cnt  = document.getElementById('wl-count');
+  if(cnt) cnt.textContent = wl.length;
+  if(!list) return;
+  if(!wl.length){
+    list.innerHTML = '<div class="wl-empty">NO ENTITIES TRACKED \u2014 CLICK WATCH IN POPUP</div>';
+    return;
+  }
+  list.innerHTML = '';
+  wl.forEach(e=>{
+    const div = document.createElement('div');
+    div.className = 'wl-item';
+    div.innerHTML = `
+      <div>
+        <div class="wl-callsign">${esc(e.callsign)}</div>
+        <div class="wl-source">${esc(e.source.toUpperCase())} \u00b7 added ${e.added_at.slice(0,10)}</div>
+      </div>
+      <button class="wl-remove" onclick="removeFromWatchlist('${esc(e.source)}','${esc(e.callsign)}')" title="Remove">\u2715</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function _checkWatchlistMatch(positions){
+  const wl = _getWatchlist();
+  if(!wl.length) return;
+  positions.forEach(p=>{
+    const match = wl.find(e=>e.callsign===p.callsign && e.source===p.source);
+    if(!match) return;
+    showToast(`\uD83D\uDC41 TRACKED: ${p.callsign} @ (${p.lat?.toFixed(2)},${p.lon?.toFixed(2)})`);
+    if(Notification.permission==='granted'){
+      try{
+        new Notification('WARDAR \u2014 TRACKED ENTITY', {
+          body:`${p.callsign} (${p.source?.toUpperCase()}) located at (${p.lat?.toFixed(2)}, ${p.lon?.toFixed(2)})`,
+          tag:`wl_${p.callsign}`,
+          silent: false,
+        });
+      }catch(e){}
+    }
+  });
+}
+
+setTimeout(renderWatchlist, 1000);
+
+// ── Phase 7: Daily Digest ─────────────────────────────────────────────────────
+async function loadDigest(){
+  const btn = document.getElementById('digest-btn');
+  const bar = document.getElementById('digest-bar');
+  if(btn){ btn.disabled=true; btn.textContent='\u27F3 LOADING...'; }
+  if(bar){ bar.style.display='block'; bar.textContent='COMPUTING CONVERGENCE SCORES...'; }
+  try{
+    const data = await fetch('/api/digest?hours=24&limit=10').then(r=>r.json());
+    if(btn){ btn.disabled=false; btn.textContent='\u26A1 DIGEST'; }
+    if(!data.events || !data.events.length){
+      if(bar){ bar.textContent='NO CONVERGENCE EVENTS IN LAST 24H'; }
+      return;
+    }
+    if(bar){ bar.style.display='none'; }
+    const list = document.getElementById('feed-list');
+    if(!list) return;
+    const prev = document.getElementById('digest-results');
+    if(prev) prev.remove();
+    const sec = document.createElement('div');
+    sec.id = 'digest-results';
+    sec.style.cssText = 'border-bottom:2px solid var(--amber);margin-bottom:.5rem';
+    sec.innerHTML = `<div style="padding:.4rem .75rem;font-size:.44rem;letter-spacing:.1em;color:var(--amber);background:rgba(245,158,11,.06)">\u26A1 TOP CONVERGENCE EVENTS (24H) \u00b7 ${data.count} RESULTS \u00b7 ${data.radius_km}km RADIUS</div>`;
+    data.events.forEach(ev=>{
+      const d = document.createElement('div');
+      d.className = 'feed-item';
+      d.style.borderLeft = '2px solid var(--amber)';
+      const ts = ev.raw_ts_utc ? ev.raw_ts_utc.slice(11,16)+' UTC' : '';
+      d.innerHTML = `
+        <div class="fi-source" style="color:var(--amber)">${esc((ev.source||'').toUpperCase())}</div>
+        <div class="fi-title">${esc(ev.title||'')}</div>
+        ${ev.country?`<div class="fi-meta">${esc(ev.country)}</div>`:''}
+        ${ts?`<div class="fi-meta">${ts}</div>`:''}
+        ${ev.lat&&ev.lon?`<div class="fi-meta" style="color:var(--cyan);cursor:pointer" onclick="if(_map2d)_map2d.setView([${ev.lat},${ev.lon}],7)">\uD83D\uDCCD ${ev.lat.toFixed(2)}, ${ev.lon.toFixed(2)}</div>`:''}
+      `;
+      if(ev.lat&&ev.lon) d.style.cursor='pointer';
+      sec.appendChild(d);
+    });
+    list.prepend(sec);
+    showToast(`DIGEST: ${data.count} high-convergence events loaded`);
+  } catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='\u26A1 DIGEST'; }
+    if(bar){ bar.textContent='DIGEST ERROR \u2014 CHECK CONSOLE'; }
+    console.error('loadDigest:', e);
+  }
+}
+
 // ── Choke points ──────────────────────────────────────────────────────────────
 const _THREAT_COLS = {CRITICAL:'#ef4444',HIGH:'#f97316',MODERATE:'#eab308',LOW:'#22c55e'};
 function _initChokeLayer(){
@@ -5667,6 +5859,8 @@ async function loadStaticLayers(){
   await Promise.all([loadNuclear(), loadMilBases()]);
   // Cables and pipelines deferred — large payloads, load non-blocking
   Promise.all([loadCables(), loadPipelines()]).catch(()=>{});
+  // EEZ boundaries — polygon overlays, deferred
+  setTimeout(()=>_loadEEZLayer(), 500);
 }
 
 function _addStaticPoint(pt){
@@ -5809,6 +6003,39 @@ function togglePipelineLayer(on){
   }
 }
 
+// ── EEZ Boundaries ───────────────────────────────────────────────────────────
+let _eezLayer = null;
+function _loadEEZLayer(){
+  if(!_map2d) return;
+  if(_eezLayer){ _map2d.removeLayer(_eezLayer); _eezLayer=null; }
+  if(!document.getElementById('cb-eez')?.checked) return;
+  fetch('/api/layers/eez').then(r=>r.json()).then(geojson=>{
+    _eezLayer = L.geoJSON(geojson, {
+      style: feat => ({
+        color: '#06b6d4',
+        weight: 1,
+        opacity: 0.6,
+        fillColor: '#06b6d4',
+        fillOpacity: 0.04,
+        dashArray: '4,4',
+      }),
+      onEachFeature: (feat, layer) => {
+        const p = feat.properties || {};
+        const tip = `<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;padding:.4rem;border:1px solid #1e1e2a">
+          <div style="color:#06b6d4;font-size:.65rem;letter-spacing:.1em;margin-bottom:.2rem">\u2693 EEZ ZONE</div>
+          <div style="font-weight:700;margin-bottom:.2rem">${esc(p.name||'EEZ Boundary')}</div>
+          ${p.dispute?`<div style="color:#f59e0b;font-size:.55rem">${esc(p.dispute)}</div>`:''}
+        </div>`;
+        layer.bindPopup(tip, {maxWidth:280});
+      }
+    });
+    const cnt = geojson.features?.length || 0;
+    const el = document.getElementById('cnt-eez');
+    if(el) el.textContent = cnt;
+    if(document.getElementById('cb-eez')?.checked) _eezLayer.addTo(_map2d);
+  }).catch(e=>console.warn('EEZ layer:', e));
+}
+
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 let ws, wsRetry=1000, wsTimer;
 
@@ -5842,6 +6069,7 @@ function connectWS(){
         (msg.events||[]).forEach(e=>updateEvent(e,false));
       } else if(msg.type==='positions'){
         if(TL.isLive)(msg.data||[]).forEach(p=>updatePosition(p,true));
+        _checkWatchlistMatch(msg.data || []);
       } else if(msg.type==='events'){
         if(TL.isLive)(msg.data||[]).forEach(e=>updateEvent(e,true));
       } else if(msg.type==='intel_brief'){
