@@ -691,7 +691,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_shodan,       C.SHODAN_INTERVAL_SEC,      "shodan")),
         asyncio.create_task(_run_every(_tick_ioda,          C.IODA_INTERVAL_SEC,        "ioda")),
         asyncio.create_task(_run_every(_tick_intel_brief,  C.INTEL_BRIEF_INTERVAL_SEC, "intel_brief")),
-        asyncio.create_task(_run_every(_tick_mil_aircraft, C.MIL_AIRCRAFT_INTERVAL_SEC,"mil_aircraft")),
+
         asyncio.create_task(_run_every(_tick_warspot,      C.WARSPOT_INTERVAL_SEC,     "warspot")),
         asyncio.create_task(_run_every(_tick_safecast,     C.SAFECAST_INTERVAL_SEC,    "safecast")),
         asyncio.create_task(_run_every(_tick_ofac,         C.OFAC_INTERVAL_SEC,        "ofac")),

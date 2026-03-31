@@ -44,8 +44,8 @@ ENABLE_ADSB           = _b("ENABLE_ADSB", True)
 ENABLE_OPENSKY        = _b("ENABLE_OPENSKY", True)   # fallback if no ADS-B Exchange key
 
 # ── Airplanes.live (free military aircraft feed) ──────
-ENABLE_MIL_AIRCRAFT       = _b("ENABLE_MIL_AIRCRAFT",       True)
-MIL_AIRCRAFT_INTERVAL_SEC = _i("MIL_AIRCRAFT_INTERVAL_SEC", 30)   # every 30s (1 req/sec limit)
+ENABLE_MIL_AIRCRAFT       = _b("ENABLE_MIL_AIRCRAFT",       False)  # covered by adsb.fetch() /mil at 10s
+MIL_AIRCRAFT_INTERVAL_SEC = _i("MIL_AIRCRAFT_INTERVAL_SEC", 30)
 
 # ── AIS Sources ───────────────────────────────────────
 AISSTREAM_API_KEY = _s("AISSTREAM_API_KEY", "")      # aisstream.io API key
