@@ -3963,25 +3963,32 @@ function buildZoomIcon(d, zoom){
   const isAir  = src==='adsb'||src==='opensky'||src==='adsb_emergency';
   const isShip = src==='ais';
   const isSat  = src==='tle';
+  const isSanctioned = d.sanctioned === true;
 
   // Tier 1 — tiny dot
   if(zoom < 5){
-    const col = isMil?'#ef4444':(LAYER_COLORS[src]||'#f59e0b');
+    const col = isSanctioned?'#dc2626':(isMil?'#ef4444':(LAYER_COLORS[src]||'#f59e0b'));
     const sz  = isMil?7:5;
     return L.divIcon({html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};box-shadow:0 0 3px ${col}77"></div>`,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
   }
 
+  // Sanctioned badge overlay (shown tier 2+)
+  const sanctBadge = isSanctioned
+    ? `<div style="position:absolute;top:-5px;right:-8px;font-size:9px;line-height:1;z-index:10;pointer-events:none" title="SANCTIONED ENTITY">⛔</div>`
+    : '';
+
   // Tier 2 — emoji (medium zoom)
   if(zoom < 8){
     const html=iconFor(src,isMil,d), sz=18;
-    return L.divIcon({html,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+    if(!isSanctioned) return L.divIcon({html,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+    return L.divIcon({html:`<div style="position:relative;display:inline-block">${html}${sanctBadge}</div>`,className:'',iconSize:[sz+10,sz+10],iconAnchor:[sz/2,sz/2]});
   }
 
   // Tier 3 — SVG directional for tracked assets
   if(isAir||isShip||isSat){
     const col = isMil
       ? (isShip?'#fb923c':'#ff3b1e')
-      : (isShip?'#06b6d4':(isSat?'#a855f7':'#f59e0b'));
+      : (isShip?(isSanctioned?'#dc2626':'#06b6d4'):(isSat?'#a855f7':(isSanctioned?'#dc2626':'#f59e0b')));
     const hdg = d.heading_deg!=null?parseFloat(d.heading_deg):null;
     const sz  = zoom>=11?30:24;
 
@@ -3998,14 +4005,15 @@ function buildZoomIcon(d, zoom){
       : '';
 
     return L.divIcon({
-      html:`<div style="position:relative;width:${sz}px;height:${sz}px">${svg}${tag}${lblHtml}</div>`,
+      html:`<div style="position:relative;width:${sz}px;height:${sz}px">${svg}${tag}${lblHtml}${sanctBadge}</div>`,
       className:'',iconSize:[sz+16,sz+16],iconAnchor:[sz/2,sz/2]
     });
   }
 
   // Events / other — emoji at standard size with no label
   const html=iconFor(src,isMil,d), sz=zoom>=9?20:16;
-  return L.divIcon({html,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+  if(!isSanctioned) return L.divIcon({html,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+  return L.divIcon({html:`<div style="position:relative;display:inline-block">${html}${sanctBadge}</div>`,className:'',iconSize:[sz+10,sz+10],iconAnchor:[sz/2,sz/2]});
 }
 
 // ── Map brightness cycle ──────────────────────────────────────────────────────
@@ -4311,7 +4319,7 @@ function buildPopup(p){
   }
 
   return `<div class="popup-inner">
-    <div class="popup-call">${esc(p.callsign||'UNKNOWN')}${isMil?' <span style="color:var(--red);font-size:.75rem">◈ MIL</span>':''}</div>
+    <div class="popup-call">${esc(p.callsign||'UNKNOWN')}${isMil?' <span style="color:var(--red);font-size:.75rem">◈ MIL</span>':''}${p.sanctioned?` <span style="color:#dc2626;font-size:.72rem;font-weight:700" title="${p.sanctioned_name||'OFAC/International Sanctions List'}">⛔ SANCTIONED</span>`:''}</div>
     <div class="popup-row"><span class="popup-label">SOURCE</span><span class="popup-val">${esc(src.toUpperCase())}</span></div>
     <div class="popup-row"><span class="popup-label">TYPE</span><span class="popup-val">${esc((p.type||'').toUpperCase())}</span></div>
     ${extraHtml}

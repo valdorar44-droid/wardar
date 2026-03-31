@@ -129,6 +129,33 @@ async def health():
         **counts,
     }
 
+def _enrich_sanctions(data: list[dict]) -> list[dict]:
+    """Tag positions that match OFAC / OpenSanctions lists (in-memory O(1) lookup)."""
+    try:
+        from ingestors.ofac_sanctions import is_sanctioned_vessel, is_sanctioned_aircraft, _SANCTIONED_NAMES
+        if not data:
+            return data
+        _AIS_SOURCES = {"ais", "dark_vessel"}
+        _ADSB_SOURCES = {"adsb", "mil_aircraft"}
+        for p in data:
+            src = p.get("source", "")
+            cs  = (p.get("callsign") or "").strip()
+            if not cs:
+                continue
+            hit = False
+            if src in _AIS_SOURCES:
+                hit = is_sanctioned_vessel(cs)
+            elif src in _ADSB_SOURCES:
+                hit = is_sanctioned_aircraft(cs)
+            if hit:
+                p["sanctioned"] = True
+                name = _SANCTIONED_NAMES.get(cs) or _SANCTIONED_NAMES.get(cs.upper())
+                if name:
+                    p["sanctioned_name"] = name
+    except Exception:
+        pass
+    return data
+
 @app.get("/api/positions")
 async def get_positions(
     response: Response,
@@ -144,6 +171,7 @@ async def get_positions(
     else:
         # No source filter — use sampled query so AIS doesn't drown aircraft/satellites
         data = get_released_positions_sampled(per_source=600, limit=limit)
+    data = _enrich_sanctions(data)
     return JSONResponse({"count": len(data), "data": data})
 
 @app.get("/api/events")
