@@ -1704,9 +1704,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 @media (max-width:768px) {
   /* ── Header: strip to essentials ── */
   .hdr-domains,#search-wrap,.hdr-sub,.hdr-sep,
-  #milonly-btn,#mapmode-btn,#bright-btn,#measure-btn,
+  #mapmode-btn,#bright-btn,#measure-btn,
   #timeline-btn,#cinema-btn,#fullscreen-toggle,#hdr-clock,
   .threat-badge{ display:none!important; }
+  /* milonly-btn stays visible on mobile — key control */
+  #milonly-btn{ font-size:.58rem;padding:.18rem .4rem; }
   #header{ gap:.6rem;padding:0 .75rem; }
   .hdr-logo{ font-size:.9rem; }
   /* Settings btn stays */
@@ -1887,7 +1889,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <button id="search-btn" onclick="doSearch()" title="Search">⌕</button>
       <div id="search-results"></div>
     </div>
-    <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only aircraft/ship display" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.2)">MIL ONLY</button>
+    <button id="milonly-btn" class="mapmode-btn" onclick="toggleMilOnly()" title="Toggle military-only aircraft/ship display" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.2)">✈<span class="mob-btn-lbl"> MIL ONLY</span></button>
     <button id="mapmode-btn" class="mapmode-btn" onclick="toggleMapMode()" title="Switch between 2D map and 3D globe">3D GLOBE</button>
     <button id="bright-btn" class="mapmode-btn" onclick="cycleBrightness()" title="Map brightness">☀ DIM</button>
     <button id="measure-btn" class="mapmode-btn" onclick="toggleMeasure()" title="Measure distance (click two points)">⊢ DIST</button>
@@ -1942,6 +1944,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <span class="grp-badge" id="grp-tracking-badge">0</span>
           </div>
           <div class="layer-group-body">
+            <!-- MIL ONLY quick-toggle -->
+            <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem .2rem;border-bottom:1px solid var(--border)">
+              <button id="milonly-panel-btn" onclick="toggleMilOnly()"
+                style="background:rgba(239,68,68,.15);border:1px solid #ef4444;color:#ef4444;font-family:var(--font);font-size:.6rem;letter-spacing:.1em;padding:.2rem .55rem;cursor:pointer;flex-shrink:0">
+                ✈ MIL ONLY
+              </button>
+              <span id="milonly-panel-lbl" style="color:var(--dim2);font-size:.58rem;letter-spacing:.06em">MILITARY AIRCRAFT &amp; SHIPS ONLY</span>
+            </div>
             <label class="layer-item" title="Live aircraft positions — ADS-B Exchange + Airplanes.live. Military aircraft in red (24h delayed). MIL ONLY mode filters to military/dark flights only.">
               <input type="checkbox" class="layer-cb" id="cb-adsb" checked style="color:var(--amber)" onchange="toggleLayer('adsb')">
               <span class="layer-icon" style="color:#ff3b1e">✈</span>
@@ -2990,6 +3000,7 @@ function runBoot(){
   // would be in the temporal dead zone if called synchronously before that line executes.
   setTimeout(()=>{
     _applySettings();
+    _syncMilOnlyUI();  // sync MIL ONLY button state from persisted localStorage value
     try { initMap(); } catch(e) {
       console.error('initMap failed:', e);
       // Show error in boot output
@@ -3551,7 +3562,10 @@ const _GLOBE_CAPS = {adsb:300,ais:200,tle:120,acled:200,notam:60,fire:60,seismic
 const _GLOBE_UNCAPPED = new Set(['adsb_emergency','dark_vessel','convergence','nuclear_threat','pipeline_threat','pikud_haoref','pikud']);
 
 // ── Globe display modes ───────────────────────────────────────────────────────
-let _milOnlyMode = true;   // hides civilian aircraft/ships when true (default on)
+let _milOnlyMode = (() => {
+  try { const v = localStorage.getItem('wardar_milonly'); return v === null ? true : v === '1'; }
+  catch(e) { return true; }
+})();  // default ON — show military aircraft/ships only
 
 // Conflict-zone countries (for protest filtering — only show protests here)
 const _CONFLICT_COUNTRIES = new Set([
@@ -5801,14 +5815,33 @@ function globeFocusRegion(r){
   });
 }
 
-function toggleMilOnly(){
-  _milOnlyMode = !_milOnlyMode;
+function _syncMilOnlyUI(){
+  const on = _milOnlyMode;
+  // Header button
   const btn = document.getElementById('milonly-btn');
   if(btn){
-    btn.textContent = _milOnlyMode ? 'MIL ONLY' : 'MIL ALL';
-    btn.style.background = _milOnlyMode ? 'rgba(239,68,68,0.2)' : '';
-    btn.style.color = '#ef4444';
+    btn.innerHTML = on ? '✈<span class="mob-btn-lbl"> MIL ONLY</span>' : '✈<span class="mob-btn-lbl"> ALL A/C</span>';
+    btn.style.background = on ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)';
+    btn.style.borderColor = on ? '#ef4444' : 'var(--border2)';
+    btn.style.color = on ? '#ef4444' : 'var(--dim)';
   }
+  // Panel button
+  const pb = document.getElementById('milonly-panel-btn');
+  if(pb){
+    pb.style.background = on ? 'rgba(239,68,68,.15)' : 'rgba(255,255,255,.04)';
+    pb.style.borderColor = on ? '#ef4444' : 'var(--border2)';
+    pb.style.color = on ? '#ef4444' : 'var(--dim)';
+  }
+  // Panel label
+  const pl = document.getElementById('milonly-panel-lbl');
+  if(pl) pl.textContent = on ? 'MILITARY AIRCRAFT & SHIPS ONLY' : 'ALL AIRCRAFT & SHIPS VISIBLE';
+  // Persist
+  try { localStorage.setItem('wardar_milonly', on ? '1' : '0'); } catch(e) {}
+}
+
+function toggleMilOnly(){
+  _milOnlyMode = !_milOnlyMode;
+  _syncMilOnlyUI();
   if(_mapMode==='3d') _scheduleRebuild();
   // Rebuild 2D adsb/ais clusters to apply new filter
   if(_map2d){
