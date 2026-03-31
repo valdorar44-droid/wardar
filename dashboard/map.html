@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>WARDAR — Global Situational Awareness</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#040406">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WARDAR">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
@@ -1627,9 +1633,109 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   font-size:.72rem;color:var(--text);line-height:1.75;
   white-space:pre-wrap;word-break:break-word;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE + PWA
+══════════════════════════════════════════════════════════════ */
+/* Mobile overlay (behind open panel, tap to dismiss) */
+#mob-overlay{
+  display:none;position:fixed;inset:0;z-index:490;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(2px);
+  transition:opacity .25s;
+}
+/* Floating mobile panel buttons */
+#mob-left-btn,#mob-right-btn{
+  display:none;position:fixed;z-index:510;
+  background:rgba(8,8,12,.94);border:1px solid var(--border2);
+  color:var(--amber);font-family:var(--font);font-size:.72rem;
+  letter-spacing:.08em;padding:.45rem .7rem;cursor:pointer;
+  transition:color .15s,border-color .15s,background .15s;
+  box-shadow:0 2px 12px rgba(0,0,0,.5);
+}
+#mob-left-btn{ left:.6rem;bottom:60px; }
+#mob-right-btn{ right:.6rem;bottom:60px; }
+#mob-left-btn:hover,#mob-right-btn:hover{
+  color:var(--text);border-color:var(--amber);background:rgba(245,158,11,.08);
+}
+#mob-left-btn.panel-open,#mob-right-btn.panel-open{
+  border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,.12);
+}
+
+@media (max-width:768px) {
+  /* ── Header: strip to essentials ── */
+  .hdr-domains,#search-wrap,.hdr-sub,.hdr-sep,
+  #milonly-btn,#mapmode-btn,#bright-btn,#measure-btn,
+  #timeline-btn,#cinema-btn,#fullscreen-toggle,#hdr-clock,
+  .threat-badge{ display:none!important; }
+  #header{ gap:.6rem;padding:0 .75rem; }
+  .hdr-logo{ font-size:.9rem; }
+  /* Settings btn stays */
+  button[onclick*="toggleSettings"]{ padding:.18rem .4rem;font-size:.58rem; }
+
+  /* ── WW3 header pill: compact ── */
+  #ww3-label-stack{ display:none; }
+  #ww3-bar-wrap{ width:52px;min-width:52px; }
+  #ww3-hdr{ padding:0 .5rem;gap:.4rem; }
+
+  /* ── Panels: off-screen by default ── */
+  #panel{
+    transform:translateX(-290px);
+    width:min(280px,88vw);
+    box-shadow:4px 0 24px rgba(0,0,0,.7);
+  }
+  #rpanel{
+    transform:translateX(295px);
+    width:min(290px,90vw);
+    box-shadow:-4px 0 24px rgba(0,0,0,.7);
+  }
+  /* Show when mobile-open */
+  #panel.mobile-open{ transform:translateX(0)!important; }
+  #rpanel.mobile-open{ transform:translateX(0)!important; }
+
+  /* ── Overlay + mobile nav buttons ── */
+  #mob-overlay{ display:block;opacity:0;pointer-events:none; }
+  #mob-overlay.active{ opacity:1;pointer-events:all; }
+  #mob-left-btn,#mob-right-btn{ display:block; }
+
+  /* ── Panel tab: hidden (use mob-left-btn instead) ── */
+  #panel-tab{ display:none!important; }
+
+  /* ── Timeline: full-width ── */
+  #timeline{ left:0!important;right:0!important; }
+
+  /* ── Video bar: shorter ── */
+  #videobar{ height:110px; }
+  .video-card{ width:160px;min-width:160px; }
+
+  /* ── WW3 drawer: full-width on mobile ── */
+  #ww3-drawer{ left:4px!important;right:4px!important;max-width:none!important; }
+
+  /* ── Popups: slightly wider ── */
+  .leaflet-popup-content{ max-width:280px!important; }
+
+  /* ── Status bar: safe area ── */
+  #statusbar{ padding-bottom:env(safe-area-inset-bottom,0px); }
+
+  /* ── Touch: larger cluster tap targets ── */
+  .leaflet-marker-icon{ touch-action:manipulation; }
+}
+
+@media (max-width:480px) {
+  /* Very small phones — even more compact */
+  #ww3-hdr{ padding:0 .3rem;gap:.3rem; }
+  #ww3-bar-wrap{ width:40px;min-width:40px; }
+  #ww3-score{ font-size:.9rem!important; }
+  .hdr-logo{ font-size:.8rem; }
+  #mob-left-btn,#mob-right-btn{ font-size:.65rem;padding:.4rem .55rem; }
+}
 </style>
 </head>
 <body>
+
+<!-- ══ MOBILE: panel overlay + floating nav buttons ══════════════════════════ -->
+<div id="mob-overlay" onclick="closeMobPanels()"></div>
+<button id="mob-left-btn" onclick="toggleMobLeft()" title="Sensor feeds &amp; layers">☰ FEEDS</button>
+<button id="mob-right-btn" onclick="toggleMobRight()" title="Intelligence panel">⌇ INTEL</button>
 
 <!-- ══ BOOT SEQUENCE ══════════════════════════════════════════════════════════ -->
 <div id="boot">
@@ -8022,6 +8128,60 @@ function openCountryIntelFromPopup(country){
   const flag=match?match.flag:_isoFlag('');
   document.getElementById('country-search-inp').value=match?match.name:country;
   openCountryIntel(match?match.name:country, flag);
+}
+
+/* ── MOBILE PANEL TOGGLING ─────────────────────────────────────── */
+function _isMobile(){ return window.innerWidth<=768; }
+
+function toggleMobLeft(){
+  if(!_isMobile()) return;
+  const p=document.getElementById('panel');
+  const r=document.getElementById('rpanel');
+  const o=document.getElementById('mob-overlay');
+  const btn=document.getElementById('mob-left-btn');
+  const open=p.classList.toggle('mobile-open');
+  if(open){ r.classList.remove('mobile-open'); document.getElementById('mob-right-btn')?.classList.remove('panel-open'); }
+  o.classList.toggle('active',open);
+  btn.classList.toggle('panel-open',open);
+  btn.textContent=open?'✕ FEEDS':'☰ FEEDS';
+}
+
+function toggleMobRight(){
+  if(!_isMobile()) return;
+  const r=document.getElementById('rpanel');
+  const p=document.getElementById('panel');
+  const o=document.getElementById('mob-overlay');
+  const btn=document.getElementById('mob-right-btn');
+  const open=r.classList.toggle('mobile-open');
+  if(open){ p.classList.remove('mobile-open'); document.getElementById('mob-left-btn')?.classList.remove('panel-open'); document.getElementById('mob-left-btn').textContent='☰ FEEDS'; }
+  o.classList.toggle('active',open);
+  btn.classList.toggle('panel-open',open);
+  btn.textContent=open?'✕ INTEL':'⌇ INTEL';
+}
+
+function closeMobPanels(){
+  document.getElementById('panel')?.classList.remove('mobile-open');
+  document.getElementById('rpanel')?.classList.remove('mobile-open');
+  document.getElementById('mob-overlay')?.classList.remove('active');
+  const lb=document.getElementById('mob-left-btn');
+  const rb=document.getElementById('mob-right-btn');
+  if(lb){ lb.classList.remove('panel-open'); lb.textContent='☰ FEEDS'; }
+  if(rb){ rb.classList.remove('panel-open'); rb.textContent='⌇ INTEL'; }
+}
+
+/* Close mobile panels when map is clicked */
+(function(){
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const mapEl=document.getElementById('map');
+    if(mapEl) mapEl.addEventListener('click', ()=>{ if(_isMobile()) closeMobPanels(); });
+  });
+})();
+
+/* PWA service worker registration */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
 }
 </script>
 </body>

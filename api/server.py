@@ -102,6 +102,24 @@ async def root(request: Request):
         "Vary": "Accept-Encoding",
     })
 
+@app.get("/manifest.json")
+async def pwa_manifest():
+    """PWA web app manifest."""
+    from fastapi.responses import FileResponse as FR
+    path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "manifest.json")
+    if not os.path.exists(path):
+        return Response(status_code=404)
+    return FR(path, media_type="application/manifest+json", headers={"Cache-Control": "public, max-age=86400"})
+
+@app.get("/sw.js")
+async def service_worker():
+    """PWA service worker."""
+    from fastapi.responses import FileResponse as FR
+    path = os.path.join(os.path.dirname(__file__), "..", "dashboard", "sw.js")
+    if not os.path.exists(path):
+        return Response(status_code=404)
+    return FR(path, media_type="application/javascript", headers={"Cache-Control": "no-cache, no-store"})
+
 @app.get("/api/health")
 async def health():
     counts = DB.get_counts()
