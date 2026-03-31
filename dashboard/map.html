@@ -4359,6 +4359,10 @@ function addMarker2D(key, d){
   } else {
     const m = L.marker([d.lat, d.lon], {icon:lIcon});
     m._wdata = d;
+    // Bind popup once — content is set dynamically in the click handler via
+    // setPopupContent so Leaflet's internal _openPopup listener (added by
+    // bindPopup) can reliably re-open it on subsequent clicks.
+    m.bindPopup('', {className:'wardar-popup', maxWidth:300, autoPanPadding:[20,60]});
     m.on('click', ()=>{
       if(_measureOn){
         // measure mode — handle click as measurement point
@@ -4378,13 +4382,17 @@ function addMarker2D(key, d){
         }
         return;
       }
-      _lastPopupData = d;
-      const _psrc = (d.source||d._lk||'').toLowerCase();
+      // Always read from m._wdata so we show current data, not stale closure
+      const data = m._wdata;
+      _lastPopupData = data;
+      const _psrc = (data.source||data._lk||'').toLowerCase();
       const _isOsint = _psrc==='reddit_osint'||_psrc==='telegram_osint';
       const _isBreaking = _psrc==='breaking_news';
-      const html = d._isComm ? buildCommunityPopup(d) : _isBreaking ? buildBreakingPopup(d) : _isOsint ? buildRedditPopup(d) : buildPopup(d);
+      const html = data._isComm ? buildCommunityPopup(data) : _isBreaking ? buildBreakingPopup(data) : _isOsint ? buildRedditPopup(data) : buildPopup(data);
       const _pw = (_isOsint||_isBreaking) ? 320 : 300;
-      m.bindPopup(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;border:1px solid #1e1e2a">${html}</div>`, {className:'wardar-popup',maxWidth:_pw}).openPopup();
+      // Update content + maxWidth; Leaflet's _openPopup (bound above) opens it
+      m.getPopup().options.maxWidth = _pw;
+      m.setPopupContent(`<div style="background:#08080c;color:#b8bcc8;font-family:monospace;font-size:11px;border:1px solid #1e1e2a">${html}</div>`);
       // Load equipment image asynchronously after popup renders
       if(_pendingEqImg){
         const eq = _pendingEqImg; _pendingEqImg = null;
