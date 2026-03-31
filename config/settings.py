@@ -227,11 +227,11 @@ REDDIT_OSINT_INTERVAL_SEC = _i("REDDIT_OSINT_INTERVAL_SEC", 900)
 # No Telegram API key needed — reads public channels via RSSHub RSS proxy
 # Requires ANTHROPIC_API_KEY for AI noise filtering
 ENABLE_TELEGRAM_OSINT       = _b("ENABLE_TELEGRAM_OSINT",       True)
-TELEGRAM_OSINT_INTERVAL_SEC = _i("TELEGRAM_OSINT_INTERVAL_SEC", 240)  # every 4 min
+TELEGRAM_OSINT_INTERVAL_SEC = _i("TELEGRAM_OSINT_INTERVAL_SEC", 900)  # 15 min — RSS refreshes slowly, batching reduces token cost
 
 # ── Breaking News (Google News RSS + wire services) ───────────────────────────
 ENABLE_BREAKING_NEWS        = _b("ENABLE_BREAKING_NEWS",        True)
-BREAKING_NEWS_INTERVAL_SEC  = _i("BREAKING_NEWS_INTERVAL_SEC",  300)   # 5 min
+BREAKING_NEWS_INTERVAL_SEC  = _i("BREAKING_NEWS_INTERVAL_SEC",  600)   # 10 min — reduces AI calls ~3x
 
 # ── Phase 7 Intelligence Products ─────────────────────────────────────────────
 ALERT_WEBHOOK_URL       = _s("ALERT_WEBHOOK_URL",       "")   # Slack/Discord/custom incoming webhook

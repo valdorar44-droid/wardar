@@ -27,7 +27,7 @@ from core.engine import (
 # With upsert, the positions table stays tiny so this is always fast and small.
 _snap_cache: str | None = None
 _snap_ts: float = 0.0
-_SNAP_TTL = 60.0  # rebuild at most once per minute
+_SNAP_TTL = 15.0  # rebuild at most once per 15s — faster new-client catchup
 
 def _get_snapshot_json() -> str:
     global _snap_cache, _snap_ts

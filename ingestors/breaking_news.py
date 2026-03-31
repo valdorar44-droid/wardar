@@ -130,8 +130,20 @@ _ISO_FALLBACK: dict[str, tuple[float, float, str]] = {
 }
 
 _SEEN_URLS: set[str] = set()
+_SEEN_FPS:  set[str] = set()
 _MAX_SEEN = 5000
 _TRIM_TO  = 3000
+
+
+def _title_fp(title: str) -> str:
+    """Normalize title to a short fingerprint for same-story dedup across outlets."""
+    import re as _re
+    t = _re.sub(r'[^a-z0-9 ]', '', title.lower())
+    t = _re.sub(r'\s+', ' ', t).strip()
+    stops = {'the','a','an','is','was','in','on','at','to','for','of','and','or',
+             'with','by','from','as','that','this','are','has','have','been','will','after','it'}
+    words = [w for w in t.split() if w not in stops and len(w) > 2]
+    return ' '.join(words[:7])
 
 # XML namespace for media
 _MEDIA_NS = "http://search.yahoo.com/mrss/"
@@ -230,7 +242,7 @@ async def _ai_classify(items: list[dict]) -> list[dict]:
 
         msg = await client.messages.create(
             model=C.AI_MODEL,
-            max_tokens=2000,
+            max_tokens=1500,  # 15 items × ~100 tokens/JSON line
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -286,10 +298,12 @@ def _resolve_coords(ai_lat: float, ai_lon: float, location: str | None, country_
 
 async def fetch() -> list[dict]:
     """Fetch breaking news from RSS feeds, AI-classify, return event dicts."""
-    global _SEEN_URLS
+    global _SEEN_URLS, _SEEN_FPS
 
     if not C.ENABLE_BREAKING_NEWS:
         return []
+
+    _SEEN_FPS.clear()  # fresh each run — URLs handle cross-run dedup
 
     try:
         from core.engine import log, log_warn
@@ -349,7 +363,7 @@ async def fetch() -> list[dict]:
                     if not url:
                         continue
 
-                    # Dedup
+                    # Dedup by URL
                     if url in _SEEN_URLS:
                         continue
 
@@ -374,6 +388,12 @@ async def fetch() -> list[dict]:
                     title_lower = clean_title.lower()
                     if not any(kw in title_lower for kw in _KEYWORDS):
                         continue
+
+                    # Fingerprint dedup — same story from multiple outlets/feeds
+                    fp = _title_fp(clean_title)
+                    if fp and fp in _SEEN_FPS:
+                        continue
+                    _SEEN_FPS.add(fp)
 
                     # Description / body
                     desc_el = item_el.find("description")
@@ -408,8 +428,8 @@ async def fetch() -> list[dict]:
 
     log(f"breaking_news: {len(raw)} items pre-filtered from {len(_FEEDS)-feed_errors}/{len(_FEEDS)} feeds")
 
-    # AI classify in batches of 10
-    BATCH = 10
+    # AI classify in batches of 15
+    BATCH = 15
     ai_map: dict[str, dict] = {}
     for i in range(0, len(raw), BATCH):
         batch = raw[i: i + BATCH]

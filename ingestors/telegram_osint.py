@@ -140,8 +140,23 @@ _ISO_FALLBACK: dict[str, tuple[float, float, str]] = {
 }
 
 _SEEN_URLS: set[str] = set()
+_SEEN_FPS:  set[str] = set()  # title fingerprints — cross-channel duplicate suppression
 _MAX_SEEN = 3000
 _ATOM = "http://www.w3.org/2005/Atom"
+
+
+def _title_fp(title: str) -> str:
+    """
+    Normalize title to a short fingerprint.
+    Catches near-identical posts where multiple channels copy-paste the same report.
+    """
+    import re as _re
+    t = _re.sub(r'[^a-z0-9 ]', '', title.lower())
+    t = _re.sub(r'\s+', ' ', t).strip()
+    stops = {'the','a','an','is','was','in','on','at','to','for','of','and','or',
+             'with','by','from','as','that','this','are','has','have','been','will','after','it'}
+    words = [w for w in t.split() if w not in stops and len(w) > 2]
+    return ' '.join(words[:7])
 
 # ── RSSHub instances (try in order if one fails) ─────────────────────────────
 _RSSHUB_HOSTS = [
@@ -178,7 +193,7 @@ async def _ai_classify(posts: list[dict]) -> list[dict]:
         )
         msg = await client.messages.create(
             model=C.AI_MODEL,
-            max_tokens=2000,
+            max_tokens=1600,  # 20 items × ~80 tokens/JSON line
             messages=[{"role": "user", "content": prompt}],
         )
         out = []
@@ -214,10 +229,12 @@ def _resolve(location: str | None, country_iso: str | None) -> tuple[float, floa
 
 async def fetch() -> list[dict]:
     """Fetch Telegram OSINT posts via RSSHub, AI-filter, geocode, return event dicts."""
-    global _SEEN_URLS
+    global _SEEN_URLS, _SEEN_FPS
 
     if not C.ENABLE_TELEGRAM_OSINT:
         return []
+
+    _SEEN_FPS.clear()  # fresh fingerprint set each run — URLs are the persistent dedup
 
     from core.engine import log, log_warn
 
@@ -281,6 +298,13 @@ async def fetch() -> list[dict]:
                         title_lower = title.lower()
                         if not any(kw in title_lower for kw in _KEYWORDS):
                             continue
+
+                        # Cross-channel fingerprint dedup — skip if near-identical to a post
+                        # already seen this run (multiple channels copy-pasting same report)
+                        fp = _title_fp(title)
+                        if fp and fp in _SEEN_FPS:
+                            continue
+                        _SEEN_FPS.add(fp)
 
                         ts_el = (entry.find(f"{{{_ATOM}}}updated")
                                  or entry.find(f"{{{_ATOM}}}published")
@@ -348,8 +372,8 @@ async def fetch() -> list[dict]:
         return []
     log(f"telegram_osint: {len(raw)} posts from {len(_CHANNELS)-blocked} channels")
 
-    # AI classify
-    BATCH = 12
+    # AI classify — batch 20 to minimise API call count
+    BATCH = 20
     ai_map: dict[str, dict] = {}
     for i in range(0, len(raw), BATCH):
         batch = raw[i: i + BATCH]
@@ -411,6 +435,8 @@ async def fetch() -> list[dict]:
 
     if len(_SEEN_URLS) > _MAX_SEEN:
         _SEEN_URLS = set(list(_SEEN_URLS)[-1500:])
+    if len(_SEEN_FPS) > 2000:
+        _SEEN_FPS.clear()  # reset fingerprints each cycle (URLs remain the real dedup)
 
     log(f"telegram_osint: {len(events)} AI-verified events from {len(raw)} pre-filtered posts")
     return events
