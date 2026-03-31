@@ -19,6 +19,7 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>window.CESIUM_BASE_URL='https://cdn.jsdelivr.net/npm/cesium@1.116.0/Build/Cesium/';</script>
 <!-- Cesium loaded lazily on demand — keeps initial page load instant -->
 <style>
@@ -2069,6 +2070,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <input type="checkbox" class="layer-cb" id="cb-trails2d" checked style="color:var(--amber)" onchange="setTrails2D(this.checked)">
               <span class="layer-icon" style="color:var(--amber)">⊷</span>
               <span class="layer-name">MOVEMENT TRAILS</span>
+            </label>
+            <label class="layer-item" title="Conflict activity heatmap — event density overlay from ACLED, OSINT, threats, and fires over the past 24 hours. Shows conflict hotspots at a glance.">
+              <input type="checkbox" class="layer-cb" id="cb-heatmap" style="color:#ef4444" onchange="toggleHeatmap(this.checked)">
+              <span class="layer-icon" style="color:#ef4444">🌡</span>
+              <span class="layer-name">ACTIVITY HEATMAP</span>
+              <span style="font-size:.44rem;color:var(--dim2);margin-left:auto">24H</span>
             </label>
             <label class="layer-item" style="cursor:pointer" onclick="toggleDrawTools()">
               <input type="checkbox" class="layer-cb" id="cb-draw" style="color:var(--green)">
@@ -6730,6 +6737,57 @@ function toggleAtmLayer(key, on){
   }).addTo(_map2d);
   // Send to back but keep above base tiles
   _atmLayers[key].setZIndex(2);
+}
+
+// ── Conflict Activity Heatmap ─────────────────────────────────────────────────
+let _heatLayer = null;
+let _heatRefreshTimer = null;
+
+async function _buildHeatmap(){
+  if(!_map2d || !window.L || !L.heatLayer) return;
+  // Collect points from current event + position data
+  const pts = [];
+  // From event clusters already on the map
+  const HEAT_SOURCES = ['acled','firms','usgs','osint','osint_geo','alerts',
+    'dark_vessel','convergence','nuclear_threat','pipeline_threat','warspot',
+    'breaking_news','gpsjam','ioda','pikud_haoref'];
+  try{
+    const r = await fetch('/api/events?limit=2000');
+    const j = await r.json();
+    (j.data||[]).forEach(e=>{
+      if(e.lat!=null && e.lon!=null && Math.abs(e.lat)<90 && Math.abs(e.lon)<180){
+        // Weight: threat/alert sources higher
+        const w = _ALERT_SOURCES.has(e.source)?1.5:
+                  ['acled','firms','warspot'].includes(e.source)?1.2:0.8;
+        pts.push([e.lat, e.lon, w]);
+      }
+    });
+  }catch(_){}
+  if(!pts.length) return;
+  if(_heatLayer){ _map2d.removeLayer(_heatLayer); _heatLayer=null; }
+  _heatLayer = L.heatLayer(pts, {
+    radius: 28,
+    blur: 22,
+    maxZoom: 8,
+    max: 1.5,
+    gradient: {0.1:'#1e3a5f', 0.3:'#1e40af', 0.5:'#f59e0b', 0.75:'#ef4444', 1.0:'#dc2626'},
+    minOpacity: 0.25,
+  }).addTo(_map2d);
+  _heatLayer.setZIndex(3);
+}
+
+function toggleHeatmap(on){
+  clearTimeout(_heatRefreshTimer);
+  if(!on){
+    if(_heatLayer){ _map2d?.removeLayer(_heatLayer); _heatLayer=null; }
+    return;
+  }
+  _buildHeatmap();
+  // Auto-refresh every 5 minutes while enabled
+  _heatRefreshTimer = setInterval(()=>{
+    if(document.getElementById('cb-heatmap')?.checked) _buildHeatmap();
+    else clearInterval(_heatRefreshTimer);
+  }, 300000);
 }
 
 // ── EEZ Boundaries ───────────────────────────────────────────────────────────
