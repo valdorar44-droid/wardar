@@ -677,8 +677,7 @@ async def start():
     # Start AIS WebSocket listener (event-driven, not polled)
     if C.ENABLE_AIS:
         from ingestors import ais as _ais_mod
-        loop = asyncio.get_event_loop()
-        _ais_mod.start_ws_listener(loop)
+        _ais_mod.start_ws_listener()
         log("engine: AIS WebSocket listener started")
 
     # Schedule polling ingestors

@@ -148,12 +148,12 @@ async def _ws_loop():
             log_warn(f"ais: WebSocket error: {exc} — reconnecting in {C.AIS_RECONNECT_SEC}s")
             await asyncio.sleep(C.AIS_RECONNECT_SEC)
 
-def start_ws_listener(loop: asyncio.AbstractEventLoop):
+def start_ws_listener():
     """Start the AIS WebSocket listener coroutine (called once by engine)."""
     global _running
     if not _running and C.ENABLE_AIS:
+        asyncio.create_task(_ws_loop())
         _running = True
-        asyncio.ensure_future(_ws_loop(), loop=loop)
 
 async def fetch() -> list[dict]:
     """Drain buffered positions accumulated since last tick."""
