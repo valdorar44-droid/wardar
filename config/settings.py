@@ -240,6 +240,9 @@ DIGEST_HOURS            = _i("DIGEST_HOURS",            24)    # daily digest lo
 DIGEST_LIMIT            = _i("DIGEST_LIMIT",            10)    # top N events
 DIGEST_CONV_RADIUS_KM   = _i("DIGEST_CONV_RADIUS_KM",  200)   # convergence radius
 
+# ── Phase 11: Entity Identity Graph ──────────────────────────────────────────
+ENTITY_GRAPH_INTERVAL_SEC = _i("ENTITY_GRAPH_INTERVAL_SEC", 300)  # resolve entities every 5 min
+
 # ── WW3 Risk Meter (Phase 8+) ─────────────────────────────────────────────────
 # AI-generated daily global escalation index (0-100).
 # Updates once per calendar day UTC at midnight; uses ANTHROPIC_API_KEY.

@@ -534,6 +534,80 @@ async def get_shared_watchlist(share_token: str):
         wl["entities"] = []
     return JSONResponse(wl)
 
+# ── Phase 11: Entity Identity Graph ──────────────────────────────────────────
+
+@app.get("/api/entities")
+async def get_entities(
+    type: str = "",
+    country: str = "",
+    callsign: str = "",
+    military_only: bool = False,
+    limit: int = 200,
+    response: Response = None,
+):
+    """Return canonical entity records, optionally filtered. Use ?callsign= for direct lookup."""
+    if response:
+        response.headers["Cache-Control"] = "public, max-age=60"
+
+    def _parse(ent):
+        try: ent["aliases"] = json.loads(ent.get("aliases") or "[]")
+        except Exception: ent["aliases"] = []
+        try: ent["source_refs"] = json.loads(ent.get("source_refs") or "[]")
+        except Exception: ent["source_refs"] = []
+        return ent
+
+    # Direct callsign lookup
+    if callsign:
+        ent = DB.get_entity_by_callsign(callsign.upper().strip())
+        if not ent:
+            ent = DB.get_entity_by_callsign(callsign.strip())
+        if ent:
+            return JSONResponse({"count": 1, "entities": [_parse(ent)]})
+        return JSONResponse({"count": 0, "entities": []})
+
+    limit = min(limit, 500)
+    data = DB.get_entities(
+        type_filter=type or None,
+        country=country or None,
+        military_only=military_only,
+        limit=limit,
+    )
+    return JSONResponse({"count": len(data), "entities": [_parse(e) for e in data]})
+
+
+@app.get("/api/entities/{uuid}")
+async def get_entity(uuid: str, response: Response = None):
+    """Return a single entity by UUID."""
+    if response:
+        response.headers["Cache-Control"] = "public, max-age=30"
+    ent = DB.get_entity(uuid)
+    if not ent:
+        raise HTTPException(status_code=404, detail="entity not found")
+    try:
+        ent["aliases"] = json.loads(ent.get("aliases") or "[]")
+    except Exception:
+        ent["aliases"] = []
+    try:
+        ent["source_refs"] = json.loads(ent.get("source_refs") or "[]")
+    except Exception:
+        ent["source_refs"] = []
+    return JSONResponse(ent)
+
+
+@app.get("/api/entities/{uuid}/timeline")
+async def get_entity_timeline(uuid: str, hours: int = 72, response: Response = None):
+    """Return merged timeline for one entity: positions, OSINT mentions, annotations."""
+    if response:
+        response.headers["Cache-Control"] = "public, max-age=30"
+    hours = min(hours, 168)  # cap at 7 days
+    timeline = DB.get_entity_timeline(uuid, hours=hours)
+    if not timeline.get("positions") and not timeline.get("events") and not timeline.get("annotations"):
+        # Check entity exists
+        if not DB.get_entity(uuid):
+            raise HTTPException(status_code=404, detail="entity not found")
+    return JSONResponse({"uuid": uuid, "hours": hours, **timeline})
+
+
 # ── Phase 8: Public API v1 ────────────────────────────────────────────────────
 # Same data as the private endpoints with delay policy enforced.
 # Future: X-API-Key header will unlock real-time tier (currently no-op).

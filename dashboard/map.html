@@ -863,6 +863,64 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
   box-shadow:-8px 0 40px rgba(0,0,0,.6);
 }
 #chat-panel.open{transform:translateX(0)}
+
+/* ── Phase 11: Entity Dossier Panel ───────────────────────────────────────── */
+#entity-panel{
+  position:fixed;left:0;top:52px;bottom:0;width:340px;
+  background:var(--panel);border-right:2px solid var(--border2);
+  z-index:610;display:flex;flex-direction:column;
+  transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+  box-shadow:8px 0 40px rgba(0,0,0,.6);
+}
+#entity-panel.open{transform:translateX(0)}
+#entity-panel-hd{
+  background:rgba(12,12,18,.98);border-bottom:1px solid var(--border2);
+  padding:.55rem .8rem;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+#entity-panel-title{
+  font-size:.72rem;letter-spacing:.14em;font-weight:700;color:#a78bfa;
+}
+#entity-panel-body{
+  flex:1;overflow-y:auto;padding:.6rem .75rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#entity-panel-body::-webkit-scrollbar{width:3px}
+#entity-panel-body::-webkit-scrollbar-thumb{background:var(--border)}
+.ent-callsign{
+  font-size:1.1rem;font-weight:700;letter-spacing:.1em;color:#e2e8f0;
+  border-bottom:1px solid var(--border2);padding-bottom:.4rem;margin-bottom:.5rem;
+}
+.ent-badge{
+  display:inline-block;font-size:.52rem;font-weight:700;letter-spacing:.1em;
+  padding:.15rem .4rem;border-radius:2px;margin-right:.2rem;margin-bottom:.2rem;
+}
+.ent-badge.mil{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.ent-badge.ofac{background:rgba(220,38,38,.2);color:#dc2626;border:1px solid rgba(220,38,38,.4)}
+.ent-row{
+  display:flex;gap:.4rem;font-size:.65rem;padding:.2rem 0;border-bottom:1px solid rgba(30,30,42,.5);
+}
+.ent-lbl{color:var(--dim2);letter-spacing:.08em;flex-shrink:0;width:80px}
+.ent-val{color:var(--text);word-break:break-all}
+.ent-section-hdr{
+  font-size:.55rem;letter-spacing:.16em;color:#a78bfa;font-weight:700;
+  margin:.75rem 0 .3rem;padding:.2rem 0;border-bottom:1px solid rgba(167,139,250,.2);
+}
+.ent-timeline-item{
+  background:rgba(8,8,12,.5);border:1px solid var(--border);
+  padding:.35rem .5rem;margin-bottom:.3rem;font-size:.62rem;
+}
+.ent-timeline-ts{color:var(--dim2);font-size:.55rem;letter-spacing:.06em}
+.ent-timeline-src{color:var(--amber);font-size:.55rem;letter-spacing:.08em;float:right}
+.ent-timeline-txt{color:var(--text);margin-top:.15rem;line-height:1.4;word-break:break-word}
+.ent-alias-chip{
+  display:inline-block;font-size:.58rem;padding:.1rem .35rem;margin:.1rem;
+  background:rgba(30,30,50,.7);border:1px solid var(--border);color:var(--dim2);
+  letter-spacing:.06em;
+}
+.ent-loading{color:var(--dim2);font-size:.65rem;padding:.75rem;text-align:center;letter-spacing:.1em}
+.ent-none{color:var(--dim2);font-size:.6rem;font-style:italic;padding:.3rem 0}
+
 #chat-hd{
   background:rgba(12,12,18,.98);border-bottom:1px solid var(--border2);
   padding:.55rem .8rem;display:flex;align-items:center;justify-content:space-between;
@@ -2761,6 +2819,21 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   </div>
 </div>
 
+<!-- Phase 11: Entity Dossier Panel -->
+<div id="entity-panel">
+  <div id="entity-panel-hd">
+    <span id="entity-panel-title">◈ ENTITY DOSSIER</span>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span style="font-size:.52rem;color:var(--dim2);letter-spacing:.1em" id="entity-panel-status"></span>
+      <button style="background:none;border:none;color:var(--dim2);cursor:pointer;font-size:.9rem;font-family:var(--font)"
+        onclick="closeEntityPanel()">✕</button>
+    </div>
+  </div>
+  <div id="entity-panel-body">
+    <div class="ent-loading">AWAITING ENTITY SELECTION</div>
+  </div>
+</div>
+
 <!-- COMMUNITY SUBMIT DIALOG -->
 <dialog id="submit-dialog">
   <div class="dlg-hd">
@@ -4442,6 +4515,8 @@ function buildPopup(p){
       ${p.country?`<button class="pvote-btn" style="flex:1;text-align:center;color:var(--green)" onclick="openCountryBrief('${esc(p.country)}')">🤖 AI BRIEF</button>`:''}
       <button class="pvote-btn" style="flex:1;text-align:center;color:#a78bfa" onclick="predictPath(_lastPopupData)">🎯 PREDICT PATH</button>
     </div>
+    <button class="pvote-btn" style="width:100%;text-align:center;color:#c4b5fd;border-color:rgba(167,139,250,.3);margin-top:.25rem"
+      onclick="openEntityDossier('${esc(p.callsign||'')}')">◈ ENTITY DOSSIER</button>
     <button class="track-btn" onclick="showTrack('${esc(src)}','${esc(p.callsign||'')}')">
       📍 SHOW TRACK (24H BIOGRAPHY)
     </button>
@@ -5202,6 +5277,129 @@ async function showTrack(source, callsign){
 
 function clearTrack(){
   if(_trackLayer && _map2d){ _map2d.removeLayer(_trackLayer); _trackLayer = null; }
+}
+
+// ── Phase 11: Entity Dossier ──────────────────────────────────────────────────
+
+function closeEntityPanel(){
+  document.getElementById('entity-panel').classList.remove('open');
+}
+
+async function openEntityDossier(callsign){
+  if(!callsign){ showToast('NO CALLSIGN'); return; }
+  const panel  = document.getElementById('entity-panel');
+  const body   = document.getElementById('entity-panel-body');
+  const status = document.getElementById('entity-panel-status');
+  body.innerHTML = '<div class="ent-loading">RESOLVING ENTITY…</div>';
+  panel.classList.add('open');
+  status.textContent = '';
+
+  try{
+    // Step 1: look up entity by callsign
+    const res = await fetch(`/api/entities?callsign=${encodeURIComponent(callsign)}`).then(r=>r.json());
+    if(!res.entities || !res.entities.length){
+      body.innerHTML = `<div class="ent-loading">ENTITY NOT YET RESOLVED<br><span style="font-size:.55rem;color:var(--dim2)">Check back after next 5-min graph tick</span></div>`;
+      return;
+    }
+    const ent = res.entities[0];
+    status.textContent = ent.uuid.slice(0,8).toUpperCase();
+
+    // Step 2: fetch timeline
+    const tl = await fetch(`/api/entities/${encodeURIComponent(ent.uuid)}/timeline?hours=72`).then(r=>r.json());
+
+    // Render
+    body.innerHTML = _renderEntityDossier(ent, tl);
+  } catch(e){
+    body.innerHTML = '<div class="ent-loading">FETCH ERROR — SEE CONSOLE</div>';
+    console.error('openEntityDossier:', e);
+  }
+}
+
+function _renderEntityDossier(ent, tl){
+  const isMil  = parseInt(ent.military_flag||0)===1;
+  const isOfac = parseInt(ent.ofac_flag||0)===1;
+  const aliases = Array.isArray(ent.aliases) ? ent.aliases : [];
+  const refs    = Array.isArray(ent.source_refs) ? ent.source_refs : [];
+
+  let html = `<div class="ent-callsign">${esc(ent.callsign||'UNKNOWN')}`;
+  if(isMil)  html += ' <span class="ent-badge mil">MIL</span>';
+  if(isOfac) html += ' <span class="ent-badge ofac">⛔ SANCTIONED</span>';
+  html += '</div>';
+
+  // Core fields
+  html += `<div class="ent-row"><span class="ent-lbl">UUID</span><span class="ent-val" style="font-size:.58rem;color:var(--dim2)">${esc(ent.uuid||'')}</span></div>`;
+  html += `<div class="ent-row"><span class="ent-lbl">TYPE</span><span class="ent-val">${esc((ent.type||'—').toUpperCase())}</span></div>`;
+  html += `<div class="ent-row"><span class="ent-lbl">COUNTRY</span><span class="ent-val">${esc(ent.country||'—')}</span></div>`;
+  html += `<div class="ent-row"><span class="ent-lbl">OBSERVATIONS</span><span class="ent-val">${(ent.obs_count||0).toLocaleString()}</span></div>`;
+  html += `<div class="ent-row"><span class="ent-lbl">FIRST SEEN</span><span class="ent-val">${fmtTs(ent.first_seen)}</span></div>`;
+  html += `<div class="ent-row"><span class="ent-lbl">LAST SEEN</span><span class="ent-val">${fmtTs(ent.last_seen)}</span></div>`;
+  if(refs.length){
+    const srcList = [...new Set(refs.map(r=>r.source||'').filter(Boolean))].map(s=>s.toUpperCase()).join(' · ');
+    html += `<div class="ent-row"><span class="ent-lbl">SOURCES</span><span class="ent-val" style="font-size:.6rem">${esc(srcList)}</span></div>`;
+  }
+
+  // Aliases
+  if(aliases.length){
+    html += `<div class="ent-section-hdr">ALIASES / ALTERNATE IDs</div>`;
+    html += aliases.map(a=>`<span class="ent-alias-chip">${esc(a)}</span>`).join('');
+  }
+
+  // Position track
+  const positions = (tl && tl.positions) ? tl.positions : [];
+  html += `<div class="ent-section-hdr">POSITION TRACK (72H) — ${positions.length} pts</div>`;
+  if(!positions.length){
+    html += '<div class="ent-none">No position history yet</div>';
+  } else {
+    // Show last 5 fixes
+    const recent = positions.slice(-5).reverse();
+    recent.forEach(p=>{
+      html += `<div class="ent-timeline-item">
+        <span class="ent-timeline-src">${esc((p.source||'').toUpperCase())}</span>
+        <div class="ent-timeline-ts">${fmtTs(p.raw_ts_utc)}</div>
+        <div class="ent-timeline-txt">${p.lat!=null?p.lat.toFixed(3):'?'},${p.lon!=null?p.lon.toFixed(3):'?'}
+          ${p.altitude_ft!=null?' · '+Math.round(p.altitude_ft).toLocaleString()+'ft':''}
+          ${p.speed_kts!=null?' · '+Math.round(p.speed_kts)+'kts':''}
+        </div>
+      </div>`;
+    });
+    if(positions.length > 5){
+      html += `<div class="ent-none">… ${positions.length-5} earlier fixes omitted</div>`;
+    }
+  }
+
+  // OSINT mentions
+  const events = (tl && tl.events) ? tl.events : [];
+  html += `<div class="ent-section-hdr">OSINT MENTIONS — ${events.length}</div>`;
+  if(!events.length){
+    html += '<div class="ent-none">No mentions yet</div>';
+  } else {
+    events.slice(0,8).forEach(ev=>{
+      html += `<div class="ent-timeline-item">
+        <span class="ent-timeline-src">${esc((ev.source||'').toUpperCase())}</span>
+        <div class="ent-timeline-ts">${fmtTs(ev.raw_ts_utc)}</div>
+        <div class="ent-timeline-txt">${esc((ev.title||'').substring(0,120))}</div>
+        ${ev.url?`<a href="${esc(ev.url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.58rem">OPEN ↗</a>`:''}
+      </div>`;
+    });
+    if(events.length > 8) html += `<div class="ent-none">… ${events.length-8} more</div>`;
+  }
+
+  // Analyst annotations
+  const anns = (tl && tl.annotations) ? tl.annotations : [];
+  html += `<div class="ent-section-hdr">ANALYST NOTES — ${anns.length}</div>`;
+  if(!anns.length){
+    html += '<div class="ent-none">No analyst notes</div>';
+  } else {
+    anns.slice(0,5).forEach(a=>{
+      html += `<div class="ent-timeline-item">
+        <span class="ent-timeline-src">${esc((a.author_token||'ANON').substring(0,10))}</span>
+        <div class="ent-timeline-ts">${fmtTs(a.created_at)}</div>
+        <div class="ent-timeline-txt">${esc((a.body||'').substring(0,200))}</div>
+      </div>`;
+    });
+  }
+
+  return html;
 }
 
 // ── Phase 5: Chokepoint Throughput ────────────────────────────────────────────

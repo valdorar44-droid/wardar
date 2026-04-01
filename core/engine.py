@@ -622,6 +622,25 @@ async def _tick_ww3_meter():
         log_err(f"tick_ww3_meter: {exc}")
 
 
+async def _tick_entity_resolution():
+    try:
+        from core import entity_graph
+        conn = DB.get_conn()
+        # Process all positions seen in the last hour (raw, not release-filtered)
+        rows = conn.execute(
+            "SELECT * FROM positions WHERE raw_ts_utc >= datetime('now', '-1 hour') LIMIT 5000"
+        ).fetchall()
+        positions = [dict(r) for r in rows]
+        n = await entity_graph.run_resolution_tick(positions)
+        # Link entity callsigns to recent released events
+        events = DB.get_released_events(limit=500)
+        linked = entity_graph.link_event_mentions(events)
+        if n or linked:
+            log(f"entity_graph: resolved {n} entities, linked {linked} mentions")
+    except Exception as exc:
+        log_err(f"tick_entity_resolution: {exc}")
+
+
 async def _tick_webhook_flush():
     if not C.ALERT_WEBHOOK_URL:
         return
@@ -701,7 +720,8 @@ async def start():
         asyncio.create_task(_run_every(_tick_breaking_news,   C.BREAKING_NEWS_INTERVAL_SEC,   "breaking_news")),
         asyncio.create_task(_run_every(_tick_route_deviation, C.ROUTE_DEV_INTERVAL_SEC,       "route_deviation")),
         asyncio.create_task(_run_every(_tick_webhook_flush,  C.WEBHOOK_MIN_INTERVAL_SEC,      "webhook_flush")),
-        asyncio.create_task(_run_every(_tick_ww3_meter,      C.WW3_METER_CHECK_SEC,           "ww3_meter")),
+        asyncio.create_task(_run_every(_tick_ww3_meter,          C.WW3_METER_CHECK_SEC,           "ww3_meter")),
+        asyncio.create_task(_run_every(_tick_entity_resolution,  C.ENTITY_GRAPH_INTERVAL_SEC,     "entity_graph")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

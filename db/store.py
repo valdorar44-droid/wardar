@@ -167,6 +167,42 @@ _MIGRATIONS: list[str] = [
     """CREATE UNIQUE INDEX IF NOT EXISTS idx_swl_token ON shared_watchlists(share_token)""",
     """CREATE INDEX        IF NOT EXISTS idx_swl_owner ON shared_watchlists(owner_token)""",
 
+    # v12 — Phase 11: Entity Identity Graph
+    # One canonical row per real-world entity (aircraft/ship/satellite).
+    # Resolution: exact callsign match + MMSI/ICAO from extra JSON.
+    """CREATE TABLE IF NOT EXISTS entities (
+        uuid          TEXT PRIMARY KEY,
+        callsign      TEXT NOT NULL,
+        aliases       TEXT NOT NULL DEFAULT '[]',   -- JSON array of alt callsigns/MMSIs
+        source_refs   TEXT NOT NULL DEFAULT '[]',   -- JSON array of {source, callsign} seen
+        type          TEXT NOT NULL DEFAULT '',     -- aircraft|ship|satellite
+        country       TEXT NOT NULL DEFAULT '',
+        military_flag INTEGER NOT NULL DEFAULT 0,
+        ofac_flag     INTEGER NOT NULL DEFAULT 0,
+        first_seen    TEXT NOT NULL,
+        last_seen     TEXT NOT NULL,
+        obs_count     INTEGER NOT NULL DEFAULT 1,
+        lat           REAL,
+        lon           REAL
+    )""",
+    """CREATE UNIQUE INDEX IF NOT EXISTS idx_ent_callsign ON entities(callsign)""",
+    """CREATE INDEX        IF NOT EXISTS idx_ent_type     ON entities(type)""",
+    """CREATE INDEX        IF NOT EXISTS idx_ent_country  ON entities(country)""",
+    """CREATE INDEX        IF NOT EXISTS idx_ent_mil      ON entities(military_flag)""",
+
+    # entity_mentions: links an event to an entity when callsign appears in title/desc
+    """CREATE TABLE IF NOT EXISTS entity_mentions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_uuid  TEXT NOT NULL,
+        event_id     INTEGER NOT NULL,
+        confidence   REAL NOT NULL DEFAULT 1.0,   -- 1.0=exact, 0.8=fuzzy
+        match_type   TEXT NOT NULL DEFAULT 'exact',
+        created_at   TEXT NOT NULL,
+        UNIQUE(entity_uuid, event_id)
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_em_entity ON entity_mentions(entity_uuid, created_at DESC)""",
+    """CREATE INDEX IF NOT EXISTS idx_em_event  ON entity_mentions(event_id)""",
+
     # v9 — Phase 5 position history (separate from upsert positions table)
     # Stores a throttled time-series of each entity's positions for track/biography.
     # One row per entity per ~2 min (throttled in engine.py to keep DB lean).
@@ -845,6 +881,144 @@ def get_shared_watchlist(share_token: str) -> dict | None:
         )
         conn.commit()
     return dict(row)
+
+# ── Phase 11: Entity Identity Graph ──────────────────────────────────────────
+
+def upsert_entity(e: dict) -> str:
+    """
+    Insert or update an entity record. e must have: uuid, callsign, type, country,
+    military_flag, ofac_flag, lat, lon, now (ISO timestamp).
+    Returns the uuid.
+    """
+    now = e.get("now") or _utcnow()
+    with _lock:
+        conn = get_conn()
+        conn.execute("""
+            INSERT INTO entities
+              (uuid, callsign, aliases, source_refs, type, country,
+               military_flag, ofac_flag, first_seen, last_seen, obs_count, lat, lon)
+            VALUES
+              (:uuid,:callsign,:aliases,:source_refs,:type,:country,
+               :military_flag,:ofac_flag,:now,:now,1,:lat,:lon)
+            ON CONFLICT(callsign) DO UPDATE SET
+              aliases       = excluded.aliases,
+              source_refs   = excluded.source_refs,
+              type          = CASE WHEN excluded.type != '' THEN excluded.type ELSE type END,
+              country       = CASE WHEN excluded.country != '' THEN excluded.country ELSE country END,
+              military_flag = MAX(military_flag, excluded.military_flag),
+              ofac_flag     = MAX(ofac_flag,     excluded.ofac_flag),
+              last_seen     = excluded.last_seen,
+              obs_count     = obs_count + 1,
+              lat           = excluded.lat,
+              lon           = excluded.lon
+        """, {
+            "uuid":         e["uuid"],
+            "callsign":     e["callsign"],
+            "aliases":      e.get("aliases", "[]"),
+            "source_refs":  e.get("source_refs", "[]"),
+            "type":         e.get("type", ""),
+            "country":      e.get("country", ""),
+            "military_flag": int(e.get("military_flag") or 0),
+            "ofac_flag":    int(e.get("ofac_flag") or 0),
+            "lat":          e.get("lat"),
+            "lon":          e.get("lon"),
+            "now":          now,
+        })
+        conn.commit()
+    return e["uuid"]
+
+def get_entity_by_callsign(callsign: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM entities WHERE callsign=?", (callsign,)
+    ).fetchone()
+    return dict(row) if row else None
+
+def get_entity(uuid: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM entities WHERE uuid=?", (uuid,)
+    ).fetchone()
+    return dict(row) if row else None
+
+def get_entities(type_filter: str | None = None, country: str | None = None,
+                 military_only: bool = False, limit: int = 200) -> list[dict]:
+    conn = get_conn()
+    clauses, params = [], []
+    if type_filter:
+        clauses.append("type=?"); params.append(type_filter)
+    if country:
+        clauses.append("country=?"); params.append(country)
+    if military_only:
+        clauses.append("military_flag=1")
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    rows = conn.execute(
+        f"SELECT * FROM entities {where} ORDER BY obs_count DESC LIMIT ?",
+        params + [limit]
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+def get_entity_timeline(uuid: str, hours: int = 72) -> dict:
+    """
+    Return merged timeline for one entity:
+      positions  — from position_history
+      events     — from entity_mentions → events
+      annotations — from entity_annotations (by callsign)
+    """
+    conn = get_conn()
+    cutoff = _utcnow_minus_hours(hours)
+
+    # Look up entity to get callsign
+    ent = get_entity(uuid)
+    if not ent:
+        return {"positions": [], "events": [], "annotations": []}
+    callsign = ent["callsign"]
+
+    # Position track
+    positions = conn.execute("""
+        SELECT lat, lon, altitude_ft, speed_kts, heading_deg, military_flag, raw_ts_utc, source
+        FROM position_history
+        WHERE callsign=? AND raw_ts_utc >= ?
+        ORDER BY raw_ts_utc ASC
+    """, (callsign, cutoff)).fetchall()
+
+    # Mentioned events
+    events = conn.execute("""
+        SELECT e.id, e.source, e.title, e.description, e.lat, e.lon,
+               e.country, e.raw_ts_utc, e.url, em.confidence, em.match_type
+        FROM entity_mentions em
+        JOIN events e ON e.id = em.event_id
+        WHERE em.entity_uuid=? AND e.raw_ts_utc >= ?
+        ORDER BY e.raw_ts_utc DESC
+        LIMIT 50
+    """, (uuid, cutoff)).fetchall()
+
+    # Analyst annotations
+    annotations = conn.execute("""
+        SELECT id, body, upvotes, downvotes, created_at, author_token
+        FROM entity_annotations
+        WHERE callsign=? AND hidden=0
+        ORDER BY created_at DESC
+        LIMIT 20
+    """, (callsign,)).fetchall()
+
+    return {
+        "positions":    [dict(r) for r in positions],
+        "events":       [dict(r) for r in events],
+        "annotations":  [dict(r) for r in annotations],
+    }
+
+def insert_entity_mention(entity_uuid: str, event_id: int,
+                          confidence: float = 1.0, match_type: str = "exact") -> None:
+    now = _utcnow()
+    with _lock:
+        conn = get_conn()
+        conn.execute("""
+            INSERT OR IGNORE INTO entity_mentions
+              (entity_uuid, event_id, confidence, match_type, created_at)
+            VALUES (?,?,?,?,?)
+        """, (entity_uuid, event_id, confidence, match_type, now))
+        conn.commit()
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
