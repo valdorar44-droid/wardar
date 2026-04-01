@@ -149,12 +149,11 @@ body::after{
   transition:left .2s ease, transform .25s ease, opacity .25s ease, bottom .2s ease;
 }
 #statusbar{
-  position:fixed;bottom:0;left:0;right:0;height:44px;
+  position:fixed;bottom:0;left:0;right:0;
   z-index:600;
-  transition:opacity .25s ease, bottom .2s ease;
+  transition:transform .2s ease, opacity .25s ease;
 }
-#statusbar.sb-hidden{ bottom:-44px; }
-body.sb-hidden-mode #timeline{ bottom:4px; transition:bottom .2s ease; }
+#statusbar.sb-hidden{ transform:translateY(110%); }
 #header{
   transition:opacity .25s ease, transform .25s ease;
 }
@@ -165,7 +164,7 @@ body.cinema #panel    { opacity:0; pointer-events:none; transform:translateX(-26
 body.cinema #panel-tab{ opacity:0; pointer-events:none; }
 body.cinema #rpanel   { opacity:0; pointer-events:none; transform:translateX(280px); }
 body.cinema #timeline { opacity:0; pointer-events:none; transform:translateY(60px); }
-body.cinema #statusbar{ opacity:0; pointer-events:none; }
+body.cinema #statusbar{ opacity:0; pointer-events:none; transform:translateY(110%); }
 body.cinema #videobar { opacity:0; pointer-events:none; transform:translateY(100%); }
 body.cinema #cinema-exit { opacity:1; pointer-events:all; }
 
@@ -1304,10 +1303,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
 /* ── STATUS BAR ── */
 #statusbar{
+  position:fixed;bottom:0;left:0;right:0;
   background:rgba(4,4,6,.98);border-top:1px solid var(--border);
   height:28px;display:flex;align-items:center;gap:1rem;
   padding:0 1rem;font-size:.58rem;letter-spacing:.05em;
-  grid-column:1/-1;
+  z-index:600;transition:transform .2s ease, opacity .25s ease;
 }
 .sb-dot{
   width:5px;height:5px;border-radius:50%;background:var(--dim);
@@ -6109,18 +6109,16 @@ function toggleMilOnly(){
 function hideStatusbar(){
   const sb  = document.getElementById('statusbar');
   const btn = document.getElementById('sb-show-btn');
-  if(sb)  sb.classList.add('sb-hidden');
+  if(sb){ sb.classList.add('sb-hidden'); sb.style.pointerEvents='none'; }
   if(btn) btn.style.display = 'block';
-  document.body.classList.add('sb-hidden-mode');
   try{ localStorage.setItem('wardar_sb_hidden','1'); }catch(e){}
 }
 
 function showStatusbar(){
   const sb  = document.getElementById('statusbar');
   const btn = document.getElementById('sb-show-btn');
-  if(sb)  sb.classList.remove('sb-hidden');
+  if(sb){ sb.classList.remove('sb-hidden'); sb.style.pointerEvents=''; }
   if(btn) btn.style.display = 'none';
-  document.body.classList.remove('sb-hidden-mode');
   try{ localStorage.removeItem('wardar_sb_hidden'); }catch(e){}
 }
 
