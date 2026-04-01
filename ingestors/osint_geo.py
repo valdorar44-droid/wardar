@@ -48,7 +48,7 @@ async def fetch() -> list[dict]:
         except ImportError:
             return []
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     raw = await loop.run_in_executor(None, _sync_extract)
     if not raw:
         return []

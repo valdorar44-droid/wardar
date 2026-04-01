@@ -141,7 +141,7 @@ async def fetch() -> list[dict]:
 
     # Propagate positions (CPU-bound — run in executor)
     results = []
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     for name, l1, l2 in tles:
         p = await loop.run_in_executor(None, _propagate, name, l1, l2)
         if p:
