@@ -893,25 +893,7 @@ def upsert_entity(e: dict) -> str:
     now = e.get("now") or _utcnow()
     with _lock:
         conn = get_conn()
-        conn.execute("""
-            INSERT INTO entities
-              (uuid, callsign, aliases, source_refs, type, country,
-               military_flag, ofac_flag, first_seen, last_seen, obs_count, lat, lon)
-            VALUES
-              (:uuid,:callsign,:aliases,:source_refs,:type,:country,
-               :military_flag,:ofac_flag,:now,:now,1,:lat,:lon)
-            ON CONFLICT(callsign) DO UPDATE SET
-              aliases       = excluded.aliases,
-              source_refs   = excluded.source_refs,
-              type          = CASE WHEN excluded.type != '' THEN excluded.type ELSE type END,
-              country       = CASE WHEN excluded.country != '' THEN excluded.country ELSE country END,
-              military_flag = MAX(military_flag, excluded.military_flag),
-              ofac_flag     = MAX(ofac_flag,     excluded.ofac_flag),
-              last_seen     = excluded.last_seen,
-              obs_count     = obs_count + 1,
-              lat           = excluded.lat,
-              lon           = excluded.lon
-        """, {
+        params = {
             "uuid":         e["uuid"],
             "callsign":     e["callsign"],
             "aliases":      e.get("aliases", "[]"),
@@ -923,7 +905,45 @@ def upsert_entity(e: dict) -> str:
             "lat":          e.get("lat"),
             "lon":          e.get("lon"),
             "now":          now,
-        })
+        }
+        try:
+            conn.execute("""
+                INSERT INTO entities
+                  (uuid, callsign, aliases, source_refs, type, country,
+                   military_flag, ofac_flag, first_seen, last_seen, obs_count, lat, lon)
+                VALUES
+                  (:uuid,:callsign,:aliases,:source_refs,:type,:country,
+                   :military_flag,:ofac_flag,:now,:now,1,:lat,:lon)
+                ON CONFLICT(callsign) DO UPDATE SET
+                  aliases       = excluded.aliases,
+                  source_refs   = excluded.source_refs,
+                  type          = CASE WHEN excluded.type != '' THEN excluded.type ELSE type END,
+                  country       = CASE WHEN excluded.country != '' THEN excluded.country ELSE country END,
+                  military_flag = MAX(military_flag, excluded.military_flag),
+                  ofac_flag     = MAX(ofac_flag,     excluded.ofac_flag),
+                  last_seen     = excluded.last_seen,
+                  obs_count     = obs_count + 1,
+                  lat           = excluded.lat,
+                  lon           = excluded.lon
+            """, params)
+        except Exception as exc:
+            if "entities.uuid" in str(exc):
+                # UUID already exists under a different callsign (alias-resolution edge case).
+                # Fall back to UPDATE by uuid so we don't lose the observation.
+                conn.execute("""
+                    UPDATE entities SET
+                      aliases       = :aliases,
+                      source_refs   = :source_refs,
+                      military_flag = MAX(military_flag, :military_flag),
+                      ofac_flag     = MAX(ofac_flag,     :ofac_flag),
+                      last_seen     = :now,
+                      obs_count     = obs_count + 1,
+                      lat           = :lat,
+                      lon           = :lon
+                    WHERE uuid = :uuid
+                """, params)
+            else:
+                raise
         conn.commit()
     return e["uuid"]
 
