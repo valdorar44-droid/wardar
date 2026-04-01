@@ -73,9 +73,15 @@ def resolve_or_create(position: dict) -> str | None:
             hit = DB.get_entity_by_callsign(alias)
             if hit:
                 ent_uuid = hit["uuid"]
+                existing = hit  # treat alias-resolved entity as existing
                 break
         if not ent_uuid:
             ent_uuid = _make_uuid()
+
+    # When resolved via alias, the existing row's callsign is the upsert key.
+    # Add the incoming callsign as an alias so the cross-reference is preserved.
+    # Using a different callsign with the same UUID would violate the PK constraint.
+    upsert_callsign = existing["callsign"] if existing else callsign
 
     # Build updated source_refs
     try:
@@ -88,18 +94,19 @@ def resolve_or_create(position: dict) -> str | None:
         if len(refs) > 20:
             refs = refs[-20:]
 
-    # Merge aliases
+    # Merge aliases — include the incoming callsign when it differs from upsert key
     try:
         existing_aliases = json.loads(existing["aliases"]) if existing else []
     except Exception:
         existing_aliases = []
-    merged_aliases = list(set(existing_aliases + aliases))[:30]
+    extra_aliases = aliases + ([callsign] if upsert_callsign != callsign else [])
+    merged_aliases = list(set(existing_aliases + extra_aliases))[:30]
 
     ofac = _ofac_flag(callsign, country, position.get("extra") or "{}")
 
     DB.upsert_entity({
         "uuid":         ent_uuid,
-        "callsign":     callsign,
+        "callsign":     upsert_callsign,
         "aliases":      json.dumps(merged_aliases),
         "source_refs":  json.dumps(refs),
         "type":         ptype,
