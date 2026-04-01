@@ -26,34 +26,43 @@ _SHIP_TYPES = {
     range(90, 100): "other",
 }
 
-# ── SHIP FILTER ───────────────────────────────────────────────────────────────
-# Accept all commercially significant vessel types globally.
-# The deque cap (2000) and frontend globe cap (200 markers) limit volume.
-# Only drop: pleasure craft (36-39), sailing (36), fishing (30-34), unknown type.
+# ── HIGH-VALUE FILTER ─────────────────────────────────────────────────────────
+# Only ingest vessels with strategic intelligence value:
+#   1. Military / government / coast guard  → tracked worldwide, flagged
+#   2. Oil/chemical/LNG tankers             → tracked only in conflict zones
+# Everything else (cargo, fishing, passenger, pleasure) is dropped.
 
-# Military/government ship type codes — flagged as military
 _MIL_SHIP_TYPES = frozenset([
-    35,               # military operations / diving ops
-    *range(50, 60),   # pilot, SAR, tug, port tender, law enforcement, coast guard
+    35,               # military operations
+    *range(50, 60),   # pilot, SAR, tug, coast guard, law enforcement
 ])
 
-# Ship types to ACCEPT globally (in addition to military)
-_COMMERCIAL_TYPES = frozenset([
-    *range(40, 50),   # high-speed craft, hydrofoil, hovercraft
-    *range(60, 70),   # passenger vessels, ferries
-    *range(70, 80),   # cargo ships, container, bulk carrier, general cargo
-    *range(80, 90),   # tankers: oil, chemical, LNG, LPG, bulk liquid
-])
+_TANKER_TYPES = frozenset(range(80, 90))  # oil, chemical, LNG, LPG
 
-# Drop: fishing (30-34), pleasure craft (36-39), wing-in-ground (20-29), other/unknown
+_CONFLICT_ZONES: list[tuple[float, float, float, float]] = [
+    ( 22,  28,  48,  60),   # Persian Gulf / Strait of Hormuz
+    (  8,  22,  38,  58),   # Red Sea / Gulf of Aden / Bab-el-Mandeb
+    ( 40,  48,  27,  42),   # Black Sea
+    ( 30,  38,  24,  40),   # Eastern Mediterranean
+    (  3,  26, 103, 125),   # South China Sea / Taiwan Strait
+    ( -6,  11,  -6,  16),   # Gulf of Guinea
+    ( 55,  70,  13,  32),   # Baltic Sea
+    ( 50,  62,  -6,  12),   # North Sea / English Channel
+]
 
-def _is_accepted(ship_type: int | None) -> tuple[bool, int]:
+def _in_conflict_zone(lat: float, lon: float) -> bool:
+    for min_lat, max_lat, min_lon, max_lon in _CONFLICT_ZONES:
+        if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
+            return True
+    return False
+
+def _is_accepted(ship_type: int | None, lat: float, lon: float) -> tuple[bool, int]:
     """Returns (accepted, military_flag)."""
     st = ship_type if ship_type is not None else -1
     if st in _MIL_SHIP_TYPES:
         return True, 1
-    if st in _COMMERCIAL_TYPES:
-        return True, 0
+    if st in _TANKER_TYPES:
+        return _in_conflict_zone(lat, lon), 0
     return False, 0
 
 def _ship_label(type_code: int | None) -> str:
@@ -87,9 +96,9 @@ def _norm_ais(msg: dict) -> dict | None:
         hdg      = pos.get("Cog") or pos.get("TrueHeading")
         ship_type = meta.get("ShipType")
 
-        accepted, mil_flag = _is_accepted(ship_type)
+        accepted, mil_flag = _is_accepted(ship_type, float(lat), float(lon))
         if not accepted:
-            return None   # drop fishing, pleasure craft, wing-in-ground, unknown
+            return None   # drop cargo, fishing, passenger, pleasure craft
 
         return {
             "source":       "ais",
