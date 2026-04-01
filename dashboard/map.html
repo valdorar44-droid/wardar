@@ -2986,7 +2986,12 @@ function _dismissBoot(){
   const el = document.getElementById('boot');
   if(!el) return;
   el.classList.add('fade');
-  setTimeout(()=>{ el.remove(); }, 600);
+  setTimeout(()=>{
+    el.remove();
+    // iOS Safari fix: force Leaflet to recalculate tile grid after
+    // the boot overlay is removed from the stacking context.
+    if(_map2d){ _map2d.invalidateSize(); }
+  }, 600);
 }
 
 function runBoot(){
@@ -2999,8 +3004,8 @@ function runBoot(){
   // _applySettings() is also deferred here — it reads `_settings` (let, line ~6521) which
   // would be in the temporal dead zone if called synchronously before that line executes.
   setTimeout(()=>{
-    _applySettings();
-    _syncMilOnlyUI();  // sync MIL ONLY button state from persisted localStorage value
+    try { _applySettings(); } catch(e) { console.warn('_applySettings failed:', e); }
+    try { _syncMilOnlyUI(); } catch(e) { console.warn('_syncMilOnlyUI failed:', e); }
     try { initMap(); } catch(e) {
       console.error('initMap failed:', e);
       // Show error in boot output
@@ -3032,6 +3037,32 @@ function runBoot(){
   step();
 }
 runBoot();
+
+// ── Mobile: invalidateSize on orientation change ───────────────────────────────
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { if(_map2d) _map2d.invalidateSize(); }, 400);
+});
+window.addEventListener('resize', () => {
+  if(_map2d) _map2d.invalidateSize();
+});
+
+// ── Mobile map health check ────────────────────────────────────────────────────
+// If the map container exists but Leaflet never initialized (iOS timing issue),
+// retry once at 4s and again at 8s.
+setTimeout(() => {
+  if(!_map2d){
+    console.warn('WARDAR: map not initialized at 4s — retrying');
+    try { initMap(); } catch(e) { console.error('WARDAR: map retry failed', e); }
+  } else {
+    _map2d.invalidateSize(); // ensure tiles fill container on slow mobile
+  }
+}, 4000);
+setTimeout(() => {
+  if(!_map2d){
+    console.warn('WARDAR: map not initialized at 8s — final retry');
+    try { initMap(); } catch(e) { console.error('WARDAR: map final retry failed', e); }
+  }
+}, 8000);
 
 // ── Header: UTC clock ─────────────────────────────────────────────────────────
 function updateClock(){
@@ -7998,10 +8029,14 @@ function _applySettings(){
   document.body.classList.toggle('compact-mode', !!_settings.compact);
   // Notification button
   const nb = document.getElementById('st-notif-btn');
-  if(nb){
+  if(nb && window.Notification){
     const p = Notification.permission;
     nb.textContent = p==='granted'?'✓ GRANTED':(p==='denied'?'✕ BLOCKED':'REQUEST PERMISSION');
     nb.style.color = p==='granted'?'var(--green)':(p==='denied'?'var(--red)':'var(--text)');
+  } else if(nb){
+    nb.textContent = 'NOT SUPPORTED';
+    nb.style.color = 'var(--dim2)';
+    nb.disabled = true;
   }
 }
 
@@ -8091,6 +8126,7 @@ function resetAllSettings(){
 }
 
 function requestNotifPermission(){
+  if(!window.Notification) return;
   Notification.requestPermission().then(()=>_applySettings());
 }
 

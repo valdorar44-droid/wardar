@@ -1,74 +1,72 @@
 ---
 name: Wardar Roadmap & Pending TODOs
-description: All pending tasks, confirmed phases, and feed additions for Wardar
+description: All completed phases and next phases (11-18) for Wardar
 type: project
 ---
 
 ## API Keys Still Needed (blocks live data)
-- AIS maritime: https://aisstream.io/authenticate → GitHub OAuth 60s → `railway variables set AISSTREAM_API_KEY=key`
+- AIS maritime: https://aisstream.io/authenticate → GitHub OAuth → `railway variables set AISSTREAM_API_KEY=key`
 - ACLED conflict: https://acleddata.com/register → `railway variables set ACLED_API_KEY=key ACLED_EMAIL=email`
 
-## Completed Phases
-- **Phase 1** ✅ — FastAPI scaffold, OpenSky ADS-B, OSINT/GDELT, WebSocket, Railway deploy
-- **Phase 2** ✅ — TLE satellites, 24h timeline/playback, NASA FIRMS thermal, USGS seismic, GPSJam EW
+## Completed Phases (1–10 + extras)
 
-## Active Work
-- **UI redesign** — full war-room overhaul: CSS Grid, corner brackets, scan lines, SIGINT feed panel, cursor lat/lon readout, signal pulse animations, threat level header
-- **Community Intel layer** — click country/region → community discussion + intel submission + verification that plots to map. Uses `community_reports` DB table, `/api/community` endpoints, anonymous tokens via localStorage
+- **Phase 1** ✅ FastAPI scaffold, OpenSky ADS-B, OSINT/GDELT, WebSocket, Railway deploy
+- **Phase 2** ✅ TLE satellites, 24h timeline/playback, NASA FIRMS thermal, USGS seismic, GPSJam EW
+- **Phase 3** ✅ All RSS/OSINT feeds (TWZ, USNI, Bellingcat, Oryx, ISW, Al Jazeera, BBC, Telegram, breaking news)
+- **Phase 4** ✅ Dark signal detectors: dark vessel, vessel spoofing, transponder loss, FIRMS+USGS, GPSJam compound
+- **Phase 5** ✅ Temporal intelligence: position_history, /api/track biography, /api/chokepoints (10 straits, 1h/6h/24h throughput counts), route deviation alerts, chokepoint flow widget
+- **Phase 6** ✅ EEZ boundaries (VLIZ), submarine cables (TeleGeography), military installations
+- **Phase 7** ✅ Watchlist, daily digest (/api/digest), webhooks (Slack/Discord)
+- **Phase 8** ✅ Entity annotations, community reports + voting, shared watchlists, public API v1 at /api/v1/
+- **Phase 9** ✅ Mobile-responsive PWA: panels collapse, floating nav, manifest.json + sw.js
+- **Phase 10** ✅ NASA GIBS atmospheric tile overlays
+- **War-room UI** ✅ CSS Grid, corner brackets, scan lines, SIGINT feed, WW3 Pip-Boy header, threat level, cursor lat/lon
+- **Admin dashboard** ✅ Login, stats, config, events, WW3 controls
+- **Post-10** ✅ Geofence watchzone, conflict heatmap, OFAC sanctions badges, browser push notifications, live crisis ticker, aircraft trails
 
-## Planned Phases
+## Next Phases (none built yet)
 
-### Phase 3 — High-Value Free Feeds (no keys)
-Add to osint.py as `_fetch_*_rss()` functions:
-- The War Zone: https://www.thedrive.com/the-war-zone/rss
-- USNI News: https://news.usni.org/feed
-- Bellingcat: https://www.bellingcat.com/feed/
-- Oryx OSINT: https://www.oryxspioenkop.com/feeds/posts/default
-- Defense News: https://www.defensenews.com/arc/outboundfeeds/rss/
-- Defense One: https://www.defenseone.com/rss/
-- UK MOD: https://www.gov.uk/search/news-and-communications.atom?organisations[]=ministry-of-defence
-- RUSI: https://rusi.org/rss.xml
-- CSIS: https://www.csis.org/rss.xml
-- Krebs Security: https://krebsonsecurity.com/feed/
-- Ransomware.live: https://www.ransomware.live/rss
-- gCaptain: https://gcaptain.com/feed/
-- Janes public: https://www.janes.com/feeds/news
+### Phase 11 — Entity Identity Graph (Priority #1, Complexity: L)
+Canonical UUID per tracked entity, cross-source identity resolution, alias tracking, unified timeline (positions + alerts + OSINT mentions + annotations). Foundational for phases 12, 14, 15.
+- New: `entities` table, `core/entity_graph.py`, `/api/entities/{uuid}/timeline`, entity panel in frontend
 
-### Phase 4 — Dark Signal Detection (ML moat)
-- Dark vessel detection: AIS gap >2h near conflict zone = alert
-- Vessel spoofing: AIS reported speed > physics max for vessel class
-- ADS-B anomaly: circling (surveillance), transponder loss over sensitive airspace, route deviation from 30-day baseline
-- FIRMS + USGS cross-correlation: thermal + seismic in same region within 4h = possible strike
-- GPSJam + AIS convergence: vessel goes dark in active jamming zone = compound alert
-- New DB table: `alerts` with source signals, confidence score, resolution
+### Phase 12 — Incident Rooms (Priority #5, Complexity: XL)
+Group events into discrete incidents with lifecycle, spatial bounds, AI assessment every 4h, PDF/JSON export, private shareable links.
+- New: `incidents` table, `core/incident_engine.py`, incident overlay on map, auto-created at convergence score 6+
 
-### Phase 5 — Temporal Intelligence
-- 180-day position baseline per callsign/MMSI → deviation alerts
-- Vessel/aircraft "biography" popup: last 30 days as polyline
-- Chokepoint throughput dashboard (Hormuz, Malacca, GIUK, Bab-el-Mandeb)
-- Port activity baseline vs current detection
+### Phase 13 — API Tiers + Monetization (Priority #2, Complexity: M)
+Tiered API keys for users (FREE/PRO/ENTERPRISE), rate limiting middleware, per-customer webhook subscriptions, usage analytics, Stripe hook.
+- Note: server.py line 539 already has stub comment "Future: X-API-Key header will unlock real-time tier (currently no-op)"
+- New: `api_keys` table, `webhook_subscriptions` table, `core/auth.py`, FastAPI middleware
 
-### Phase 6 — Geospatial Enrichment (static layers)
-- Submarine cable routes: https://www.submarinecablemap.com/api/v3/cable/cable-geo.json
-- EEZ boundaries: MarineRegions.org GeoJSON
-- Military installations layer (OSM-derived public data)
-- Space-Track.org upgrade (138M+ historical TLE, maneuver detection)
-- Sentinel SAR pass prediction over alert regions
+### Phase 14 — ML Anomaly Detection (Priority #3, Complexity: XL)
+Chokepoint throughput baselines (7-day rolling mean/std → anomaly when 2σ deviation), dark swarm detector (3+ vessels dark in same cell within 6h), compound multi-domain spike detector, conflict escalation trajectory → WW3 meter.
+- Note: Phase 5 chokepoint COUNTS are built. These BASELINES are not.
+- New: `grid_baselines`, `chokepoint_baselines`, `dark_pattern_episodes`, `core/anomaly.py`
 
-### Phase 7 — Intelligence Products (monetization)
-- AI SITREP: region → all signals 24h → Claude Haiku → structured brief
-- Daily digest: top 10 events ranked by anomaly + cross-domain convergence score
-- Watchlist: track specific MMSI/callsign/NORAD/country, fire alerts on anomaly
-- Public API v1: Free (24h delayed), Pro (near-realtime), Enterprise (raw + custom regions)
-- Webhook delivery: POST alerts to Slack/Discord/PagerDuty
-- OSINT report export: region + timeframe → PDF brief with map snapshot + AI synthesis
+### Phase 15 — Conversational Analyst (Priority #4, Complexity: L)
+Query the DB in natural language. "What military aircraft were near Taiwan in 48h?" → grounded answer with map citations. Builds on intel_brief.py's _build_context() pattern.
+- New: `chat_sessions` table, `core/analyst.py`, `/api/analyst/chat`, Analyst panel in frontend
 
-### Phase 8 — Collaborative Intelligence
-- Analyst annotations on map events
-- Community confidence voting on anomaly flags
-- Shared watchlists for teams
-- Open API for Bellingcat/academics (citation required, free tier)
+### Phase 16 — Signal Expansion (Priority #6, Complexity: M per sub)
+- 16A: AIS enrichment — vessel metadata, flag/owner mismatch dark signal, ETA vs actual divergence
+- 16B: Space domain — SpaceTrack.org, IMINT satellite pass prediction over hotspots, conjunction alerts
+- 16C: HF/ACARS — oceanic aircraft positions (fills ADS-B ocean gap)
+- 16D: OpenSanctions — replace OFAC-only with 100+ sanctions lists (key exists in config, ENABLE_OPENSANCTIONS=False)
 
-**Why:** Dark signal detection is the primary moat — no competitor has multi-domain correlation. Community intel + verification makes Wardar the "open Bellingcat." Public API enables journalist/academic adoption which drives credibility.
+### Phase 17 — UX Overhaul (Priority #7, Complexity: L+M)
+Vite build step, URL-encoded shareable map state, split-screen multi-viewport, command palette, theme variants, bearing lines/range rings
 
-**How to apply:** When building Phase 4, alerts must never bypass the delay policy. Military anomalies still hold 24h. Community-submitted intel goes through same delay rules.
+### Phase 18 — Scale Infrastructure (Priority #8, do last)
+TimescaleDB migration, Redis for rate limiting + WS pub/sub, CDN for frontend assets
+
+## Recommended Build Order
+1. Phase 13 (API tiers) — before users arrive, every request gets attributed
+2. Phase 11 (Entity graph) — makes AI layer defensible, foundational for 12/14/15
+3. Phase 14 minimal (chokepoint baselines + dark swarm) — improves existing map signals
+4. Phase 15 MVP (conversational chat) — builds on existing intel_brief.py context builder
+5. Phase 12 (incidents), 16A (AIS enrichment), 17 (UX)
+6. Phase 18 (only when growth forces it)
+
+## Known Bugs
+- **Mobile map not loading** — loading screen shows, map never appears. Under investigation.
