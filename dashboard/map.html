@@ -151,11 +151,10 @@ body::after{
 #statusbar{
   position:fixed;bottom:0;left:0;right:0;height:44px;
   z-index:600;
-  transition:opacity .25s ease, transform .2s ease;
+  transition:opacity .25s ease, bottom .2s ease;
 }
-#statusbar.collapsed{transform:translateY(100%)}
-/* When statusbar collapsed, timeline bar can breathe */
-body.sb-collapsed #timeline{bottom:4px}
+#statusbar.sb-hidden{ bottom:-44px; }
+body.sb-hidden-mode #timeline{ bottom:4px; transition:bottom .2s ease; }
 #header{
   transition:opacity .25s ease, transform .25s ease;
 }
@@ -2768,31 +2767,33 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
   <!-- STATUS BAR -->
   <div id="statusbar">
-    <button id="sb-collapse-btn" onclick="toggleStatusbar()" title="Collapse status bar"
-      style="background:none;border:none;color:var(--dim2);cursor:pointer;font-size:.65rem;
-             font-family:var(--font);padding:0 .4rem 0 0;flex-shrink:0;line-height:1">▼</button>
     <span id="sb-conn">
       <span class="sb-dot" id="sb-dot"></span>
       <span id="sb-conntext">CONNECTING</span>
     </span>
-    <span class="sb-sep">│</span>
-    <span class="sb-count">✈ <span id="sb-ac">0</span></span>
-    <span class="sb-count">⛵ <span id="sb-sh">0</span></span>
-    <span class="sb-count">◎ <span id="sb-sat">0</span></span>
-    <span class="sb-count">⚑ <span id="sb-ev">0</span></span>
-    <span class="sb-sep">│</span>
+    <span class="sb-sep">|</span>
+    <span class="sb-count">AC <span id="sb-ac">0</span></span>
+    <span class="sb-count">SH <span id="sb-sh">0</span></span>
+    <span class="sb-count">SAT <span id="sb-sat">0</span></span>
+    <span class="sb-count">EV <span id="sb-ev">0</span></span>
+    <span class="sb-sep">|</span>
     <span id="sb-ts" style="color:var(--dim2)">--:--:-- UTC</span>
     <div id="crisis-ticker-wrap">
       <div id="crisis-ticker"><!-- populated by JS --></div>
     </div>
-    <span class="sb-delay">▸ ALMOST LIVE</span>
+    <span class="sb-delay">ALMOST LIVE</span>
+    <button onclick="hideStatusbar()"
+      style="margin-left:auto;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);
+             color:#ef4444;cursor:pointer;font-family:var(--font);font-size:.55rem;
+             letter-spacing:.1em;padding:.15rem .5rem;flex-shrink:0">HIDE</button>
   </div>
-  <!-- Statusbar restore tab (visible when bar is collapsed) -->
-  <button id="sb-restore-tab" onclick="toggleStatusbar()" title="Show status bar"
-    style="display:none;position:fixed;bottom:0;right:60px;z-index:601;
-           background:rgba(4,4,6,.95);border:1px solid var(--border);border-bottom:none;
-           color:var(--dim2);font-family:var(--font);font-size:.52rem;letter-spacing:.08em;
-           padding:.2rem .6rem;cursor:pointer">▲ STATUS</button>
+  <!-- Restore tab — appears when statusbar is hidden -->
+  <button id="sb-show-btn" onclick="showStatusbar()"
+    style="display:none;position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+           z-index:700;background:rgba(4,4,6,.97);border:1px solid var(--border2);
+           border-bottom:none;color:var(--amber);font-family:var(--font);
+           font-size:.52rem;letter-spacing:.1em;padding:.25rem 1rem;cursor:pointer">
+    STATUS BAR</button>
 
 </div><!-- /shell -->
 
@@ -6105,30 +6106,28 @@ function toggleMilOnly(){
   }
 }
 
-function toggleStatusbar(){
+function hideStatusbar(){
   const sb  = document.getElementById('statusbar');
-  const tab = document.getElementById('sb-restore-tab');
-  const btn = document.getElementById('sb-collapse-btn');
-  const collapsed = sb.classList.toggle('collapsed');
-  document.body.classList.toggle('sb-collapsed', collapsed);
-  tab.style.display = collapsed ? 'block' : 'none';
-  if(btn) btn.textContent = collapsed ? '▲' : '▼';
-  try{ localStorage.setItem('wardar_sb_collapsed', collapsed?'1':''); }catch(e){}
+  const btn = document.getElementById('sb-show-btn');
+  if(sb)  sb.classList.add('sb-hidden');
+  if(btn) btn.style.display = 'block';
+  document.body.classList.add('sb-hidden-mode');
+  try{ localStorage.setItem('wardar_sb_hidden','1'); }catch(e){}
 }
 
-// Restore statusbar collapse state from localStorage
-(function(){
-  try{
-    if(localStorage.getItem('wardar_sb_collapsed')==='1'){
-      const sb  = document.getElementById('statusbar');
-      const tab = document.getElementById('sb-restore-tab');
-      const btn = document.getElementById('sb-collapse-btn');
-      if(sb){ sb.classList.add('collapsed'); document.body.classList.add('sb-collapsed'); }
-      if(tab) tab.style.display='block';
-      if(btn) btn.textContent='▲';
-    }
-  }catch(e){}
-})();
+function showStatusbar(){
+  const sb  = document.getElementById('statusbar');
+  const btn = document.getElementById('sb-show-btn');
+  if(sb)  sb.classList.remove('sb-hidden');
+  if(btn) btn.style.display = 'none';
+  document.body.classList.remove('sb-hidden-mode');
+  try{ localStorage.removeItem('wardar_sb_hidden'); }catch(e){}
+}
+
+// Restore hidden state across reloads
+try{
+  if(localStorage.getItem('wardar_sb_hidden')==='1') hideStatusbar();
+}catch(e){}
 
 function flyTo(lat,lon,alt){
   if(cesium){
