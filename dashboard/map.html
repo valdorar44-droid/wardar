@@ -4617,8 +4617,8 @@ function buildCommunityPopup(r){
     ${r.description?`<div class="popup-row" style="flex-direction:column"><span class="popup-label">DETAILS</span><span class="popup-val" style="color:var(--dim2);font-size:.69rem;margin-top:.2rem">${esc(r.description.substring(0,300))}</span></div>`:''}
     ${!r.image_url&&r.image_url===''&&r.source_url?'':`${r.source_url?`<div class="popup-row"><span class="popup-label">SOURCE</span><a href="${esc(r.source_url)}" target="_blank" rel="noopener" style="color:var(--blue);font-size:.69rem">LINK ↗</a></div>`:''}`}
     <div class="popup-vote">
-      <button class="pvote-btn" onclick="castVote(${r.id},1)">▲ UP (${r.upvotes||0})</button>
-      <button class="pvote-btn down" onclick="castVote(${r.id},-1)">▼ DN (${r.downvotes||0})</button>
+      <button class="pvote-btn" onclick="castVote(${parseInt(r.id,10)},1)">▲ UP (${r.upvotes||0})</button>
+      <button class="pvote-btn down" onclick="castVote(${parseInt(r.id,10)},-1)">▼ DN (${r.downvotes||0})</button>
       <span class="pvote-score">NET ${net>=0?'+':''}${net}</span>
     </div>
     ${r.country?`<div style="margin-top:.4rem;display:flex;gap:.3rem">
@@ -5608,8 +5608,8 @@ function refreshCommunityList(reports){
       </div>
       <div class="comm-title">${esc(r.title)}</div>
       <div class="comm-votes">
-        <button class="vote-btn" onclick="castVote(${r.id},1,this)">▲ ${r.upvotes||0}</button>
-        <button class="vote-btn down" onclick="castVote(${r.id},-1,this)">▼ ${r.downvotes||0}</button>
+        <button class="vote-btn" onclick="castVote(${parseInt(r.id,10)},1,this)">▲ ${r.upvotes||0}</button>
+        <button class="vote-btn down" onclick="castVote(${parseInt(r.id,10)},-1,this)">▼ ${r.downvotes||0}</button>
         <span class="vote-score">NET ${net>=0?'+':''}${net}</span>
       </div>
       <div class="comm-ts">${fmtTs(r.created_at)}</div>
@@ -7391,7 +7391,7 @@ function connectWS(){
   };
 
   ws.onclose=()=>{ setConnStatus(false); scheduleReconnect(); };
-  ws.onerror=()=>{ setConnStatus(false); };
+  ws.onerror=()=>{ setConnStatus(false); scheduleReconnect(); };
 }
 
 function scheduleReconnect(){

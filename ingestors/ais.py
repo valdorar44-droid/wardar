@@ -2,6 +2,11 @@
 
 Maintains a persistent WebSocket connection. Positions accumulate in memory
 and are drained by the engine on each tick. Never raises — reconnects on error.
+
+ShipType fix: PositionReport messages do NOT carry ShipType in the AIS protocol.
+aisstream.io only populates MetaData.ShipType when it has static data cached.
+We subscribe to ShipStaticData messages as well and maintain an MMSI→ship_type
+cache. _norm_ais falls back to the cache when MetaData.ShipType is absent.
 """
 from __future__ import annotations
 import asyncio, json
@@ -13,6 +18,9 @@ from config import settings as C
 # Thread-safe position buffer — engine drains this (tight cap — only priority vessels)
 _buffer: deque[dict] = deque(maxlen=2_000)
 _running = False
+
+# MMSI → ship_type cache populated by ShipStaticData messages
+_mmsi_type_cache: dict[str, int] = {}
 
 # Ship type codes → human label
 _SHIP_TYPES = {
@@ -73,9 +81,36 @@ def _ship_label(type_code: int | None) -> str:
             return label
     return "ship"
 
-def _norm_ais(msg: dict) -> dict | None:
-    """Normalize aisstream.io message to Wardar position schema."""
+def _cache_static(msg: dict) -> None:
+    """Cache MMSI → ship_type from ShipStaticData messages (type 24 / type 5)."""
     try:
+        meta  = msg.get("MetaData", {})
+        static = msg.get("Message", {}).get("ShipStaticData", {}) or {}
+        mmsi  = str(meta.get("MMSI") or static.get("UserID") or "")
+        # ShipType comes from Message.ShipStaticData.Type or MetaData.ShipType
+        stype = static.get("Type") or meta.get("ShipType")
+        if mmsi and stype is not None:
+            _mmsi_type_cache[mmsi] = int(stype)
+    except Exception:
+        pass
+
+
+def _norm_ais(msg: dict) -> dict | None:
+    """Normalize aisstream.io message to Wardar position schema.
+
+    ShipType is NOT present in PositionReport messages (AIS types 1/2/3/18).
+    aisstream.io only populates MetaData.ShipType when it has seen a static
+    data broadcast for that MMSI. We fall back to _mmsi_type_cache (populated
+    by ShipStaticData messages) before giving up.
+    """
+    try:
+        mtype = msg.get("MessageType", "")
+
+        # ShipStaticData — just update cache, no position to emit
+        if mtype == "ShipStaticData":
+            _cache_static(msg)
+            return None
+
         meta = msg.get("MetaData", {})
         pos  = msg.get("Message", {}).get("PositionReport", {}) or \
                msg.get("Message", {}).get("StandardClassBPositionReport", {}) or {}
@@ -94,7 +129,11 @@ def _norm_ais(msg: dict) -> dict | None:
         country  = str(meta.get("ShipCountry") or "")
         spd      = pos.get("Sog")   # speed over ground (knots)
         hdg      = pos.get("Cog") or pos.get("TrueHeading")
+
+        # ShipType: prefer MetaData (aisstream may have it cached), fall back to our cache
         ship_type = meta.get("ShipType")
+        if ship_type is None and mmsi:
+            ship_type = _mmsi_type_cache.get(mmsi)
 
         accepted, mil_flag = _is_accepted(ship_type, float(lat), float(lon))
         if not accepted:
@@ -132,7 +171,13 @@ async def _ws_loop():
                     "APIKey":     C.AISSTREAM_API_KEY,
                     "BoundingBoxes": [[[-90, -180], [90, 180]]],  # global
                     "FiltersShipMMSI": [],
-                    "FilterMessageTypes": ["PositionReport", "StandardClassBPositionReport"],
+                    # ShipStaticData (type 24/5) carries ShipType — needed to
+                    # populate _mmsi_type_cache so PositionReports can be filtered.
+                    "FilterMessageTypes": [
+                        "PositionReport",
+                        "StandardClassBPositionReport",
+                        "ShipStaticData",
+                    ],
                 }
                 await ws.send(json.dumps(subscribe))
                 log("ais: WebSocket connected")

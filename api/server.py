@@ -657,7 +657,9 @@ async def v1_alerts(response: Response, hours: int = 24, limit: int = 100):
     db = DB.get_conn()
     rows = db.execute(
         "SELECT source, title, description, lat, lon, raw_ts_utc FROM events "
-        "WHERE source='alert' AND raw_ts_utc >= ? ORDER BY raw_ts_utc DESC LIMIT ?",
+        "WHERE source IN ('dark_vessel','convergence','nuclear_threat','pipeline_threat',"
+        "'vessel_spoof','transponder_loss','route_dev','gpsjam_dark','firms_usgs') "
+        "AND raw_ts_utc >= ? ORDER BY raw_ts_utc DESC LIMIT ?",
         (cutoff, min(limit, 100))
     ).fetchall()
     data = [dict(r) for r in rows]
