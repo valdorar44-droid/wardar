@@ -198,6 +198,16 @@ async def playback_summary():
     """Return time range + 5-minute bucket counts for the timeline scrubber."""
     return JSONResponse(DB.get_playback_summary())
 
+@app.get("/api/playback/events")
+async def playback_events(
+    ts: str,
+    window_hours: int = 24,
+    limit: int = 500,
+):
+    """Return geo-tagged events visible at timestamp `ts` (within window_hours before ts)."""
+    data = DB.get_events_at(ts=ts, window_hours=window_hours, limit=limit)
+    return JSONResponse({"ts": ts, "count": len(data), "data": data})
+
 @app.get("/api/playback/frame")
 async def playback_frame(
     ts: str,

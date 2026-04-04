@@ -368,23 +368,42 @@ def get_released_positions_sampled(per_source: int = 600,
 # ── Playback ─────────────────────────────────────────────────────────────────
 
 def get_playback_summary() -> dict:
-    """Return time range and per-minute bucket counts for the playback timeline."""
+    """Return time range and per-minute bucket counts for the playback timeline.
+
+    Combines positions (aircraft/ships) AND geo-tagged events so the timeline
+    initialises even when no ADS-B/AIS data is available yet.
+    """
     conn = get_conn()
     row = conn.execute("""
-        SELECT MIN(raw_ts_utc) as oldest, MAX(raw_ts_utc) as newest, COUNT(*) as total
-        FROM positions
+        SELECT MIN(ts) as oldest, MAX(ts) as newest, COUNT(*) as total FROM (
+            SELECT raw_ts_utc AS ts FROM positions
+            UNION ALL
+            SELECT raw_ts_utc AS ts FROM events
+            WHERE lat IS NOT NULL AND lon IS NOT NULL
+        )
     """).fetchone()
     if not row or not row["oldest"]:
         return {"oldest": None, "newest": None, "total": 0, "buckets": []}
 
-    # Per-5-minute bucket counts — strftime rounds to 5-min interval
+    # Per-5-minute bucket counts — combined positions + events
     buckets_raw = conn.execute("""
-        SELECT
-          strftime('%Y-%m-%dT%H:', raw_ts_utc) ||
-            printf('%02d', (CAST(strftime('%M', raw_ts_utc) AS INTEGER) / 5) * 5)
-            || ':00+00:00' AS bucket,
-          COUNT(DISTINCT callsign) AS callsigns
-        FROM positions
+        SELECT bucket, SUM(cnt) AS callsigns FROM (
+            SELECT
+              strftime('%Y-%m-%dT%H:', raw_ts_utc) ||
+                printf('%02d', (CAST(strftime('%M', raw_ts_utc) AS INTEGER) / 5) * 5)
+                || ':00+00:00' AS bucket,
+              COUNT(DISTINCT callsign) AS cnt
+            FROM positions
+            GROUP BY bucket
+            UNION ALL
+            SELECT
+              strftime('%Y-%m-%dT%H:', raw_ts_utc) ||
+                printf('%02d', (CAST(strftime('%M', raw_ts_utc) AS INTEGER) / 5) * 5)
+                || ':00+00:00' AS bucket,
+              COUNT(*) AS cnt
+            FROM events WHERE lat IS NOT NULL AND lon IS NOT NULL
+            GROUP BY bucket
+        )
         GROUP BY bucket
         ORDER BY bucket
     """).fetchall()
@@ -440,6 +459,25 @@ def get_positions_at(ts: str, window_sec: int = 600,
         LIMIT ?
     """, base_params + [limit]).fetchall()
 
+    return [dict(r) for r in rows]
+
+def get_events_at(ts: str, window_hours: int = 24, limit: int = 500) -> list[dict]:
+    """Return geo-tagged events visible at playback timestamp `ts`.
+
+    Returns events where raw_ts_utc is between (ts - window_hours) and ts,
+    respecting the release delay (release_ts_utc <= ts).
+    """
+    conn = get_conn()
+    window_start = _offset_ts(ts, -window_hours * 3600)
+    rows = conn.execute("""
+        SELECT * FROM events
+        WHERE raw_ts_utc <= ?
+          AND raw_ts_utc >= ?
+          AND release_ts_utc <= ?
+          AND lat IS NOT NULL
+          AND lon IS NOT NULL
+        ORDER BY raw_ts_utc DESC LIMIT ?
+    """, (ts, window_start, ts, limit)).fetchall()
     return [dict(r) for r in rows]
 
 def _offset_ts(ts: str, delta_sec: int) -> str:

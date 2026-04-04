@@ -2763,7 +2763,9 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
         <button class="tl-btn active" onclick="setSpeed(30)"  id="sp-30" >30×</button>
         <button class="tl-btn" onclick="setSpeed(120)" id="sp-120">120×</button>
         <button class="tl-btn" onclick="setSpeed(300)" id="sp-300">300×</button>
+        <button class="tl-btn" onclick="setSpeed(900)" id="sp-900">900×</button>
       </div>
+      <button class="tl-btn" id="tl-loop" onclick="toggleLoop()" title="Loop replay">⟳ LOOP</button>
       <span id="tl-mode">LIVE</span>
       <span id="tl-time">──</span>
       <label class="tl-trail-toggle" title="Show movement trails">
@@ -2772,7 +2774,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     </div>
     <div class="tl-scrubber-wrap" id="tl-scrubber"
          onmousemove="scrubHover(event)" onmouseleave="scrubLeave()"
-         onmousedown="scrubStart(event)">
+         onmousedown="scrubStart(event)"
+         ontouchstart="scrubTouchStart(event)" ontouchmove="scrubTouchMove(event)" ontouchend="scrubTouchEnd(event)">
       <div class="tl-track"></div>
       <canvas id="tl-density"></canvas>
       <div id="tl-thumb" style="left:100%"></div>
@@ -7514,7 +7517,7 @@ setInterval(refreshCounts, 1000);
 // ── TIMELINE / PLAYBACK ───────────────────────────────────────────────────────
 const TL={
   summary:null, buckets:[], startMs:0, endMs:0,
-  isLive:true, isPlaying:false, currentMs:0, speed:30, showTrails:true,
+  isLive:true, isPlaying:false, currentMs:0, speed:30, showTrails:true, loop:false,
   frameCache:new Map(), CACHE_MAX:200,
   trails:{}, trailPolylines:{},
   _rafId:null, _lastRealMs:null, _dragging:false,
@@ -7602,7 +7605,14 @@ function togglePlay(){
 
 function setSpeed(s){
   TL.speed=s;
-  ['1','30','120','300'].forEach(v=>document.getElementById('sp-'+v).classList.toggle('active',parseInt(v)===s));
+  ['1','30','120','300','900'].forEach(v=>{
+    const el=document.getElementById('sp-'+v); if(el) el.classList.toggle('active',parseInt(v)===s);
+  });
+}
+
+function toggleLoop(){
+  TL.loop=!TL.loop;
+  document.getElementById('tl-loop').classList.toggle('active',TL.loop);
 }
 
 function toggleTrails(on){ TL.showTrails=on; if(!on) clearTrails(); }
@@ -7613,8 +7623,12 @@ function startPlayLoop(){
     const e=now-(TL._lastRealMs||now); TL._lastRealMs=now;
     TL.currentMs+=e*TL.speed;
     if(TL.currentMs>=TL.endMs){
-      TL.currentMs=TL.endMs; TL.isPlaying=false;
-      document.getElementById('tl-play').textContent='▶ PLAY';
+      if(TL.loop){
+        TL.currentMs=TL.startMs; // loop back to start
+      } else {
+        TL.currentMs=TL.endMs; TL.isPlaying=false;
+        document.getElementById('tl-play').textContent='▶ PLAY';
+      }
     }
     updateScrubberThumb(); updateTimeLabel(TL.currentMs);
     loadFrame(new Date(TL.currentMs).toISOString());
@@ -7625,30 +7639,61 @@ function startPlayLoop(){
 function stopPlayLoop(){ if(TL._rafId){ cancelAnimationFrame(TL._rafId); TL._rafId=null; } }
 
 let _frameDebounce=null;
+let _frameFetching=false;  // prevents concurrent frame loads stacking up
+
 function loadFrame(tsIso){
   clearTimeout(_frameDebounce);
+  // At high speeds debounce more — no point fetching 10+ frames/sec
+  const delay = TL.isPlaying ? Math.max(100, Math.min(250, TL.speed)) : 0;
   _frameDebounce=setTimeout(async()=>{
-    const ck=tsIso.substring(0,16);
-    let data;
-    if(TL.frameCache.has(ck)){ data=TL.frameCache.get(ck); }
-    else{
-      try{
+    if(_frameFetching) return;
+    _frameFetching=true;
+    try{
+      const ck=tsIso.substring(0,16);
+
+      // ── Positions (aircraft, ships) ───────────────────────────────────
+      let posData;
+      if(TL.frameCache.has('p:'+ck)){ posData=TL.frameCache.get('p:'+ck); }
+      else{
         const res=await fetch(`/api/playback/frame?ts=${encodeURIComponent(tsIso)}&window=600&limit=3000`).then(r=>r.json());
-        data=res.data||[];
+        posData=res.data||[];
         if(TL.frameCache.size>=TL.CACHE_MAX) TL.frameCache.delete(TL.frameCache.keys().next().value);
-        TL.frameCache.set(ck,data);
-      }catch(e){ return; }
-    }
-    applyFrame(data);
-  }, TL.isPlaying?80:0);
+        TL.frameCache.set('p:'+ck, posData);
+      }
+
+      // ── Events (ACLED, fires, osint, etc.) ─────────────────────────────
+      let evtData;
+      if(TL.frameCache.has('e:'+ck)){ evtData=TL.frameCache.get('e:'+ck); }
+      else{
+        const res=await fetch(`/api/playback/events?ts=${encodeURIComponent(tsIso)}&window_hours=24&limit=500`).then(r=>r.json());
+        evtData=res.data||[];
+        TL.frameCache.set('e:'+ck, evtData);
+      }
+
+      applyFrame(posData, evtData);
+    }catch(e){ console.warn('loadFrame:',e); }
+    finally{ _frameFetching=false; }
+  }, delay);
 }
 
-function applyFrame(positions){
-  // Clear positionStore for playback frame
+// Clear all Leaflet cluster markers so replay can repopulate from scratch
+function _clearAllPlaybackMarkers(){
+  if(_mapMode!=='2d') return;
+  for(const lk in _cluster2d) _cluster2d[lk].clearLayers();
+  for(const k in _markers2d) delete _markers2d[k];
+}
+
+function applyFrame(positions, evtData){
+  // Wipe current state and rebuild from the historical snapshot
   for(const k in positionStore) delete positionStore[k];
+  _clearAllPlaybackMarkers();  // 2D markers must be cleared — 3D is cleared by _rebuildGlobe
   positions.forEach(p=>{
     if(p.lat==null||p.lon==null) return;
     updatePosition(p, false);
+  });
+  if(evtData) evtData.forEach(e=>{
+    if(e.lat==null||e.lon==null) return;
+    updatePosition(e, false);
   });
   _scheduleRebuild();
   refreshCounts();
@@ -7698,6 +7743,30 @@ function scrubHover(e){
 function scrubLeave(){
   document.getElementById('tl-hover-line').style.display='none';
   document.getElementById('tl-hover-time').style.display='none';
+}
+
+// Touch support for mobile scrubbing
+function scrubTouchStart(e){
+  e.preventDefault();
+  if(TL.startMs===TL.endMs) return;
+  TL._dragging=true; TL.isLive=false; TL.isPlaying=false; stopPlayLoop();
+  document.getElementById('tl-live').classList.remove('active');
+  document.getElementById('tl-play').textContent='▶ PLAY';
+  document.getElementById('tl-mode').textContent='REPLAY';
+  document.getElementById('tl-mode').className='replay';
+  TL.currentMs=scrubPosToMs(e.touches[0].clientX);
+  updateScrubberThumb(); updateTimeLabel(TL.currentMs);
+  loadFrame(new Date(TL.currentMs).toISOString());
+}
+function scrubTouchMove(e){
+  e.preventDefault();
+  if(!TL._dragging) return;
+  TL.currentMs=scrubPosToMs(e.touches[0].clientX);
+  updateScrubberThumb(); updateTimeLabel(TL.currentMs);
+  loadFrame(new Date(TL.currentMs).toISOString());
+}
+function scrubTouchEnd(e){
+  TL._dragging=false;
 }
 
 window.addEventListener('resize',()=>{ if(TL.summary) renderDensityCanvas(); });
