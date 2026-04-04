@@ -1342,10 +1342,10 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 #crisis-ticker{
   display:flex;align-items:center;
   white-space:nowrap;font-size:.55rem;letter-spacing:.05em;
-  animation:tickerScroll 40s linear infinite;
+  animation:tickerScroll 80s linear infinite;
   animation-play-state:running;
 }
-#crisis-ticker:hover{ animation-play-state:paused; }
+#crisis-ticker-wrap:hover #crisis-ticker{ animation-play-state:paused; }
 @keyframes tickerScroll{
   0%{transform:translateX(0)}
   100%{transform:translateX(-50%)}
@@ -1780,13 +1780,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   .hdr-domains,#search-wrap,.hdr-sub,.hdr-sep,
   #mapmode-btn,#bright-btn,#measure-btn,
   #timeline-btn,#cinema-btn,#fullscreen-toggle,#hdr-clock,
-  .threat-badge{ display:none!important; }
+  .threat-badge,#settings-hdr-btn{ display:none!important; }
   /* milonly-btn stays visible on mobile — key control */
   #milonly-btn{ font-size:.58rem;padding:.18rem .4rem; }
   #header{ gap:.6rem;padding:0 .75rem; }
   .hdr-logo{ font-size:.9rem; }
-  /* Settings btn stays */
-  button[onclick*="toggleSettings"]{ padding:.18rem .4rem;font-size:.58rem; }
 
   /* ── WW3 header pill: compact ── */
   #ww3-label-stack{ display:none; }
@@ -1850,9 +1848,17 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 /* ══ MOBILE BOTTOM NAV ══════════════════════════════════════════════════════ */
 #mob-nav{
   display:none;position:fixed;bottom:0;left:0;right:0;
-  height:56px;z-index:701;
+  height:72px;z-index:701;
   background:rgba(4,4,6,.98);border-top:1px solid var(--border2);
   padding-bottom:env(safe-area-inset-bottom,0px);
+  flex-direction:column;
+}
+#mob-status-strip{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.18rem .8rem;
+  border-bottom:1px solid var(--border);
+  background:rgba(4,4,6,.6);
+  flex-shrink:0;
 }
 .mnb{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -1906,7 +1912,6 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 @media (max-width:540px) {
   /* Small phones — icon-only buttons to save header space */
   .mob-btn-lbl{ display:none; }
-  button[onclick*="toggleSettings"]{ display:none; }
 }
 @media (max-width:480px) {
   /* Very small phones — even more compact */
@@ -2002,6 +2007,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <div class="hdr-logo">WARDAR</div>
     <div class="hdr-sep">│</div>
     <div class="hdr-sub">GLOBAL SITUATIONAL AWARENESS</div>
+    <!-- Settings always before flex:1 domain bar so it's never pushed off-screen -->
+    <button class="mapmode-btn" id="settings-hdr-btn" onclick="toggleSettings()" title="User settings &amp; preferences" style="letter-spacing:.05em;flex-shrink:0">⚙ SETTINGS</button>
     <div class="hdr-domains" id="hdr-domains">
       <!-- populated by JS -->
     </div>
@@ -2034,7 +2041,6 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <button id="timeline-btn" class="mapmode-btn" onclick="toggleTimeline()" title="Show/hide timeline">⏱ TL</button>
     <button id="cinema-btn"   class="mapmode-btn" onclick="toggleCinema()"   title="Map-only mode — hide all panels">⊞ MAP</button>
     <button id="fullscreen-toggle" class="mapmode-btn" onclick="toggleFullscreen()" title="Browser fullscreen">⛶ FULL</button>
-    <button class="mapmode-btn" onclick="toggleSettings()" title="User settings &amp; preferences" style="letter-spacing:.05em">⚙ SETTINGS</button>
     <button id="mob-left-btn" onclick="toggleMobLeft()" title="Sensor feeds &amp; layers">☰<span class="mob-btn-lbl"> FEEDS</span></button>
     <button id="mob-right-btn" onclick="toggleMobRight()" title="Intelligence panel">⌇<span class="mob-btn-lbl"> INTEL</span></button>
     <div id="hdr-clock">--:--:-- UTC</div>
@@ -2889,6 +2895,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
 <!-- ══ MOBILE BOTTOM NAV ═════════════════════════════════════════════════════ -->
 <nav id="mob-nav">
+  <!-- Status strip — matches desktop statusbar info -->
+  <div id="mob-status-strip">
+    <span id="mob-sb-dot" class="sb-dot" style="width:5px;height:5px;border-radius:50%;background:var(--dim2);flex-shrink:0"></span>
+    <span id="mob-sb-counts" style="font-size:.42rem;letter-spacing:.06em;color:var(--dim2)">AC <span id="mob-sb-ac">0</span> · SH <span id="mob-sb-sh">0</span> · EV <span id="mob-sb-ev">0</span></span>
+    <span id="mob-sb-ts" style="font-size:.4rem;color:var(--dim2);margin-left:auto">--:-- UTC</span>
+  </div>
   <button class="mnb active" id="mnb-map" onclick="mobNav('map')" aria-label="Map">
     <span class="mnb-icon">🗺</span>
     <span class="mnb-lbl">MAP</span>
@@ -6021,7 +6033,18 @@ function refreshCounts(){
   document.getElementById('sb-ev').textContent  = ev;
 
   const now=new Date();
-  document.getElementById('sb-ts').textContent=now.toISOString().replace('T',' ').substring(0,19)+' UTC';
+  const tsStr = now.toISOString().replace('T',' ').substring(0,19)+' UTC';
+  document.getElementById('sb-ts').textContent = tsStr;
+
+  // Mobile status strip
+  const mobAc = document.getElementById('mob-sb-ac');
+  const mobSh = document.getElementById('mob-sb-sh');
+  const mobEv = document.getElementById('mob-sb-ev');
+  const mobTs = document.getElementById('mob-sb-ts');
+  if(mobAc) mobAc.textContent = ac;
+  if(mobSh) mobSh.textContent = sh;
+  if(mobEv) mobEv.textContent = ev;
+  if(mobTs) mobTs.textContent = now.toISOString().substring(11,16)+' UTC';
 
   updateDomainBars();
   updateThreatLevel();
@@ -7594,6 +7617,8 @@ function setConnStatus(connected){
   dot.className='sb-dot '+(connected?'live':'dead');
   txt.textContent=connected?'LIVE':'RECONNECTING';
   txt.style.color=connected?'var(--green)':'var(--red)';
+  const mobDot=document.getElementById('mob-sb-dot');
+  if(mobDot) mobDot.className='sb-dot '+(connected?'live':'dead');
 }
 
 function connectWS(){
@@ -9301,15 +9326,19 @@ const _TICKER_ICONS = {
   dark_vessel:'⛵', convergence:'⚡', nuclear_threat:'☢', pipeline_threat:'⊸',
   warspot:'⚔', pikud_haoref:'💥', default:'•'
 };
+const _MISSILE_KW = /missile|rocket|bomb(?:ing|ed|s)?|air.?strike|airstrike|explosion|blast|intercept|artillery|barrage|shelling|mortar|ballistic|drone.?attack|UAV.?attack|kamikaze/i;
 let _tickerData = [];
 
 async function _refreshTicker(){
   try{
-    const r = await fetch(`/api/events?sources=${_TICKER_SOURCES}&limit=60`);
+    const r = await fetch(`/api/events?sources=${_TICKER_SOURCES}&limit=120`);
     const j = await r.json();
-    const items = (j.data||[]).filter(e=>e.title&&e.lat!=null).slice(0,30);
+    const all = (j.data||[]).filter(e=>e.title&&e.lat!=null);
+    // Prefer missile/bomb/strike events; fall back to anything if too few
+    let items = all.filter(e=>_MISSILE_KW.test((e.title||'')+' '+(e.description||'')));
+    if(items.length < 5) items = all;
     if(!items.length) return;
-    _tickerData = items;
+    _tickerData = items.slice(0,40);
     _renderTicker();
   }catch(_){}
 }
@@ -9329,14 +9358,15 @@ function _renderTicker(){
   // Reset animation so new content plays from start
   el.style.animation = 'none';
   el.offsetHeight; // reflow
-  const dur = Math.max(30, _tickerData.length * 4); // ~4s per item
+  const secPerItem = _isMobile() ? 12 : 8; // slower on mobile
+  const dur = Math.max(60, _tickerData.length * secPerItem);
   el.style.animation = `tickerScroll ${dur}s linear infinite`;
 }
 
 // Initialize ticker after map loads
 setTimeout(()=>{
   _refreshTicker();
-  setInterval(_refreshTicker, 120000); // refresh every 2 min
+  setInterval(_refreshTicker, 3600000); // refresh hourly
 }, 8000);
 
 /* PWA service worker registration */
