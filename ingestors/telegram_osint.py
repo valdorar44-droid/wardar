@@ -407,7 +407,10 @@ async def fetch() -> list[dict]:
             "lat":         lat,
             "lon":         lon,
             "country":     country_name,
-            "category":    "aircraft_down" if ev_type == "aircraft_down" else "osint_crowd",
+            "category":    ev_type if ev_type in (
+                "aircraft_down","missile_strike","airstrike",
+                "drone_attack","naval","equipment_loss",
+            ) else "osint_crowd",
             "raw_ts_utc":  ts,
             "url":         post["url"],
             "extra":       json.dumps({

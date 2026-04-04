@@ -2132,11 +2132,41 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">CONFLICT EVENTS</span>
               <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
             </label>
+            <label class="layer-item" title="Missile and rocket strikes — AI-detected from Telegram OSINT. Ballistic, cruise, HIMARS, Iskander, Shahed, Kalibr, etc.">
+              <input type="checkbox" class="layer-cb" id="cb-missile-strike" checked style="color:#ef4444" onchange="toggleLayer('missile_strike')">
+              <span class="layer-icon" style="color:#ef4444;display:inline-block;transform:rotate(-45deg)">🚀</span>
+              <span class="layer-name">MISSILE STRIKES</span>
+              <span class="layer-count" id="cnt-missile-strike" style="background:#ef4444">0</span>
+            </label>
+            <label class="layer-item" title="Airstrikes — bombs and air-delivered munitions detected via Telegram OSINT AI classification.">
+              <input type="checkbox" class="layer-cb" id="cb-airstrike" checked style="color:#f97316" onchange="toggleLayer('airstrike')">
+              <span class="layer-icon" style="color:#f97316">💣</span>
+              <span class="layer-name">AIRSTRIKES</span>
+              <span class="layer-count" id="cnt-airstrike" style="background:#f97316">0</span>
+            </label>
+            <label class="layer-item" title="Drone / UAV attacks — Shahed, Lancet, Switchblade, Bayraktar and other drone-delivered strikes.">
+              <input type="checkbox" class="layer-cb" id="cb-drone-attack" checked style="color:#f59e0b" onchange="toggleLayer('drone_attack')">
+              <span class="layer-icon" style="color:#f59e0b;font-weight:900">✦</span>
+              <span class="layer-name">DRONE / UAV</span>
+              <span class="layer-count" id="cnt-drone-attack" style="background:#f59e0b">0</span>
+            </label>
             <label class="layer-item" title="Downed / shot-down aircraft — AI-detected reports from Telegram OSINT channels. Red ✈ nose-diving icon. Pinned to location of incident.">
               <input type="checkbox" class="layer-cb" id="cb-aircraft-down" checked style="color:#ef4444" onchange="toggleLayer('aircraft_down')">
               <span class="layer-icon" style="color:#ef4444;display:inline-block;transform:rotate(45deg)">✈</span>
               <span class="layer-name">DOWNED AIRCRAFT</span>
               <span class="layer-count" id="cnt-aircraft-down" style="background:#ef4444">0</span>
+            </label>
+            <label class="layer-item" title="Naval incidents — maritime attacks, ship strikes, Houthi Red Sea activity, Black Sea engagements.">
+              <input type="checkbox" class="layer-cb" id="cb-naval" checked style="color:#06b6d4" onchange="toggleLayer('naval')">
+              <span class="layer-icon" style="color:#06b6d4">⚓</span>
+              <span class="layer-name">NAVAL INCIDENTS</span>
+              <span class="layer-count" id="cnt-naval" style="background:#06b6d4">0</span>
+            </label>
+            <label class="layer-item" title="Equipment losses — tanks, vehicles, artillery and other military hardware destroyed in combat.">
+              <input type="checkbox" class="layer-cb" id="cb-equipment-loss" checked style="color:#fb923c" onchange="toggleLayer('equipment_loss')">
+              <span class="layer-icon" style="color:#fb923c;font-weight:900">⊗</span>
+              <span class="layer-name">EQUIPMENT LOSS</span>
+              <span class="layer-count" id="cnt-equipment-loss" style="background:#fb923c">0</span>
             </label>
             <label class="layer-item" title="Civil unrest — protests and riots from ACLED data. Separate from armed conflict events. Often precede military crackdowns.">
               <input type="checkbox" class="layer-cb" id="cb-protest" style="color:#fb923c" onchange="toggleLayer('protest')">
@@ -4179,7 +4209,7 @@ const visible = {
   adsb:true, ais:true, acled:true, notam:true, ew:true, ioda:true,
   mil_base:true, nuclear:true, alerts:true, pikud:true,
   adsb_emergency:true, osint_geo:true, community:true, reddit:true, breaking:true,
-  aircraft_down:true,
+  aircraft_down:true, missile_strike:true, airstrike:true, drone_attack:true, naval:true, equipment_loss:true,
   // DEFAULT OFF — noisy / civilian / optional
   tle:false, osint:false, fire:false, seismic:false, protest:false,
   unhcr:false, views:false, wikipedia:false, polymarket:false, shodan:false,
@@ -4201,6 +4231,36 @@ function makeDownedAircraftIcon(){
   return `<div style="position:relative;font-size:20px;line-height:1">
     <span style="color:#ef4444;text-shadow:0 0 10px #ef4444,0 0 20px #ef444466;display:inline-block;transform:rotate(45deg);filter:drop-shadow(0 0 3px #ef4444)">✈</span>
     <span style="position:absolute;top:-6px;right:-26px;font-size:6.5px;color:#ef4444;font-family:monospace;font-weight:700;white-space:nowrap;letter-spacing:.05em">DOWN</span>
+  </div>`;
+}
+function makeMissileIcon(){
+  return `<div style="position:relative;font-size:19px;line-height:1">
+    <span style="color:#ef4444;text-shadow:0 0 12px #ef4444,0 0 24px #ef444455;display:inline-block;transform:rotate(-45deg)">🚀</span>
+    <span style="position:absolute;top:-6px;right:-28px;font-size:6.5px;color:#ef4444;font-family:monospace;font-weight:700;letter-spacing:.05em">MSLS</span>
+  </div>`;
+}
+function makeAirstrikeIcon(){
+  return `<div style="position:relative;font-size:19px;line-height:1">
+    <span style="color:#f97316;text-shadow:0 0 10px #f97316;display:inline-block;transform:rotate(20deg)">💣</span>
+    <span style="position:absolute;top:-6px;right:-22px;font-size:6.5px;color:#f97316;font-family:monospace;font-weight:700;letter-spacing:.05em">A/S</span>
+  </div>`;
+}
+function makeDroneIcon(){
+  return `<div style="position:relative;font-size:16px;line-height:1">
+    <span style="color:#f59e0b;text-shadow:0 0 10px #f59e0b;font-family:monospace;font-weight:900;letter-spacing:-.1em">✦</span>
+    <span style="position:absolute;top:-6px;right:-22px;font-size:6.5px;color:#f59e0b;font-family:monospace;font-weight:700;letter-spacing:.05em">UAV</span>
+  </div>`;
+}
+function makeNavalIcon(){
+  return `<div style="position:relative;font-size:18px;line-height:1">
+    <span style="color:#06b6d4;text-shadow:0 0 10px #06b6d4">⚓</span>
+    <span style="position:absolute;top:-6px;right:-30px;font-size:6px;color:#06b6d4;font-family:monospace;font-weight:700;letter-spacing:.05em">NAVAL</span>
+  </div>`;
+}
+function makeEquipLossIcon(){
+  return `<div style="position:relative;font-size:18px;line-height:1">
+    <span style="color:#fb923c;text-shadow:0 0 8px #fb923c;font-weight:900">⊗</span>
+    <span style="position:absolute;top:-6px;right:-18px;font-size:6px;color:#fb923c;font-family:monospace;font-weight:700;letter-spacing:.05em">EQ</span>
   </div>`;
 }
 
@@ -4237,6 +4297,11 @@ const ICONS = {
   polymarket:     {fn:()=>makeIcon('📊','#f59e0b',17)},
   shodan:         {fn:()=>makeIcon('🔌','#06b6d4',17)},
   aircraft_down:  {fn:()=>makeDownedAircraftIcon()},
+  missile_strike: {fn:()=>makeMissileIcon()},
+  airstrike:      {fn:()=>makeAirstrikeIcon()},
+  drone_attack:   {fn:()=>makeDroneIcon()},
+  naval:          {fn:()=>makeNavalIcon()},
+  equipment_loss: {fn:()=>makeEquipLossIcon()},
   warspot:        {fn:()=>makeIcon('💀','#ef4444',18)},
   safecast:       {fn:()=>makeIcon('☢','#22c55e',17)},
   ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
@@ -5081,7 +5146,7 @@ function initMap2D(){
   const _allLK = ['adsb','ais','tle','acled','protest','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','ioda','alerts','pikud','wikipedia','adsb_emergency','polymarket',
     'shodan','osint_geo','unhcr','views','reddit','breaking','dark_vessel','convergence','nuclear_threat','pipeline_threat',
-    'aircraft_down'];
+    'aircraft_down','missile_strike','airstrike','drone_attack','naval','equipment_loss'];
   for(const lk of _allLK){
     _cluster2d[lk] = L.markerClusterGroup({
       maxClusterRadius:50, disableClusteringAtZoom:9,
@@ -5730,7 +5795,8 @@ setTimeout(()=>{
 // ── Layer helpers ─────────────────────────────────────────────────────────────
 function sourceToLayerKey(source, category){
   const s=(source||'').toLowerCase();
-  if(category==='aircraft_down') return 'aircraft_down';
+  const _combatCat = {aircraft_down:1,missile_strike:1,airstrike:1,drone_attack:1,naval:1,equipment_loss:1};
+  if(_combatCat[category]) return category;
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
   if(s==='shodan')         return 'shodan';
@@ -5801,7 +5867,8 @@ function spawnPulse(lat, lon, color){
 // ── Position updater ──────────────────────────────────────────────────────────
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
-  aircraft_down:'#ef4444',
+  aircraft_down:'#ef4444', missile_strike:'#ef4444', airstrike:'#f97316',
+  drone_attack:'#f59e0b', naval:'#06b6d4', equipment_loss:'#fb923c',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
   ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',protest:'#fb923c',reddit:'#ff6314',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
@@ -6029,9 +6096,14 @@ function refreshCounts(){
     if(el) el.textContent = t||'';
   };
   _gb('grp-tracking-badge', ['adsb','ais','tle']);
-  const cntAcDown = document.getElementById('cnt-aircraft-down');
-  if(cntAcDown) cntAcDown.textContent = (_cnt.aircraft_down||0);
-  _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic','aircraft_down']);
+  const _sc = (id, key) => { const el=document.getElementById(id); if(el) el.textContent=(_cnt[key]||0); };
+  _sc('cnt-aircraft-down',  'aircraft_down');
+  _sc('cnt-missile-strike', 'missile_strike');
+  _sc('cnt-airstrike',      'airstrike');
+  _sc('cnt-drone-attack',   'drone_attack');
+  _sc('cnt-naval',          'naval');
+  _sc('cnt-equipment-loss', 'equipment_loss');
+  _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic','aircraft_down','missile_strike','airstrike','drone_attack','naval','equipment_loss']);
   _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia','reddit','breaking']);
   _gb('grp-infra-badge',     ['nuclear','mil_base','ew','ioda']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
