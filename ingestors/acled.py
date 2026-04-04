@@ -44,6 +44,7 @@ async def _get_token(client: httpx.AsyncClient) -> str | None:
         r = await client.post(
             _TOKEN_URL,
             data={
+                "email":      C.ACLED_USERNAME,
                 "username":   C.ACLED_USERNAME,
                 "password":   C.ACLED_PASSWORD,
                 "grant_type": "password",
