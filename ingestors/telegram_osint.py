@@ -407,7 +407,7 @@ async def fetch() -> list[dict]:
             "lat":         lat,
             "lon":         lon,
             "country":     country_name,
-            "category":    "osint_crowd",
+            "category":    "aircraft_down" if ev_type == "aircraft_down" else "osint_crowd",
             "raw_ts_utc":  ts,
             "url":         post["url"],
             "extra":       json.dumps({

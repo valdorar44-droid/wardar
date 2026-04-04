@@ -2132,6 +2132,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span class="layer-name">CONFLICT EVENTS</span>
               <span class="layer-count" id="cnt-acled" style="background:var(--red)">0</span>
             </label>
+            <label class="layer-item" title="Downed / shot-down aircraft — AI-detected reports from Telegram OSINT channels. Red ✈ nose-diving icon. Pinned to location of incident.">
+              <input type="checkbox" class="layer-cb" id="cb-aircraft-down" checked style="color:#ef4444" onchange="toggleLayer('aircraft_down')">
+              <span class="layer-icon" style="color:#ef4444;display:inline-block;transform:rotate(45deg)">✈</span>
+              <span class="layer-name">DOWNED AIRCRAFT</span>
+              <span class="layer-count" id="cnt-aircraft-down" style="background:#ef4444">0</span>
+            </label>
             <label class="layer-item" title="Civil unrest — protests and riots from ACLED data. Separate from armed conflict events. Often precede military crackdowns.">
               <input type="checkbox" class="layer-cb" id="cb-protest" style="color:#fb923c" onchange="toggleLayer('protest')">
               <span class="layer-icon" style="color:#fb923c">✊</span>
@@ -4173,6 +4179,7 @@ const visible = {
   adsb:true, ais:true, acled:true, notam:true, ew:true, ioda:true,
   mil_base:true, nuclear:true, alerts:true, pikud:true,
   adsb_emergency:true, osint_geo:true, community:true, reddit:true, breaking:true,
+  aircraft_down:true,
   // DEFAULT OFF — noisy / civilian / optional
   tle:false, osint:false, fire:false, seismic:false, protest:false,
   unhcr:false, views:false, wikipedia:false, polymarket:false, shodan:false,
@@ -4188,6 +4195,12 @@ function makePulseIcon(emoji, color, label){
   return `<div style="position:relative;font-size:18px;line-height:1">
     <span style="color:${color};text-shadow:0 0 8px ${color}">${emoji}</span>
     <span style="position:absolute;top:-5px;right:-18px;font-size:7px;color:${color};font-family:monospace;white-space:nowrap">${label}</span>
+  </div>`;
+}
+function makeDownedAircraftIcon(){
+  return `<div style="position:relative;font-size:20px;line-height:1">
+    <span style="color:#ef4444;text-shadow:0 0 10px #ef4444,0 0 20px #ef444466;display:inline-block;transform:rotate(45deg);filter:drop-shadow(0 0 3px #ef4444)">✈</span>
+    <span style="position:absolute;top:-6px;right:-26px;font-size:6.5px;color:#ef4444;font-family:monospace;font-weight:700;white-space:nowrap;letter-spacing:.05em">DOWN</span>
   </div>`;
 }
 
@@ -4223,6 +4236,7 @@ const ICONS = {
   adsb_emergency: {fn:()=>makePulseIcon('🆘','#ef4444','SQUAWK')},
   polymarket:     {fn:()=>makeIcon('📊','#f59e0b',17)},
   shodan:         {fn:()=>makeIcon('🔌','#06b6d4',17)},
+  aircraft_down:  {fn:()=>makeDownedAircraftIcon()},
   warspot:        {fn:()=>makeIcon('💀','#ef4444',18)},
   safecast:       {fn:()=>makeIcon('☢','#22c55e',17)},
   ucdp:           {fn:()=>makeIcon('💥','#f97316',18)},
@@ -5066,7 +5080,8 @@ function initMap2D(){
   // Cluster group per layer key
   const _allLK = ['adsb','ais','tle','acled','protest','notam','fire','seismic','osint','community',
     'nuclear','mil_base','ew','ioda','alerts','pikud','wikipedia','adsb_emergency','polymarket',
-    'shodan','osint_geo','unhcr','views','reddit','breaking','dark_vessel','convergence','nuclear_threat','pipeline_threat'];
+    'shodan','osint_geo','unhcr','views','reddit','breaking','dark_vessel','convergence','nuclear_threat','pipeline_threat',
+    'aircraft_down'];
   for(const lk of _allLK){
     _cluster2d[lk] = L.markerClusterGroup({
       maxClusterRadius:50, disableClusteringAtZoom:9,
@@ -5715,6 +5730,7 @@ setTimeout(()=>{
 // ── Layer helpers ─────────────────────────────────────────────────────────────
 function sourceToLayerKey(source, category){
   const s=(source||'').toLowerCase();
+  if(category==='aircraft_down') return 'aircraft_down';
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
   if(s==='shodan')         return 'shodan';
@@ -5785,6 +5801,7 @@ function spawnPulse(lat, lon, color){
 // ── Position updater ──────────────────────────────────────────────────────────
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
+  aircraft_down:'#ef4444',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',
   ew:'#e879f9',community:'#22c55e',ioda:'#ef4444',protest:'#fb923c',reddit:'#ff6314',
   nuclear:'#eab308',mil_base:'#f59e0b',osint_geo:'#f97316',unhcr:'#a855f7',views:'#ef4444',
@@ -6012,7 +6029,9 @@ function refreshCounts(){
     if(el) el.textContent = t||'';
   };
   _gb('grp-tracking-badge', ['adsb','ais','tle']);
-  _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic']);
+  const cntAcDown = document.getElementById('cnt-aircraft-down');
+  if(cntAcDown) cntAcDown.textContent = (_cnt.aircraft_down||0);
+  _gb('grp-conflict-badge',  ['acled','protest','notam','fire','seismic','aircraft_down']);
   _gb('grp-intel-badge',     ['osint','osint_geo','polymarket','wikipedia','reddit','breaking']);
   _gb('grp-infra-badge',     ['nuclear','mil_base','ew','ioda']);
   _gb('grp-human-badge',     ['community','unhcr','views','shodan']);
