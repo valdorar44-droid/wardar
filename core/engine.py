@@ -229,6 +229,8 @@ _ALL_OSINT_SOURCES = [
     # Iran / Middle East focus
     "iran_intl", "mehr_news", "al_monitor", "tasnim", "jpost", "haaretz", "arab_news",
     "pentagon", "africom", "navy", "un_peace", "crisisgroup", "state_dept",
+    # New command feeds
+    "eucom", "indopacom", "iaea",
 ]
 
 async def _tick_osint():
@@ -641,6 +643,103 @@ async def _tick_entity_resolution():
         log_err(f"tick_entity_resolution: {exc}")
 
 
+async def _tick_chokepoint_snapshot():
+    """Hourly snapshot of chokepoint throughput for sparkline time-series."""
+    try:
+        from datetime import datetime, timezone
+        from api.server import _CHOKEPOINTS
+        ts_hour = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:00:00")
+        for name, w, s, e, n in _CHOKEPOINTS:
+            count = DB.get_chokepoint_count(w, s, e, n, hours=1)
+            DB.store_chokepoint_snapshot(name, ts_hour, count)
+    except Exception as exc:
+        log_err(f"tick_chokepoint_snapshot: {exc}")
+
+
+async def _tick_bluesky_osint():
+    if not C.ENABLE_BLUESKY_OSINT or not C.ANTHROPIC_API_KEY:
+        return
+    try:
+        from ingestors import bluesky_osint
+        events = await bluesky_osint.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["bluesky_osint"], limit=200)
+            await _broadcast({"type": "events", "sources": ["bluesky_osint"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_bluesky_osint: {exc}")
+
+
+async def _tick_eurdep():
+    if not C.ENABLE_EURDEP:
+        return
+    try:
+        from ingestors import eurdep
+        events = await eurdep.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["eurdep"], limit=500)
+            await _broadcast({"type": "events", "sources": ["eurdep"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_eurdep: {exc}")
+
+
+async def _tick_commodity_prices():
+    if not C.ENABLE_COMMODITY_PRICES:
+        return
+    try:
+        from ingestors import commodity_prices
+        events = await commodity_prices.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["commodity_prices"], limit=20)
+            await _broadcast({"type": "events", "sources": ["commodity_prices"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_commodity_prices: {exc}")
+
+
+async def _tick_acled_iran():
+    if not C.ENABLE_ACLED or not C.ACLED_API_KEY:
+        return
+    try:
+        from ingestors import acled
+        events = await acled.fetch_iran()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["acled_iran"], limit=300)
+            await _broadcast({"type": "events", "sources": ["acled_iran"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_acled_iran: {exc}")
+
+
+async def _tick_reliefweb_api():
+    if not C.ENABLE_RELIEFWEB_API:
+        return
+    try:
+        from ingestors import reliefweb_api
+        events = await reliefweb_api.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["reliefweb_api"], limit=100)
+            await _broadcast({"type": "events", "sources": ["reliefweb_api"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_reliefweb_api: {exc}")
+
+
+async def _tick_gfw_vessels():
+    if not C.ENABLE_GFW or not C.GFW_API_KEY:
+        return
+    try:
+        from ingestors import gfw_vessels
+        events = await gfw_vessels.fetch()
+        n = _save_events(events)
+        if n:
+            released = DB.get_released_events(sources=["gfw_vessels"], limit=200)
+            await _broadcast({"type": "events", "sources": ["gfw_vessels"], "data": released})
+    except Exception as exc:
+        log_err(f"tick_gfw_vessels: {exc}")
+
+
 async def _tick_webhook_flush():
     if not C.ALERT_WEBHOOK_URL:
         return
@@ -721,6 +820,13 @@ async def start():
         asyncio.create_task(_run_every(_tick_webhook_flush,  C.WEBHOOK_MIN_INTERVAL_SEC,      "webhook_flush")),
         asyncio.create_task(_run_every(_tick_ww3_meter,          C.WW3_METER_CHECK_SEC,           "ww3_meter")),
         asyncio.create_task(_run_every(_tick_entity_resolution,  C.ENTITY_GRAPH_INTERVAL_SEC,     "entity_graph")),
+        asyncio.create_task(_run_every(_tick_chokepoint_snapshot,  3600,                           "chokepoint_snapshot")),
+        asyncio.create_task(_run_every(_tick_bluesky_osint,        C.BLUESKY_OSINT_INTERVAL_SEC,   "bluesky_osint")),
+        asyncio.create_task(_run_every(_tick_eurdep,               C.EURDEP_INTERVAL_SEC,          "eurdep")),
+        asyncio.create_task(_run_every(_tick_commodity_prices,     C.COMMODITY_PRICES_INTERVAL_SEC,"commodity_prices")),
+        asyncio.create_task(_run_every(_tick_acled_iran,           C.ACLED_INTERVAL_SEC,           "acled_iran")),
+        asyncio.create_task(_run_every(_tick_reliefweb_api,        C.RELIEFWEB_API_INTERVAL_SEC,   "reliefweb_api")),
+        asyncio.create_task(_run_every(_tick_gfw_vessels,          C.GFW_INTERVAL_SEC,             "gfw_vessels")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

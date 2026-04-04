@@ -515,6 +515,9 @@ _fetch_navy          = _make_rss_fetcher('navy',       'https://www.navy.mil/Des
 _fetch_un_peace      = _make_rss_fetcher('un_peace',   'https://news.un.org/feed/subscribe/en/news/topic/peace-and-security/feed/rss.xml')
 _fetch_crisisgroup   = _make_rss_fetcher('crisisgroup','https://www.crisisgroup.org/rss/crisiswatch')
 _fetch_state_dept    = _make_rss_fetcher('state_dept', 'https://www.state.gov/rss-feeds/', atom=False)
+_fetch_eucom         = _make_rss_fetcher('eucom',      'https://www.eucom.mil/media-library/rss/all')
+_fetch_indopacom     = _make_rss_fetcher('indopacom',  'https://www.pacom.mil/Media/News/RSS/')
+_fetch_iaea          = _make_rss_fetcher('iaea',       'https://www.iaea.org/news/rss.xml')
 
 # ── Iran / Middle East focus feeds ───────────────────────────────────────────
 # Iran International — London-based, English, independent reporting on Iran
@@ -525,8 +528,6 @@ _fetch_mehr_news     = _make_rss_fetcher('mehr_news',  'https://en.mehrnews.com/
 _fetch_al_monitor    = _make_rss_fetcher('al_monitor', 'https://www.al-monitor.com/rss')
 # Tasnim — Iranian news agency, military/IRGC events often first here
 _fetch_tasnim        = _make_rss_fetcher('tasnim',     'https://www.tasnimnews.com/en/rss/feed/0/8/0/tasnim-english-news')
-# CENTCOM — US Central Command (covers Iran/ME AOR)
-_fetch_centcom_news  = _make_rss_fetcher('centcom',    'https://www.centcom.mil/RSS/CENTCOM-News/', atom=True)
 # Jerusalem Post — Israel-side conflict reporting
 _fetch_jpost         = _make_rss_fetcher('jpost',      'https://www.jpost.com/rss/rssfeedsfrontpage.aspx')
 # Haaretz — Israeli paper, often breaks military news
@@ -568,12 +569,14 @@ async def fetch() -> list[dict]:
         _fetch_un_peace(),
         _fetch_crisisgroup(),
         _fetch_state_dept(),
+        _fetch_eucom(),
+        _fetch_indopacom(),
+        _fetch_iaea(),
         # Iran / Middle East focus
         _fetch_iran_intl(),
         _fetch_mehr_news(),
         _fetch_al_monitor(),
         _fetch_tasnim(),
-        _fetch_centcom_news(),
         _fetch_jpost(),
         _fetch_haaretz(),
         _fetch_arab_news(),

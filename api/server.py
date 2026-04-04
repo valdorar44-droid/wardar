@@ -262,6 +262,26 @@ async def get_chokepoints():
     return JSONResponse({"chokepoints": results})
 
 
+@app.get("/api/chokepoints/history")
+async def get_chokepoints_history(hours: int = 168):
+    """Return hourly throughput time-series for all chokepoints (default last 7 days)."""
+    result = {}
+    for name, w, s, e, n in _CHOKEPOINTS:
+        result[name] = DB.get_chokepoint_history(name, hours=hours)
+    return JSONResponse({"hours": hours, "chokepoints": result})
+
+
+@app.get("/api/prices")
+async def get_commodity_prices():
+    """Return current Brent/WTI/NG/Gold spot prices from Yahoo Finance (cached 5 min)."""
+    try:
+        from ingestors.commodity_prices import fetch_prices
+        prices = await fetch_prices()
+        return JSONResponse({"prices": prices})
+    except Exception as exc:
+        return JSONResponse({"prices": {}, "error": str(exc)}, status_code=500)
+
+
 @app.get("/api/digest")
 async def get_digest(hours: int = 24, limit: int = 10):
     """

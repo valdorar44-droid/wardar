@@ -249,6 +249,33 @@ ENTITY_GRAPH_INTERVAL_SEC = _i("ENTITY_GRAPH_INTERVAL_SEC", 300)  # resolve enti
 ENABLE_WW3_METER         = _b("ENABLE_WW3_METER",         True)
 WW3_METER_CHECK_SEC      = _i("WW3_METER_CHECK_SEC",       3600)  # check hourly, update if date rolled
 
+# ── Bluesky Jetstream OSINT ───────────────────────────────────────────────────
+# Free WebSocket firehose — no key required. Requires ANTHROPIC_API_KEY for AI filter.
+ENABLE_BLUESKY_OSINT        = _b("ENABLE_BLUESKY_OSINT",        True)
+BLUESKY_OSINT_INTERVAL_SEC  = _i("BLUESKY_OSINT_INTERVAL_SEC",  900)   # 15 min (25s listen per call)
+
+# ── EURDEP EU Radiation Network ────────────────────────────────────────────────
+# Free REST API — 5,000 gamma stations across Europe. No key required.
+ENABLE_EURDEP       = _b("ENABLE_EURDEP",       True)
+EURDEP_INTERVAL_SEC = _i("EURDEP_INTERVAL_SEC", 3600)  # hourly
+EURDEP_ALERT_NSVH  = _i("EURDEP_ALERT_NSVH",   500)   # alert above 500 nSv/h (≥3× normal)
+
+# ── Commodity Prices (Yahoo Finance, no key) ───────────────────────────────────
+ENABLE_COMMODITY_PRICES        = _b("ENABLE_COMMODITY_PRICES",        True)
+COMMODITY_PRICES_INTERVAL_SEC  = _i("COMMODITY_PRICES_INTERVAL_SEC",  3600)  # hourly
+
+# ── ReliefWeb Humanitarian API ────────────────────────────────────────────────
+# Free API at api.reliefweb.int. No key required.
+ENABLE_RELIEFWEB_API        = _b("ENABLE_RELIEFWEB_API",        True)
+RELIEFWEB_API_INTERVAL_SEC  = _i("RELIEFWEB_API_INTERVAL_SEC",  21600)  # 6h
+
+# ── Global Fishing Watch (SAR dark vessel detection) ──────────────────────────
+# Free non-commercial API. Register at globalfishingwatch.org.
+# Set GFW_API_KEY in Railway environment variables.
+GFW_API_KEY         = _s("GFW_API_KEY",         "")
+ENABLE_GFW          = _b("ENABLE_GFW",          False)  # enable once key is set
+GFW_INTERVAL_SEC    = _i("GFW_INTERVAL_SEC",    3600)   # hourly
+
 # ── Admin Dashboard ────────────────────────────────────────────────────────────
 # Set ADMIN_PASSWORD in Railway env vars. Default is "wardar-admin" (change it!).
 # Stored as SHA-256 hex digest. To generate: python3 -c "import hashlib; print(hashlib.sha256(b'yourpassword').hexdigest())"

@@ -222,6 +222,18 @@ _MIGRATIONS: list[str] = [
     """CREATE INDEX        IF NOT EXISTS idx_hist_track  ON position_history(source, callsign, raw_ts_utc)""",
     """CREATE INDEX        IF NOT EXISTS idx_hist_ts     ON position_history(raw_ts_utc)""",
     """CREATE INDEX        IF NOT EXISTS idx_hist_bbox   ON position_history(lat, lon, raw_ts_utc)""",
+
+    # v13 — chokepoint throughput time-series (Task 6)
+    # Hourly snapshot of vessel/aircraft count per chokepoint.
+    # ts_utc is truncated to the hour: YYYY-MM-DDTHH:00:00
+    """CREATE TABLE IF NOT EXISTS chokepoint_history (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        name     TEXT NOT NULL,
+        ts_utc   TEXT NOT NULL,
+        count_1h INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(name, ts_utc)
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_cphs_name ON chokepoint_history(name, ts_utc DESC)""",
 ]
 
 def get_conn() -> sqlite3.Connection:
@@ -601,6 +613,29 @@ def get_chokepoint_count(bbox_w: float, bbox_s: float, bbox_e: float, bbox_n: fl
         WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? AND raw_ts_utc >= ?
     """, (bbox_s, bbox_n, bbox_w, bbox_e, cutoff)).fetchone()
     return row["n"] if row else 0
+
+def store_chokepoint_snapshot(name: str, ts_hour: str, count_1h: int) -> None:
+    """Upsert a single-hour chokepoint throughput snapshot."""
+    with _lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT OR REPLACE INTO chokepoint_history (name, ts_utc, count_1h) VALUES (?,?,?)",
+            (name, ts_hour, count_1h),
+        )
+        conn.commit()
+
+
+def get_chokepoint_history(name: str, hours: int = 168) -> list[dict]:
+    """Return hourly throughput snapshots for a chokepoint (default last 7 days)."""
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT ts_utc, count_1h FROM chokepoint_history WHERE name=? AND ts_utc>=? ORDER BY ts_utc ASC",
+        (name, cutoff),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
 
 def purge_old_history() -> int:
     """Delete position_history rows older than HISTORY_RETAIN_HOURS."""

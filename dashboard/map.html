@@ -691,6 +691,7 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
 }
 .choke-row:last-of-type{border-bottom:none}
 .choke-name{color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.choke-spark{flex-shrink:0;margin:0 .3rem;opacity:.75;line-height:0}
 .choke-counts{display:flex;gap:.3rem;flex-shrink:0}
 .choke-cnt{
   font-size:.6rem;padding:.08rem .28rem;
@@ -2472,6 +2473,16 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               LOADING TOP EVENTS...
             </div>
           </div>
+          <!-- Commodity Price Ticker -->
+          <div id="price-section" style="border-bottom:1px solid var(--border);flex-shrink:0">
+            <div id="price-hdr" onclick="document.getElementById('price-body').style.display=document.getElementById('price-body').style.display==='none'?'block':'none'" style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;cursor:pointer;font-size:.65rem;letter-spacing:.08em;color:var(--amber);user-select:none">
+              $ COMMODITY PRICES
+              <span id="price-badge" style="font-size:.44rem;color:var(--dim2)">LOADING…</span>
+            </div>
+            <div id="price-body" style="padding:.3rem .75rem .4rem">
+              <div id="price-list" style="display:flex;gap:.4rem;flex-wrap:wrap"></div>
+            </div>
+          </div>
           <!-- Phase 5: Chokepoint Throughput -->
           <div id="choke-section" class="open">
             <div id="choke-hdr" onclick="toggleChokeSection()">
@@ -2479,10 +2490,11 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span id="choke-badge" style="font-size:.44rem;color:var(--dim2)">LOADING…</span>
             </div>
             <div id="choke-body">
-              <div id="choke-legend">
+              <div id="choke-legend" style="display:flex;gap:.5rem;margin-bottom:.3rem;font-size:.6rem;color:var(--dim2);letter-spacing:.04em">
                 <span style="color:var(--cyan)">1H</span>
                 <span style="color:var(--cyan);opacity:.8">6H</span>
                 <span>24H</span>
+                <span style="margin-left:auto;font-size:.55rem">7D TREND</span>
               </div>
               <div id="choke-list"><div style="color:var(--dim2);font-size:.5rem">LOADING…</div></div>
               <div id="choke-ts"></div>
@@ -5408,14 +5420,34 @@ function _renderEntityDossier(ent, tl){
 // ── Phase 5: Chokepoint Throughput ────────────────────────────────────────────
 let _chokeData = null;
 
+function _makeSparkline(history){
+  /* Render a tiny 60×16 SVG polyline from hourly count data. */
+  if(!history || history.length < 2) return '<svg width="60" height="16"></svg>';
+  const vals = history.map(h=>h.count_1h);
+  const mx = Math.max(...vals, 1);
+  const W=60, H=14, pad=1;
+  const pts = vals.map((v,i)=>{
+    const x = pad + (i/(vals.length-1))*(W-2*pad);
+    const y = H - pad - (v/mx)*(H-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg width="${W}" height="${H+2}" style="overflow:visible"><polyline points="${pts}" fill="none" stroke="#0ff" stroke-width="1.2" stroke-opacity="0.7"/></svg>`;
+}
+
 function toggleChokeSection(){
   document.getElementById('choke-section').classList.toggle('open');
 }
 
+let _chokeHistory = {};
+
 async function loadChokepoints(){
   try{
-    const data = await fetch('/api/chokepoints').then(r=>r.json());
+    const [data, hist] = await Promise.all([
+      fetch('/api/chokepoints').then(r=>r.json()),
+      fetch('/api/chokepoints/history?hours=168').then(r=>r.json()).catch(()=>({chokepoints:{}})),
+    ]);
     _chokeData = data.chokepoints;
+    _chokeHistory = hist.chokepoints || {};
     renderChokepoints();
   } catch(e){ console.warn('chokepoints fetch:', e); }
 }
@@ -5436,8 +5468,10 @@ function renderChokepoints(){
     row.className = 'choke-row';
     // Truncate name to keep layout tight
     const name = c.name.length > 22 ? c.name.slice(0,20)+'…' : c.name;
+    const sparkSvg = _makeSparkline(_chokeHistory[c.name] || []);
     row.innerHTML = `
       <span class="choke-name" title="${esc(c.name)}">${esc(name)}</span>
+      <div class="choke-spark">${sparkSvg}</div>
       <div class="choke-counts">
         <span class="choke-cnt h1">${c.last1h}</span>
         <span class="choke-cnt h6">${c.last6h}</span>
@@ -5454,10 +5488,33 @@ function renderChokepoints(){
   if(tsEl) tsEl.textContent = 'UPDATED ' + new Date().toISOString().slice(11,16) + ' UTC';
 }
 
+async function loadPrices(){
+  try{
+    const data = await fetch('/api/prices').then(r=>r.json());
+    const prices = data.prices || {};
+    const list = document.getElementById('price-list');
+    const badge = document.getElementById('price-badge');
+    if(!list) return;
+    const brent = prices['BZ=F'];
+    if(brent && badge) badge.textContent = `BRENT $${brent.price.toFixed(2)}/bbl`;
+    list.innerHTML = Object.entries(prices).map(([sym,p])=>{
+      const sign = p.change_pct >= 0 ? '+' : '';
+      const col  = p.change_pct >= 0 ? '#f59e0b' : '#06b6d4';
+      return `<div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);padding:.15rem .3rem;border-radius:2px;font-size:.55rem;letter-spacing:.04em;color:var(--text)">
+        <div style="color:var(--dim2);font-size:.5rem">${esc(p.label)}</div>
+        <div style="color:var(--amber);font-weight:700">$${p.price.toFixed(2)}</div>
+        <div style="color:${col};font-size:.5rem">${sign}${p.change_pct.toFixed(1)}%</div>
+      </div>`;
+    }).join('');
+  } catch(e){ console.warn('prices fetch:', e); }
+}
+
 // Load on boot, then refresh every 30 min
 setTimeout(()=>{
   loadChokepoints();
+  loadPrices();
   setInterval(loadChokepoints, 1800000);
+  setInterval(loadPrices, 300000);  // prices every 5 min
 }, 5000);  // 5s after boot so map is ready
 
 // ── Layer helpers ─────────────────────────────────────────────────────────────
@@ -5481,8 +5538,14 @@ function sourceToLayerKey(source, category){
   if(s==='safecast') return 'seismic';            // geophysical/environmental layer
   if(s==='community') return 'community';
   if(s==='breaking_news') return 'breaking';
-  if(s==='reddit_osint'||s==='telegram_osint') return 'reddit';  // AI-filtered TG/Reddit OSINT → shared layer
+  if(s==='reddit_osint'||s==='telegram_osint'||s==='bluesky_osint') return 'reddit';  // AI-filtered OSINT → shared layer
+  if(s==='eurdep') return 'seismic';              // radiation → environmental layer
+  if(s==='gfw_vessels') return 'ais';             // dark vessel detection → maritime layer
+  if(s==='acled_iran') return 'acled';            // Iran war ACLED → conflict layer
+  if(s==='reliefweb_api') return 'unhcr';         // humanitarian → UNHCR layer
+  if(s==='commodity_prices') return 'osint';      // price alerts → news/intel layer
   if(['iran_intl','mehr_news','al_monitor','tasnim','jpost','haaretz','arab_news'].includes(s)) return 'osint'; // Iran/ME feeds → news layer
+  if(['eucom','indopacom','iaea'].includes(s)) return 'osint'; // new command/agency feeds → news layer
   if(s==='osint_geo'||s==='geoconfirmed'||s==='bellingcat'||s==='ceninfores'||s==='defmon'||s==='texty') return 'osint_geo';
   if(s==='unhcr') return 'unhcr';
   if(s==='views_forecast') return 'views';
