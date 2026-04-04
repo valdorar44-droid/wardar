@@ -112,9 +112,8 @@ async def fetch() -> list[dict]:
                 continue
             seen_countries.add(isoab)
 
-            # Map 2-letter → 3-letter to look up centroid
-            iso3 = _ISO2_TO_3.get(isoab.upper())
-            coords = _COUNTRY_CENTROIDS.get(iso3 or "") if iso3 else None
+            # VIEWS isoab is already 3-letter ISO (e.g. "ETH", "UKR") — look up directly
+            coords = _COUNTRY_CENTROIDS.get(isoab.upper())
             if not coords:
                 continue
             lat, lon, country_name = coords
