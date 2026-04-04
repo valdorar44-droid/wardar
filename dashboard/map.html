@@ -2354,7 +2354,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             </label>
             <label class="layer-item" id="lr-pikud" title="Pikud Ha'Oref (Israel Home Front Command) live rocket/missile alerts — real-time air raid warnings across Israel.">
               <input type="checkbox" class="layer-cb" id="cb-pikud" checked style="color:var(--red)" onchange="toggleLayer('pikud')">
-              <span class="layer-icon" style="color:var(--red)">🚨</span>
+              <span class="layer-icon" style="color:var(--red)">💥</span>
               <span class="layer-name">IL ROCKET ALERTS</span>
               <span class="layer-count" id="cnt-pikud" style="background:var(--red)">0</span>
             </label>
@@ -4070,7 +4070,7 @@ const ICONS = {
   views:         {fn:()=>makeIcon('◉','#ef4444',17)},
   views_forecast:{fn:()=>makeIcon('◉','#ef4444',17)},
   // Israel rocket alerts — fast-flash red
-  pikud_haoref:  {fn:()=>makePulseIcon('🚨','#ef4444','ALERT')},
+  pikud_haoref:  {fn:()=>makePulseIcon('💥','#ef4444','BOOM')},
   // Wikipedia edit spikes — breaking news signal
   wikipedia:     {fn:()=>makeIcon('📖','#f59e0b',17)},
   // Phase 3 alert sources — pulsing red/orange threat icons
@@ -4687,20 +4687,38 @@ function buildRedditPopup(d){
   const delayBadge = `<span style="background:#92400e;color:#fef3c7;font-size:.66rem;padding:.1rem .3rem;border-radius:2px;letter-spacing:.04em">⏱ DELAYED 1H</span>`;
 
   // ── Media block ───────────────────────────────────────────────────────────
-  // Priority: try inline video → thumbnail+play → image → nothing
+  // Priority: YouTube embed → direct MP4/WEBM → TG deeplink → thumbnail+play → image
   const _DIRECT_VID = /\.(mp4|webm|mov|m3u8)(\?[^"]*)?$/i;
   const directVidUrl =
     (_DIRECT_VID.test(mediaUrl)   ? mediaUrl   : null) ||
     (_DIRECT_VID.test(linkedUrl)  ? linkedUrl  : null) ||
     (_DIRECT_VID.test(previewUrl) ? previewUrl : null);
 
-  // Thumb — best still image we have
-  const thumbUrl = videoThumb || previewUrl || mediaUrl || '';
+  // YouTube video ID (works for watch?v=, youtu.be/, /shorts/, /live/)
+  const _ytId = u => { if(!u) return null; const m=u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/); return m?m[1]:null; };
+  const ytId = _ytId(linkedUrl) || _ytId(postUrl) || _ytId(mediaUrl);
+
+  // Telegram post deep-link (opens native TG app on mobile, t.me on desktop)
+  const tgPostUrl = postUrl||linkedUrl||'';
+  const tgMatch   = tgPostUrl.match(/t\.me\/([A-Za-z0-9_]+)\/(\d+)/);
+  const tgDeeplink= tgMatch ? `tg://resolve?domain=${tgMatch[1]}&post=${tgMatch[2]}` : null;
+
+  // Thumb — best still image available; synthesise YouTube thumbnail if needed
+  const thumbUrl = videoThumb || previewUrl || mediaUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '');
 
   let mediaBlock = '';
 
-  if(isVideo && directVidUrl){
-    // ── Case 1: direct MP4/WEBM → embed inline, fall back on error ───────
+  if(ytId){
+    // ── Case 0: YouTube — privacy-safe nocookie embed ─────────────────────
+    mediaBlock = `
+    <div style="margin:.5rem 0;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border:1px solid #1e1e2a;border-radius:2px;background:#000">
+      <iframe src="https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1"
+        style="position:absolute;top:0;left:0;width:100%;height:100%;border:none"
+        allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen loading="lazy">
+      </iframe>
+    </div>`;
+  } else if(isVideo && directVidUrl){
+    // ── Case 1: direct MP4/WEBM → <video>, fallback to open-link ─────────
     const fallbackHref = esc(postUrl||directVidUrl);
     mediaBlock = `
     <div class="osint-vid-wrap" style="margin:.5rem 0;position:relative">
@@ -4717,8 +4735,29 @@ function buildRedditPopup(d){
           style="padding:.25rem .7rem;background:${srcColor};color:#000;font-size:.55rem;font-weight:700;text-decoration:none;border-radius:2px">▶ OPEN SOURCE ↗</a>
       </div>
     </div>`;
+  } else if(isVideo && isTelegram){
+    // ── Case TG: Telegram video — TG CDN blocks CORS, use deeplink ───────
+    // "OPEN IN APP" = tg:// scheme opens native app on mobile (Android/iOS)
+    // "WEB ↗" = t.me link opens Telegram Web for desktop/no-app users
+    const webHref   = esc(tgPostUrl||'#');
+    const appHref   = esc(tgDeeplink||tgPostUrl||'#');
+    mediaBlock = `
+    <div style="margin:.5rem 0">
+      ${thumbUrl?`
+      <div style="position:relative;cursor:pointer;margin-bottom:.4rem" onclick="window.open('${webHref}','_blank')">
+        <img src="${esc(thumbUrl)}" onerror="this.parentNode.style.display='none'"
+          style="width:100%;max-height:160px;object-fit:cover;border:1px solid #1e1e2a;display:block;border-radius:2px">
+        <div style="position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35)">
+          <div style="background:rgba(0,0,0,.75);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;border:2px solid rgba(255,255,255,.3)">▶</div>
+        </div>
+      </div>`:''}
+      <div style="display:flex;gap:.3rem">
+        <a href="${appHref}" style="flex:1;display:block;text-align:center;padding:.35rem;background:#2da5e0;color:#fff;font-size:.58rem;font-weight:700;text-decoration:none;border-radius:2px;letter-spacing:.04em">📲 OPEN IN APP</a>
+        <a href="${webHref}" target="_blank" rel="noopener" style="flex:1;display:block;text-align:center;padding:.35rem;background:#111120;color:#2da5e0;font-size:.58rem;font-weight:700;text-decoration:none;border-radius:2px;border:1px solid #2da5e0">⧉ TELEGRAM WEB ↗</a>
+      </div>
+    </div>`;
   } else if(isVideo && thumbUrl){
-    // ── Case 2: video but no direct URL — thumbnail + play button ─────────
+    // ── Case 2: video, no direct URL — thumbnail + play button ───────────
     const watchHref = esc(postUrl||linkedUrl||'#');
     mediaBlock = `
     <div style="margin:.5rem 0;position:relative;cursor:pointer" onclick="window.open('${watchHref}','_blank')">
@@ -8986,7 +9025,7 @@ const _TICKER_SOURCES = 'acled,osint,osint_geo,breaking_news,dark_vessel,converg
 const _TICKER_ICONS = {
   acled:'💥', osint:'📡', osint_geo:'📡', breaking_news:'📰',
   dark_vessel:'⛵', convergence:'⚡', nuclear_threat:'☢', pipeline_threat:'⊸',
-  warspot:'⚔', pikud_haoref:'🚨', default:'•'
+  warspot:'⚔', pikud_haoref:'💥', default:'•'
 };
 let _tickerData = [];
 
