@@ -2193,9 +2193,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
               <span style="font-size:.42rem;color:var(--dim2);margin-left:auto">OSINT</span>
             </label>
             <label class="layer-item">
-              <input type="checkbox" class="layer-cb" id="cb-trails2d" checked style="color:var(--amber)" onchange="setTrails2D(this.checked)">
+              <input type="checkbox" class="layer-cb" id="cb-trails2d" style="color:var(--amber)" onchange="setTrails2D(this.checked)">
               <span class="layer-icon" style="color:var(--amber)">⊷</span>
               <span class="layer-name">MOVEMENT TRAILS</span>
+            </label>
+            <label class="layer-item" id="lr-trails2d-mil" style="padding-left:1.4rem;opacity:.35">
+              <input type="checkbox" class="layer-cb" id="cb-trails2d-mil" checked style="color:var(--amber)" onchange="setTrails2DMilOnly(this.checked)">
+              <span class="layer-icon" style="color:var(--amber);font-size:.55rem">✈</span>
+              <span class="layer-name" style="font-size:.58rem">MIL ONLY</span>
             </label>
             <label class="layer-item" title="Conflict activity heatmap — event density overlay from ACLED, OSINT, threats, and fires over the past 24 hours. Shows conflict hotspots at a glance.">
               <input type="checkbox" class="layer-cb" id="cb-heatmap" style="color:#ef4444" onchange="toggleHeatmap(this.checked)">
@@ -5666,7 +5671,7 @@ function updatePosition(p, isNew){
       _trails[cs].push({lat:p.lat,lon:p.lon});
       if(_trails[cs].length>_TRAIL_MAX) _trails[cs].shift();
     }
-    if(_mapMode==='2d') _updateTrail2D(cs, _trails[cs], LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b');
+    if(_mapMode==='2d') _updateTrail2D(cs, _trails[cs], LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b', !!parseInt(p.military_flag||0));
   }
   if(isNew&&(p.title||p.callsign)) pushFeed({...p,source:p.source});
   if(isNew&&Math.random()<0.12) spawnPulse(p.lat,p.lon,LAYER_COLORS[sourceToLayerKey(p.source)]||'#f59e0b');
@@ -6333,7 +6338,8 @@ let _samLayer      = null;
 let _drawLayer     = null;
 let _drawControl   = null;
 let _drawOn        = false;
-let _trails2dOn    = true;
+let _trails2dOn    = false; // off by default — too cluttered with all civilian traffic
+let _trails2dMilOnly = true;  // when on: only military aircraft get trails
 let _trails2dLines = {}; // callsign → L.polyline
 let _tileLayer     = null;
 let _timeFilter    = 'all'; // all|1h|6h|24h|7d
@@ -7049,24 +7055,32 @@ function _renderWatchzoneList(){
 }
 
 // ── Movement trails in 2D ─────────────────────────────────────────────────────
-function setTrails2D(on){ _trails2dOn = on; if(!on) _clearTrails2D(); }
+function setTrails2D(on){
+  _trails2dOn = on;
+  if(!on) _clearTrails2D();
+  // Sync mil-only checkbox visibility
+  const milCb = document.getElementById('cb-trails2d-mil');
+  if(milCb) milCb.closest('label').style.opacity = on ? '1' : '0.35';
+}
+function setTrails2DMilOnly(on){ _trails2dMilOnly = on; _clearTrails2D(); }
 function _clearTrails2D(){
   Object.values(_trails2dLines).forEach(t=>{
     if(!_map2d) return;
     if(t && t.line){ _map2d.removeLayer(t.line); _map2d.removeLayer(t.dots); }
-    else if(t && t.removeFrom) _map2d.removeLayer(t); // legacy single-layer
+    else if(t && t.removeFrom) _map2d.removeLayer(t);
   });
   _trails2dLines = {};
 }
-function _updateTrail2D(callsign, pts, color){
+function _updateTrail2D(callsign, pts, color, isMil){
   if(!_map2d||!_trails2dOn||pts.length<2) return;
+  if(_trails2dMilOnly && !isMil) return; // skip civilian when mil-only mode is active
   const prev = _trails2dLines[callsign];
   if(prev){ if(prev.line){ _map2d.removeLayer(prev.line); _map2d.removeLayer(prev.dots); } else if(prev.removeFrom) _map2d.removeLayer(prev); }
   const coords = pts.map(p=>[p.lat,p.lon]);
-  // Solid connecting line
-  const line = L.polyline(coords,{color,weight:1.5,opacity:0.5}).addTo(_map2d);
-  // Round dot at each waypoint — dashArray '1 N' with lineCap round = evenly-spaced dots
-  const dots = L.polyline(coords,{color,weight:5,opacity:0.65,dashArray:'1 12',lineCap:'round'}).addTo(_map2d);
+  // Thin connecting line — very subtle
+  const line = L.polyline(coords,{color,weight:1,opacity:0.25}).addTo(_map2d);
+  // Small round dots at each waypoint — much lighter than before
+  const dots = L.polyline(coords,{color,weight:isMil?3:2,opacity:isMil?0.55:0.25,dashArray:'1 14',lineCap:'round'}).addTo(_map2d);
   _trails2dLines[callsign] = {line, dots};
 }
 
