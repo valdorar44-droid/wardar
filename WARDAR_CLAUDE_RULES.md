@@ -34,14 +34,14 @@
 - Log every fetch with count: `log(f"adsb: {len(results)} positions")`
 - Return empty list on failure, never raise
 
-## Delay Policy — NEVER BYPASS
+## Delay Policy — ALL ZERO (decided 2026-04-03)
 ```python
-DELAY_CIVILIAN_SEC  = 30      # ADS-B / AIS civilian
-DELAY_SENSITIVE_SEC = 86400   # Military-flagged assets, 24h
-DELAY_CONFLICT_SEC  = 3600    # Conflict zone event overlays, 1h
+DELAY_CIVILIAN_SEC  = 0   # All feeds are public broadcast data — no delay
+DELAY_SENSITIVE_SEC = 0   # Military ADS-B/AIS from public transponders — no delay
+DELAY_CONFLICT_SEC  = 0   # Conflict overlays — no delay
 ```
-The `apply_delay()` function in `core/engine.py` is the enforcement point.
-**Do not add special cases. Do not add admin bypass. Delays are non-negotiable.**
+`apply_delay()` still runs so `release_ts_utc = raw_ts_utc` — the release filter
+keeps working. Do NOT add delays back. All data sources are public broadcast feeds.
 
 ## Source ID Map (ingestor → DB → frontend must match exactly)
 `adsb`, `opensky`, `ais`, `tle`, `notam`, `acled`, `gdelt`, `osint_news`

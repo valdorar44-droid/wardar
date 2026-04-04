@@ -31,3 +31,13 @@ _Rationale: Sean's aesthetic preference. Consistent brand across projects._
 
 **Scope boundary:**
 _Decided: Only public, broadcast signal data. No scraping of classified sources, no proprietary military feeds, no live identification of active military operations. Time-delayed OSINT for conflict context only._
+
+---
+
+## 2026-04-03
+
+**All delays removed (DELAY_CIVILIAN_SEC = DELAY_SENSITIVE_SEC = DELAY_CONFLICT_SEC = 0)**
+_Decided: Sean. All feeds are public broadcast data (ADS-B transponders, AIS VHF, OSINT). No delay necessary. release_ts_utc = raw_ts_utc. apply_delay() kept in code so DB logic stays intact._
+
+**No-delay on AIS military/government ships**
+_Decided: Sean. Military and government vessel AIS is public VHF broadcast. No delay, no filter on release timestamps._

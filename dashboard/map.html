@@ -2367,8 +2367,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       </div>
 
       <div class="panel-ft">
-        DATA DELAYED PER POLICY<br>
-        CIVILIAN +30s · MILITARY +5MIN · CONFLICT +10MIN
+        ALL FEEDS LIVE — NO DELAY · PUBLIC DATA ONLY
       </div>
     </div>
 
@@ -2644,13 +2643,6 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
             <div class="setting-desc">Show AI brief on startup</div>
           </div>
           <label class="sw"><input type="checkbox" id="st-autobrief" onchange="saveSetting('autobrief',this.checked)"><div class="sw-track"></div></label>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="setting-label">Show delay badges</div>
-            <div class="setting-desc">Show [DELAYED Xmin] on popups</div>
-          </div>
-          <label class="sw"><input type="checkbox" id="st-delaybadge" checked onchange="saveSetting('delaybadge',this.checked)"><div class="sw-track"></div></label>
         </div>
       </div>
 
@@ -2979,7 +2971,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
       <input class="dlg-input" id="dlg-imgurl" type="url" maxlength="1000" placeholder="https://... image or video link (leave blank if uploaded above)">
     </div>
     <div style="font-size:.48rem;color:var(--dim2);letter-spacing:.06em;margin-top:.3rem;line-height:1.6">
-      NO ACCOUNT REQUIRED · CALLSIGN OPTIONAL · COMMUNITY VERIFICATION APPLIES DELAY POLICY
+      NO ACCOUNT REQUIRED · CALLSIGN OPTIONAL · COMMUNITY VERIFICATION FOR BADGE
     </div>
   </div>
   <div class="dlg-ft">
@@ -3064,7 +3056,7 @@ const BOOT_LINES = [
   {t:"ISW FRONTLINES + NUCLEAR + MIL BASE.", cls:"ok"},
   {t:"WARSPOT + UCDP + SAFECAST...........", cls:"ok"},
   {t:"COMMUNITY INTEL LAYER...............", cls:"ok"},
-  {t:"DELAY POLICY ENGAGED — MULTI-DOMAIN.", cls:"ok"},
+  {t:"ALL FEEDS LIVE — ZERO DELAY................", cls:"ok"},
   {t:"ALL SYSTEMS NOMINAL ▸ WARDAR ACTIVE", cls:""},
 ];
 
@@ -4469,8 +4461,6 @@ function buildPopup(p){
   const isConflict = ['acled','gdelt','osint_news','warspot','ucdp'].includes(src);
 
   let badge='';
-  if(isMil)      badge='<div class="delay-badge">[DELAYED 24H — MILITARY]</div>';
-  else if(isConflict) badge='<div class="delay-badge conflict">[DELAYED 1H — CONFLICT]</div>';
 
   // Equipment image — always try to find one; _getWikiArticle returns null if no match
   const eqImg = _mkEqImgPlaceholder(p);
