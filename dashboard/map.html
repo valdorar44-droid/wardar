@@ -1818,21 +1818,21 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   #statusbar{ display:none!important; }
   #sb-show-btn{ display:none!important; }
 
-  /* ── Panels stop at bottom nav (56px) ── */
-  #panel{ bottom:56px; }
-  #rpanel{ bottom:56px; }
+  /* ── Panels stop at bottom nav (72px) ── */
+  #panel{ bottom:72px; }
+  #rpanel{ bottom:72px; }
 
   /* ── Panel tab: hidden ── */
   #panel-tab{ display:none!important; }
 
   /* ── Timeline: full-width, sits above bottom nav ── */
-  #timeline{ bottom:56px!important;left:0!important;right:0!important; }
+  #timeline{ bottom:72px!important;left:0!important;right:0!important; }
 
   /* ── CIP (country intel drawer): above bottom nav ── */
-  #cip{ bottom:calc(56px + 8px); }
+  #cip{ bottom:calc(72px + 8px); }
 
   /* ── Video bar: above nav ── */
-  #videobar{ bottom:56px; }
+  #videobar{ bottom:72px; }
   #videobar.open{ display:none!important; }
 
   /* ── WW3 drawer: full-width on mobile ── */
@@ -1860,6 +1860,9 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   background:rgba(4,4,6,.6);
   flex-shrink:0;
 }
+#mnb-row{
+  display:flex;flex:1;min-height:0;
+}
 .mnb{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;background:none;border:none;color:var(--dim2);
@@ -1883,7 +1886,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 /* MORE drawer — slides up from bottom nav */
 #mob-more-drawer{
   display:none;flex-direction:column;gap:.6rem;
-  position:fixed;bottom:56px;left:0;right:0;z-index:700;
+  position:fixed;bottom:72px;left:0;right:0;z-index:700;
   background:rgba(6,6,10,.98);border-top:1px solid var(--border2);
   padding:.8rem .9rem;
   box-shadow:0 -8px 32px rgba(0,0,0,.5);
@@ -2937,27 +2940,29 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <span id="mob-sb-counts" style="font-size:.42rem;letter-spacing:.06em;color:var(--dim2)">AC <span id="mob-sb-ac">0</span> · SH <span id="mob-sb-sh">0</span> · EV <span id="mob-sb-ev">0</span></span>
     <span id="mob-sb-ts" style="font-size:.4rem;color:var(--dim2);margin-left:auto">--:-- UTC</span>
   </div>
-  <button class="mnb active" id="mnb-map" onclick="mobNav('map')" aria-label="Map">
-    <span class="mnb-icon">🗺</span>
-    <span class="mnb-lbl">MAP</span>
-  </button>
-  <button class="mnb" id="mnb-feeds" onclick="mobNav('feeds')" aria-label="Feeds">
-    <span class="mnb-icon">☰</span>
-    <span class="mnb-lbl">FEEDS</span>
-  </button>
-  <button class="mnb" id="mnb-alerts" onclick="mobNav('alerts')" aria-label="Alerts">
-    <span class="mnb-icon">⚡</span>
-    <span class="mnb-lbl">ALERTS</span>
-    <span class="mnb-badge" id="mnb-alert-n"></span>
-  </button>
-  <button class="mnb" id="mnb-intel" onclick="mobNav('intel')" aria-label="Intel">
-    <span class="mnb-icon">◈</span>
-    <span class="mnb-lbl">INTEL</span>
-  </button>
-  <button class="mnb" id="mnb-more" onclick="mobNav('more')" aria-label="More">
-    <span class="mnb-icon">⋯</span>
-    <span class="mnb-lbl">MORE</span>
-  </button>
+  <div id="mnb-row">
+    <button class="mnb active" id="mnb-map" onclick="mobNav('map')" aria-label="Map">
+      <span class="mnb-icon">🗺</span>
+      <span class="mnb-lbl">MAP</span>
+    </button>
+    <button class="mnb" id="mnb-feeds" onclick="mobNav('feeds')" aria-label="Feeds">
+      <span class="mnb-icon">☰</span>
+      <span class="mnb-lbl">FEEDS</span>
+    </button>
+    <button class="mnb" id="mnb-alerts" onclick="mobNav('alerts')" aria-label="Alerts">
+      <span class="mnb-icon">⚡</span>
+      <span class="mnb-lbl">ALERTS</span>
+      <span class="mnb-badge" id="mnb-alert-n"></span>
+    </button>
+    <button class="mnb" id="mnb-intel" onclick="mobNav('intel')" aria-label="Intel">
+      <span class="mnb-icon">◈</span>
+      <span class="mnb-lbl">INTEL</span>
+    </button>
+    <button class="mnb" id="mnb-more" onclick="mobNav('more')" aria-label="More">
+      <span class="mnb-icon">⋯</span>
+      <span class="mnb-lbl">MORE</span>
+    </button>
+  </div>
 </nav>
 
 <!-- ══ MOBILE MORE DRAWER ════════════════════════════════════════════════════ -->
