@@ -364,6 +364,17 @@ async def fetch() -> list[dict]:
         return []
     log(f"telegram_osint: {len(raw)} posts from {len(_CHANNELS)-blocked} channels")
 
+    # Skip posts already in DB — prevents re-classifying on every redeploy
+    from db import store as DB
+    _SEEN_URLS |= DB.get_event_urls("telegram_osint", hours=48)
+    before = len(raw)
+    raw = [p for p in raw if p["url"] not in _SEEN_URLS]
+    if before != len(raw):
+        log(f"telegram_osint: {before-len(raw)} already in DB, {len(raw)} new for AI")
+
+    if not raw:
+        return []
+
     # AI classify — batch 20 to minimise API call count
     BATCH = 20
     ai_map: dict[str, dict] = {}

@@ -776,6 +776,9 @@ async def trigger_intel_brief():
     asyncio.create_task(_run())
     return JSONResponse({"status": "generating", "message": "Brief will be ready in ~30s"}, status_code=202)
 
+_predict_cache: dict[str, dict] = {}   # key → {result, ts}
+_PREDICT_TTL = 300.0                   # 5 min — position changes enough to recompute
+
 @app.post("/api/predict")
 async def predict_asset(request: Request):
     """AI prediction for a tracked asset — identifies what it is, where it's going, threat assessment.
@@ -785,6 +788,21 @@ async def predict_asset(request: Request):
     body = await request.json()
     if not C.ANTHROPIC_API_KEY:
         return JSONResponse({"error": "no_api_key", "text": "ANTHROPIC_API_KEY not configured."})
+
+    # Cache by callsign + rounded position (0.5° grid) — prevents burning tokens on repeat clicks
+    _cs  = str(body.get("callsign") or "").strip()[:32]
+    _lat = round(float(body.get("lat") or 0) * 2) / 2
+    _lon = round(float(body.get("lon") or 0) * 2) / 2
+    _cache_key = f"{_cs}:{_lat}:{_lon}"
+    _now = time.monotonic()
+    _cached = _predict_cache.get(_cache_key)
+    if _cached and (_now - _cached["ts"]) < _PREDICT_TTL:
+        return JSONResponse(_cached["result"])
+    # Evict old entries to keep cache small
+    if len(_predict_cache) > 500:
+        _oldest = sorted(_predict_cache, key=lambda k: _predict_cache[k]["ts"])[:200]
+        for k in _oldest:
+            _predict_cache.pop(k, None)
 
     callsign    = str(body.get("callsign") or "UNKNOWN").strip()[:32]
     asset_type  = str(body.get("type") or "").strip()[:32]
@@ -856,6 +874,7 @@ Keep path realistic — account for known geography (don't fly through mountains
         result = json.loads(raw)
         result["callsign"] = callsign
         result["model"] = C.AI_MODEL
+        _predict_cache[_cache_key] = {"result": result, "ts": _now}
         return JSONResponse(result)
     except json.JSONDecodeError as exc:
         return JSONResponse({"error": f"parse_error: {exc}", "text": raw if 'raw' in dir() else ""})

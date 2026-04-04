@@ -428,6 +428,17 @@ async def fetch() -> list[dict]:
 
     log(f"breaking_news: {len(raw)} items pre-filtered from {len(_FEEDS)-feed_errors}/{len(_FEEDS)} feeds")
 
+    # Skip posts already in DB — prevents re-classifying on every redeploy
+    from db import store as DB
+    _SEEN_URLS |= DB.get_event_urls("breaking_news", hours=48)
+    before = len(raw)
+    raw = [p for p in raw if p["url"] not in _SEEN_URLS]
+    if before != len(raw):
+        log(f"breaking_news: {before-len(raw)} already in DB, {len(raw)} new for AI")
+
+    if not raw:
+        return []
+
     # AI classify in batches of 15
     BATCH = 15
     ai_map: dict[str, dict] = {}

@@ -507,6 +507,18 @@ def purge_old_positions() -> int:
 
 # ── Events ───────────────────────────────────────────────────────────────────
 
+def get_event_urls(source: str, hours: int = 48) -> set[str]:
+    """Return set of known event URLs for a source (survives restarts — used to skip re-classifying)."""
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT url FROM events WHERE source=? AND url IS NOT NULL AND url!='' AND raw_ts_utc>=?",
+        (source, cutoff),
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
 def upsert_event(e: dict) -> None:
     """Insert event, skipping exact duplicates (same source/ts/lat/lon)."""
     with _lock:
