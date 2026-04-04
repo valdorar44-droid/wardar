@@ -1808,36 +1808,100 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   #panel.mobile-open{ transform:translateX(0)!important; }
   #rpanel.mobile-open{ transform:translateX(0)!important; }
 
-  /* ── Overlay + mobile nav buttons ── */
+  /* ── Bottom nav: show; replace old header buttons ── */
+  #mob-nav{ display:flex; }
+  #mob-left-btn,#mob-right-btn{ display:none!important; }
+
+  /* ── Overlay ── */
   #mob-overlay{ display:block;opacity:0;pointer-events:none; }
   #mob-overlay.active{ opacity:1;pointer-events:all; }
-  #mob-left-btn,#mob-right-btn{ display:inline-block; }
-  /* Don't auto-open video bar on mobile — hides below statusbar */
-  #videobar.open{ display:none!important; }
-  body.vbar-open #panel,body.vbar-open #rpanel,body.vbar-open #timeline{ bottom:44px!important; }
 
-  /* ── Panel tab: hidden (use mob-left-btn instead) ── */
+  /* ── Status bar: hidden on mobile (too text-heavy; use panels instead) ── */
+  #statusbar{ display:none!important; }
+  #sb-show-btn{ display:none!important; }
+
+  /* ── Panels stop at bottom nav (56px) ── */
+  #panel{ bottom:56px; }
+  #rpanel{ bottom:56px; }
+
+  /* ── Panel tab: hidden ── */
   #panel-tab{ display:none!important; }
 
-  /* ── Timeline: full-width ── */
-  #timeline{ left:0!important;right:0!important; }
+  /* ── Timeline: full-width, sits above bottom nav ── */
+  #timeline{ bottom:56px!important;left:0!important;right:0!important; }
 
-  /* ── Video bar: shorter ── */
-  #videobar{ height:110px; }
-  .video-card{ width:160px;min-width:160px; }
+  /* ── CIP (country intel drawer): above bottom nav ── */
+  #cip{ bottom:calc(56px + 8px); }
+
+  /* ── Video bar: above nav ── */
+  #videobar{ bottom:56px; }
+  #videobar.open{ display:none!important; }
 
   /* ── WW3 drawer: full-width on mobile ── */
   #ww3-drawer{ left:4px!important;right:4px!important;max-width:none!important; }
 
-  /* ── Popups: slightly wider ── */
-  .leaflet-popup-content{ max-width:280px!important; }
-
-  /* ── Status bar: safe area ── */
-  #statusbar{ padding-bottom:env(safe-area-inset-bottom,0px); }
+  /* ── Popups: wider, centered ── */
+  .leaflet-popup-content{ max-width:min(300px,90vw)!important; }
 
   /* ── Touch: larger cluster tap targets ── */
-  .leaflet-marker-icon{ touch-action:manipulation; }
+  .leaflet-marker-icon{ touch-action:manipulation;min-width:36px;min-height:36px; }
 }
+
+/* ══ MOBILE BOTTOM NAV ══════════════════════════════════════════════════════ */
+#mob-nav{
+  display:none;position:fixed;bottom:0;left:0;right:0;
+  height:56px;z-index:701;
+  background:rgba(4,4,6,.98);border-top:1px solid var(--border2);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.mnb{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;background:none;border:none;color:var(--dim2);
+  font-family:var(--font);cursor:pointer;position:relative;
+  transition:color .15s;-webkit-tap-highlight-color:transparent;
+}
+.mnb.active{ color:var(--amber); }
+.mnb.active::after{
+  content:'';position:absolute;top:0;left:22%;right:22%;
+  height:2px;background:var(--amber);border-radius:0 0 2px 2px;
+}
+.mnb-icon{ font-size:1.1rem;line-height:1; }
+.mnb-lbl{ font-size:.42rem;letter-spacing:.1em;margin-top:1px; }
+.mnb-badge{
+  position:absolute;top:5px;left:calc(50% + 5px);
+  background:var(--red);color:#fff;font-size:.38rem;font-weight:700;
+  padding:1px 4px;border-radius:99px;min-width:14px;text-align:center;
+  line-height:1.4;display:none;pointer-events:none;
+}
+.mnb-badge.show{ display:block; }
+/* MORE drawer — slides up from bottom nav */
+#mob-more-drawer{
+  display:none;flex-direction:column;gap:.6rem;
+  position:fixed;bottom:56px;left:0;right:0;z-index:700;
+  background:rgba(6,6,10,.98);border-top:1px solid var(--border2);
+  padding:.8rem .9rem;
+  box-shadow:0 -8px 32px rgba(0,0,0,.5);
+}
+#mob-more-drawer.open{ display:flex; }
+#mob-more-drawer h4{
+  font-size:.48rem;letter-spacing:.14em;color:var(--dim2);
+  margin-bottom:.1rem;
+}
+.mmd-row{ display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem; }
+.mmd-btn{
+  padding:.6rem .2rem;
+  background:rgba(255,255,255,.04);border:1px solid var(--border2);
+  color:var(--dim2);font-family:var(--font);font-size:.46rem;
+  letter-spacing:.07em;cursor:pointer;border-radius:3px;
+  display:flex;flex-direction:column;align-items:center;gap:.3rem;
+  transition:border-color .15s,color .15s,background .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.mmd-btn:active,.mmd-btn.on{
+  border-color:var(--amber);color:var(--amber);
+  background:rgba(245,158,11,.1);
+}
+.mmd-icon{ font-size:1.1rem;line-height:1; }
 
 @media (max-width:540px) {
   /* Small phones — icon-only buttons to save header space */
@@ -2822,6 +2886,64 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     STATUS BAR</button>
 
 </div><!-- /shell -->
+
+<!-- ══ MOBILE BOTTOM NAV ═════════════════════════════════════════════════════ -->
+<nav id="mob-nav">
+  <button class="mnb active" id="mnb-map" onclick="mobNav('map')" aria-label="Map">
+    <span class="mnb-icon">🗺</span>
+    <span class="mnb-lbl">MAP</span>
+  </button>
+  <button class="mnb" id="mnb-feeds" onclick="mobNav('feeds')" aria-label="Feeds">
+    <span class="mnb-icon">☰</span>
+    <span class="mnb-lbl">FEEDS</span>
+  </button>
+  <button class="mnb" id="mnb-alerts" onclick="mobNav('alerts')" aria-label="Alerts">
+    <span class="mnb-icon">⚡</span>
+    <span class="mnb-lbl">ALERTS</span>
+    <span class="mnb-badge" id="mnb-alert-n"></span>
+  </button>
+  <button class="mnb" id="mnb-intel" onclick="mobNav('intel')" aria-label="Intel">
+    <span class="mnb-icon">◈</span>
+    <span class="mnb-lbl">INTEL</span>
+  </button>
+  <button class="mnb" id="mnb-more" onclick="mobNav('more')" aria-label="More">
+    <span class="mnb-icon">⋯</span>
+    <span class="mnb-lbl">MORE</span>
+  </button>
+</nav>
+
+<!-- ══ MOBILE MORE DRAWER ════════════════════════════════════════════════════ -->
+<div id="mob-more-drawer">
+  <h4>MAP CONTROLS</h4>
+  <div class="mmd-row">
+    <button class="mmd-btn" id="mmd-globe" onclick="toggleMapMode();_mmdSync()" aria-label="3D Globe">
+      <span class="mmd-icon">🌐</span>3D GLOBE
+    </button>
+    <button class="mmd-btn" id="mmd-mil" onclick="toggleMilOnly();_mmdSync()" aria-label="Mil only">
+      <span class="mmd-icon">✈</span>MIL ONLY
+    </button>
+    <button class="mmd-btn" id="mmd-replay" onclick="toggleTimeline();document.getElementById('mob-more-drawer').classList.remove('open');document.getElementById('mnb-more').classList.remove('active');document.getElementById('mnb-map').classList.add('active');" aria-label="Replay">
+      <span class="mmd-icon">⏱</span>REPLAY
+    </button>
+    <button class="mmd-btn" id="mmd-search" onclick="_mobOpenSearch()" aria-label="Search">
+      <span class="mmd-icon">⌕</span>SEARCH
+    </button>
+  </div>
+  <div class="mmd-row" style="grid-template-columns:repeat(4,1fr)">
+    <button class="mmd-btn" onclick="toggleSettings();document.getElementById('mob-more-drawer').classList.remove('open');" aria-label="Settings">
+      <span class="mmd-icon">⚙</span>SETTINGS
+    </button>
+    <button class="mmd-btn" id="mmd-trails" onclick="setTrails2D(!_trails2dOn);document.getElementById('cb-trails2d').checked=_trails2dOn;_mmdSync()" aria-label="Trails">
+      <span class="mmd-icon">⊷</span>TRAILS
+    </button>
+    <button class="mmd-btn" id="mmd-bright" onclick="cycleBrightness();_mmdSync()" aria-label="Brightness">
+      <span class="mmd-icon">☀</span>BRIGHT
+    </button>
+    <button class="mmd-btn" onclick="document.getElementById('mob-more-drawer').classList.remove('open');document.getElementById('mnb-more').classList.remove('active');document.getElementById('mnb-map').classList.add('active')" aria-label="Close">
+      <span class="mmd-icon">✕</span>CLOSE
+    </button>
+  </div>
+</div>
 
 <!-- ══ WW3 DRAWER (dropdown from header bar) ══════════════════════════════════ -->
 <div id="ww3-drawer">
@@ -5885,6 +6007,13 @@ function refreshCounts(){
   const nAlertTotal = nAlerts + nPikud + nEmergency;
   const ab = document.getElementById('grp-alerts-badge');
   if(ab) ab.textContent = nAlertTotal||'';
+  // Mobile bottom nav alert badge
+  const mnbBadge = document.getElementById('mnb-alert-n');
+  if(mnbBadge){
+    const n = alertBuffer.length + nAlertTotal;
+    mnbBadge.textContent = n > 99 ? '99+' : (n || '');
+    mnbBadge.classList.toggle('show', n > 0);
+  }
 
   document.getElementById('sb-ac').textContent  = ac;
   document.getElementById('sb-sh').textContent  = sh;
@@ -9089,11 +9218,88 @@ function closeMobPanels(){
   document.getElementById('panel')?.classList.remove('mobile-open');
   document.getElementById('rpanel')?.classList.remove('mobile-open');
   document.getElementById('mob-overlay')?.classList.remove('active');
-  const lb=document.getElementById('mob-left-btn');
-  const rb=document.getElementById('mob-right-btn');
-  if(lb){ lb.classList.remove('panel-open'); _mobBtnLabel('mob-left-btn','☰','FEEDS'); }
-  if(rb){ rb.classList.remove('panel-open'); _mobBtnLabel('mob-right-btn','⌇','INTEL'); }
+  document.getElementById('mob-more-drawer')?.classList.remove('open');
+  // Reset bottom nav to MAP
+  document.querySelectorAll('.mnb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mnb-map')?.classList.add('active');
 }
+
+// ── Mobile bottom nav ─────────────────────────────────────────────────────────
+function mobNav(tab){
+  // Collapse more drawer whenever switching tabs
+  document.getElementById('mob-more-drawer')?.classList.remove('open');
+  // Close panels
+  document.getElementById('panel')?.classList.remove('mobile-open');
+  document.getElementById('rpanel')?.classList.remove('mobile-open');
+  document.getElementById('mob-overlay')?.classList.remove('active');
+  // Update active tab
+  document.querySelectorAll('.mnb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mnb-'+tab)?.classList.add('active');
+
+  if(tab==='feeds'){
+    document.getElementById('panel').classList.add('mobile-open');
+    document.getElementById('mob-overlay').classList.add('active');
+  } else if(tab==='intel'){
+    document.getElementById('rpanel').classList.add('mobile-open');
+    document.getElementById('mob-overlay').classList.add('active');
+  } else if(tab==='alerts'){
+    document.getElementById('rpanel').classList.add('mobile-open');
+    document.getElementById('mob-overlay').classList.add('active');
+    // Scroll to alerts section inside right panel
+    setTimeout(()=>{
+      const aSection = document.getElementById('alerts-section') || document.querySelector('.alert-feed-wrap');
+      if(aSection) aSection.scrollIntoView({behavior:'smooth',block:'start'});
+    }, 200);
+  } else if(tab==='more'){
+    // Toggle more drawer (don't set panel-open)
+    const d = document.getElementById('mob-more-drawer');
+    const opening = !d.classList.contains('open');
+    d.classList.toggle('open', opening);
+    if(!opening){ // drawer closing — reset to map tab
+      document.getElementById('mnb-map')?.classList.add('active');
+      document.getElementById('mnb-more')?.classList.remove('active');
+    }
+    _mmdSync();
+    return; // don't set map as active when more is open
+  }
+  // tab === 'map' — everything already closed above
+}
+
+// Sync MORE drawer button states
+function _mmdSync(){
+  const milBtn = document.getElementById('mmd-mil');
+  if(milBtn) milBtn.classList.toggle('on', !!_milOnlyMode);
+  const trailBtn = document.getElementById('mmd-trails');
+  if(trailBtn) trailBtn.classList.toggle('on', !!_trails2dOn);
+  const globeBtn = document.getElementById('mmd-globe');
+  if(globeBtn) globeBtn.classList.toggle('on', _mapMode==='3d');
+}
+
+// Open search bar (show it briefly) from MORE drawer
+function _mobOpenSearch(){
+  document.getElementById('mob-more-drawer')?.classList.remove('open');
+  mobNav('map');
+  const inp = document.getElementById('search-input');
+  if(inp){ inp.style.display='block'; inp.focus(); }
+}
+
+// ── Mobile swipe gestures ─────────────────────────────────────────────────────
+(function(){
+  let _sx=0, _sy=0, _sel=null;
+  document.addEventListener('touchstart', e=>{
+    _sx=e.touches[0].clientX; _sy=e.touches[0].clientY; _sel=e.target;
+  },{passive:true});
+  document.addEventListener('touchend', e=>{
+    if(!_isMobile()) return;
+    // Don't hijack swipes inside panels, nav, scrubber, or drawers
+    if(_sel?.closest('#panel,#rpanel,#mob-nav,#mob-more-drawer,#tl-scrubber,#ww3-drawer,#cip')) return;
+    const dx=e.changedTouches[0].clientX-_sx;
+    const dy=e.changedTouches[0].clientY-_sy;
+    if(Math.abs(dx)<55||Math.abs(dy)>Math.abs(dx)*0.8) return; // need clear horizontal
+    if(dx>0) mobNav('feeds'); // swipe right → feeds
+    else     mobNav('intel'); // swipe left  → intel
+  },{passive:true});
+})();
 
 /* Close mobile panels when map is clicked */
 (function(){
