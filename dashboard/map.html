@@ -1547,20 +1547,32 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 .csb-sug-iso{color:var(--dim2);font-size:.42rem}
 
 /* ── COUNTRY INTEL PANEL (bottom sheet) ── */
+#cip-backdrop{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  z-index:899;background:rgba(0,0,0,.45);
+  cursor:pointer;
+}
+#cip-backdrop.visible{display:block}
 #cip{
-  position:fixed;bottom:44px;left:0;right:0;
+  position:fixed;bottom:28px;left:0;right:0;
   height:68vh;max-height:620px;
   z-index:900;
   background:#05050a;
   border-top:2px solid var(--amber);
   display:flex;flex-direction:column;
-  transform:translateY(100%);
-  transition:transform .35s cubic-bezier(.22,.68,0,1.2);
+  transform:translateY(calc(100% + 28px));
+  transition:transform .3s ease-out;
 }
-#cip.open{transform:translateY(0)}
+#cip.open{transform:translateY(0);transition:transform .35s cubic-bezier(.22,.68,0,1.1)}
 #cip-handle{
+  width:48px;height:20px;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto;cursor:pointer;flex-shrink:0;
+  padding:.3rem 0;
+}
+#cip-handle::after{
+  content:'';display:block;
   width:40px;height:3px;background:var(--border2);border-radius:2px;
-  margin:.55rem auto .1rem;cursor:pointer;flex-shrink:0;
 }
 #cip-header{
   display:flex;align-items:center;gap:.75rem;
@@ -1577,11 +1589,12 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
   padding:.2rem .55rem;border-radius:2px;
 }
 #cip-close{
-  background:none;border:none;color:var(--dim2);font-size:.85rem;
-  cursor:pointer;padding:.2rem .4rem;font-family:var(--font);
-  transition:color .15s;
+  background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);
+  color:var(--red);font-size:.55rem;letter-spacing:.08em;
+  cursor:pointer;padding:.3rem .6rem;font-family:var(--font);
+  border-radius:2px;transition:background .15s,color .15s;flex-shrink:0;
 }
-#cip-close:hover{color:var(--text)}
+#cip-close:hover{background:rgba(239,68,68,.18);color:#fff}
 
 /* Tabs */
 #cip-tabs{
@@ -2373,13 +2386,14 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     </div>
 
     <!-- COUNTRY INTEL PANEL (bottom sheet) -->
+    <div id="cip-backdrop" onclick="closeCountryIntel()"></div>
     <div id="cip">
-      <div id="cip-handle" onclick="closeCountryIntel()"></div>
+      <div id="cip-handle" onclick="closeCountryIntel()" title="Close"></div>
       <div id="cip-header">
         <div id="cip-flag">🌍</div>
         <div id="cip-name">—</div>
         <div id="cip-threat-badge"></div>
-        <button id="cip-close" onclick="closeCountryIntel()">✕</button>
+        <button id="cip-close" onclick="closeCountryIntel()">✕ CLOSE</button>
       </div>
       <div id="cip-tabs">
         <div class="cip-tab active" onclick="cipSwitchTab('overview')">OVERVIEW</div>
@@ -8765,13 +8779,20 @@ function openCountryIntel(country, flag){
   document.getElementById('cip-sitrep-btn').disabled=false;
   document.getElementById('cip-views-card').style.display='none';
   document.getElementById('cip').classList.add('open');
+  document.getElementById('cip-backdrop').classList.add('visible');
   _fetchCountryStats(country);
 }
 
 function closeCountryIntel(){
   document.getElementById('cip').classList.remove('open');
+  document.getElementById('cip-backdrop').classList.remove('visible');
   _cipCountry='';
 }
+
+// ESC key closes the panel
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && _cipCountry) closeCountryIntel();
+});
 
 function cipSwitchTab(tab){
   _cipCurrentTab=tab;
@@ -8786,10 +8807,21 @@ function cipSwitchTab(tab){
 
 async function _fetchCountryStats(country){
   try{
-    const data = await fetch(`/api/country-stats/${encodeURIComponent(country)}`).then(r=>r.json());
-    _renderCipData(data);
+    const r = await fetch(`/api/country-stats/${encodeURIComponent(country)}`);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    try{
+      _renderCipData(data);
+    }catch(renderErr){
+      console.error('CIP render error:', renderErr);
+      document.getElementById('cip-src-rows').innerHTML=
+        '<div style="color:var(--red);font-size:.66rem">RENDER ERROR: '+esc(String(renderErr))+'</div>';
+    }
   }catch(e){
-    document.getElementById('cip-src-rows').innerHTML='<div style="color:var(--red);font-size:.66rem">FETCH ERROR: '+esc(String(e))+'</div>';
+    console.error('CIP fetch error:', e);
+    document.getElementById('cip-src-rows').innerHTML=
+      '<div style="color:var(--red);font-size:.66rem">FETCH ERROR: '+esc(String(e))+'</div>';
+    document.getElementById('cip-stat-events').textContent='ERR';
   }
 }
 
