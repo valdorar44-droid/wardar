@@ -51,7 +51,16 @@ def apply_delay(raw_ts_utc: str, military_flag: int, source: str) -> str:
     else:
         delay_sec = C.DELAY_CIVILIAN_SEC
 
-    return (ts + timedelta(seconds=delay_sec)).isoformat()
+    release = ts + timedelta(seconds=delay_sec)
+
+    # NOTAMs: raw_ts_utc is the effective start date (may be future).
+    # Always release immediately when fetched so upcoming restrictions are visible.
+    if source == "notam":
+        now_ts = datetime.now(timezone.utc)
+        if release > now_ts:
+            release = now_ts
+
+    return release.isoformat()
 
 # ── WebSocket broadcast ───────────────────────────────────────────────────────
 

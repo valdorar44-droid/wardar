@@ -111,8 +111,12 @@ async def _fetch_checkwx(log, log_warn) -> list[dict]:
                 log_warn("notam: CheckWX rate limit hit — reduce polling or upgrade plan")
                 break
             if r.status_code != 200:
+                log_warn(f"notam: CheckWX {icao} HTTP {r.status_code}")
                 continue
             data = r.json()
+            n_raw = data.get("results", len(data.get("data") or []))
+            if n_raw > 0:
+                log(f"notam: {icao} → {n_raw} NOTAMs")
         except Exception as exc:
             log_warn(f"notam: CheckWX error ({icao}): {exc}")
             continue
