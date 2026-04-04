@@ -699,7 +699,7 @@ async def _tick_commodity_prices():
 
 
 async def _tick_acled_iran():
-    if not C.ENABLE_ACLED or not C.ACLED_PASSWORD:
+    if not C.ENABLE_ACLED or not (C.ACLED_API_KEY or C.ACLED_PASSWORD):
         return
     try:
         from ingestors import acled

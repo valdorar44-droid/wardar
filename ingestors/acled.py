@@ -1,12 +1,16 @@
 """ACLED conflict events ingestor — acleddata.com API
 
-ACLED migrated from static key+email params to OAuth (Bearer token) in 2024.
-Auth flow:
-  POST https://acleddata.com/oauth/token
-  body: username=<email>&password=<pw>&grant_type=password&client_id=acled
-  → { access_token, refresh_token, expires_in (86400s), token_type }
+Auth (two methods, tried in order):
+  1. Email + API Access Key (preferred):
+       Set ACLED_USERNAME=<email> and ACLED_API_KEY=<access_key>
+       Key is shown on your ACLED portal page under "API Access Key"
+       Passed as ?email=&key= query params — no OAuth needed
 
-Set ACLED_USERNAME + ACLED_PASSWORD in Railway environment variables.
+  2. OAuth Bearer token (fallback):
+       Set ACLED_USERNAME=<email> and ACLED_PASSWORD=<website_password>
+       POST https://acleddata.com/oauth/token → Bearer token (24h TTL)
+
+Set variables in Railway. ACLED_API_KEY is the standard credential.
 
 Returns list of event dicts. Never raises.
 """
@@ -22,12 +26,12 @@ from config import settings as C
 _ACLED_URL   = "https://api.acleddata.com/acled/read"
 _TOKEN_URL   = "https://acleddata.com/oauth/token"
 
-# In-process token cache: (access_token, expires_at_epoch)
+# In-process OAuth token cache: (access_token, expires_at_epoch)
 _token_cache: tuple[str, float] | None = None
 
 
 async def _get_token(client: httpx.AsyncClient) -> str | None:
-    """Return a valid Bearer token, refreshing if needed."""
+    """Return a valid Bearer token via OAuth, refreshing if needed."""
     from core.engine import log_warn
 
     global _token_cache
@@ -45,7 +49,10 @@ async def _get_token(client: httpx.AsyncClient) -> str | None:
                 "grant_type": "password",
                 "client_id":  "acled",
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent":   "Mozilla/5.0 (compatible; Wardar/0.1)",
+            },
             timeout=15,
         )
         if r.status_code != 200:
@@ -64,6 +71,24 @@ async def _get_token(client: httpx.AsyncClient) -> str | None:
         return None
 
 
+def _base_params(extra: dict) -> dict:
+    """Build ACLED request params. Uses API key auth if available, else Bearer via headers."""
+    params = {**extra, "format": "json"}
+    if C.ACLED_API_KEY and C.ACLED_USERNAME:
+        # Preferred: email + access key as query params (no OAuth needed)
+        params["email"] = C.ACLED_USERNAME
+        params["key"]   = C.ACLED_API_KEY
+    return params
+
+
+def _auth_headers(token: str | None) -> dict:
+    """Return auth headers for OAuth mode (empty dict when using key params)."""
+    h = {"User-Agent": "Mozilla/5.0 (compatible; Wardar/0.1)"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return h
+
+
 # Event type → category
 _CATEGORY_MAP = {
     "Battles":             "conflict",
@@ -79,36 +104,41 @@ async def fetch() -> list[dict]:
     """Fetch last 7 days of ACLED events."""
     from core.engine import log, log_warn
 
-    if not C.ENABLE_ACLED or not (C.ACLED_USERNAME and C.ACLED_PASSWORD):
+    has_key  = bool(C.ACLED_API_KEY and C.ACLED_USERNAME)
+    has_oauth = bool(C.ACLED_USERNAME and C.ACLED_PASSWORD)
+    if not C.ENABLE_ACLED or not (has_key or has_oauth):
+        log_warn("acled: no credentials — set ACLED_USERNAME + ACLED_API_KEY in Railway")
         return []
 
     async with httpx.AsyncClient(timeout=20) as client:
-        token = await _get_token(client)
-        if not token:
-            return []
+        # Try OAuth only when no direct API key is configured
+        token = None
+        if not has_key and has_oauth:
+            token = await _get_token(client)
+            if not token:
+                return []
 
         since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-        params = {
+        params = _base_params({
             "event_date":       since,
             "event_date_where": ">=",
             "limit":            500,
             "fields":           "event_date|event_type|sub_event_type|actor1|country|admin1|location|latitude|longitude|notes|source",
-            "format":           "json",
-        }
+        })
 
         try:
             r = await client.get(
                 _ACLED_URL,
                 params=params,
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_auth_headers(token),
             )
             if r.status_code == 401:
                 global _token_cache
                 _token_cache = None
-                log_warn("acled: 401 Unauthorized — token invalidated, will retry next tick")
+                log_warn("acled: 401 Unauthorized — check ACLED_API_KEY or credentials")
                 return []
             if r.status_code != 200:
-                log_warn(f"acled: HTTP {r.status_code}")
+                log_warn(f"acled: HTTP {r.status_code}: {r.text[:200]}")
                 return []
             data = r.json().get("data") or []
         except Exception as exc:
@@ -151,47 +181,44 @@ async def fetch() -> list[dict]:
 
 
 async def fetch_iran() -> list[dict]:
-    """Fetch last 30 days of ACLED events for Iran/Israel/Gaza war zone.
-
-    Uses a broader 30-day window and country filter to capture the full
-    US/Israel vs Iran conflict arc. Source tagged 'acled_iran' so the
-    frontend can toggle it as its own layer.
-    """
+    """Fetch last 30 days of ACLED events for Iran/Israel/Gaza war zone."""
     from core.engine import log, log_warn
 
-    if not C.ENABLE_ACLED or not (C.ACLED_USERNAME and C.ACLED_PASSWORD):
+    has_key  = bool(C.ACLED_API_KEY and C.ACLED_USERNAME)
+    has_oauth = bool(C.ACLED_USERNAME and C.ACLED_PASSWORD)
+    if not C.ENABLE_ACLED or not (has_key or has_oauth):
         return []
 
     async with httpx.AsyncClient(timeout=20) as client:
-        token = await _get_token(client)
-        if not token:
-            return []
+        token = None
+        if not has_key and has_oauth:
+            token = await _get_token(client)
+            if not token:
+                return []
 
         since = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-        country_filter = "Iran|Israel|Iraq|Yemen|Syria|Lebanon"
-        params = {
+        params = _base_params({
             "event_date":       since,
             "event_date_where": ">=",
-            "country":          country_filter,
+            "country":          "Iran|Israel|Iraq|Yemen|Syria|Lebanon",
             "country_where":    "LIKE",
             "limit":            500,
             "fields":           "event_date|event_type|sub_event_type|actor1|country|admin1|location|latitude|longitude|notes|source",
-            "format":           "json",
-        }
+        })
 
         try:
             r = await client.get(
                 _ACLED_URL,
                 params=params,
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_auth_headers(token),
             )
             if r.status_code == 401:
                 global _token_cache
                 _token_cache = None
-                log_warn("acled_iran: 401 Unauthorized — token invalidated, will retry next tick")
+                log_warn("acled_iran: 401 Unauthorized — check ACLED_API_KEY or credentials")
                 return []
             if r.status_code != 200:
-                log_warn(f"acled_iran: HTTP {r.status_code}")
+                log_warn(f"acled_iran: HTTP {r.status_code}: {r.text[:200]}")
                 return []
             data = r.json().get("data") or []
         except Exception as exc:
