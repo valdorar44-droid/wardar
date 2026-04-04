@@ -66,8 +66,8 @@ FAA_CLIENT_SECRET = _s("FAA_CLIENT_SECRET", "")
 ENABLE_NOTAM    = _b("ENABLE_NOTAM", True)
 
 # ── Conflict / OSINT ──────────────────────────────────
-ACLED_API_KEY   = _s("ACLED_API_KEY", "")            # ACLED conflict events
-ACLED_EMAIL     = _s("ACLED_EMAIL", "")
+ACLED_USERNAME  = _s("ACLED_USERNAME", "")           # ACLED OAuth — your registered email
+ACLED_PASSWORD  = _s("ACLED_PASSWORD", "")           # ACLED OAuth — your registered password
 GDELT_URL       = _s("GDELT_URL", "https://api.gdeltproject.org/api/v2/doc/doc")
 BRAVE_API_KEY   = _s("BRAVE_API_KEY", "")            # reuse from Argus if same key
 ENABLE_ACLED    = _b("ENABLE_ACLED", True)
