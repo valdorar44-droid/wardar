@@ -120,7 +120,7 @@ body::after{
 }
 #main{display:none} /* remove old grid */
 #panel{
-  position:fixed;left:0;top:52px;bottom:44px;width:260px;
+  position:fixed;left:0;top:56px;bottom:44px;width:260px;
   z-index:500;background:rgba(8,8,12,.92);border-right:1px solid var(--border);
   display:flex;flex-direction:column;overflow:hidden;
   transition:transform .25s ease, opacity .25s ease;
@@ -138,7 +138,7 @@ body::after{
 #panel-tab:hover{color:var(--text)}
 #panel.collapsed ~ #panel-tab, .panel-collapsed #panel-tab{display:block}
 #rpanel{
-  position:fixed;right:0;top:52px;bottom:44px;width:280px;
+  position:fixed;right:0;top:56px;bottom:44px;width:280px;
   z-index:500;background:rgba(8,8,12,.96);border-left:1px solid var(--border);
   display:flex;flex-direction:column;
   transition:transform .25s ease, opacity .25s ease;
@@ -277,7 +277,7 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
 
 /* ── Drop-down drawer ── */
 #ww3-drawer{
-  position:fixed;top:52px;
+  position:fixed;top:56px;
   z-index:699;width:340px;
   background:rgba(4,4,8,.97);
   border:1px solid var(--ww3-col,#22c55e);
@@ -366,7 +366,7 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
 
 /* ── HEADER BAR ── */
 #header{
-  position:fixed;top:0;left:0;right:0;height:52px;
+  position:fixed;top:0;left:0;right:0;height:56px;
   display:flex;align-items:center;gap:1.2rem;
   background:rgba(4,4,6,.97);
   border-bottom:1px solid var(--border2);
@@ -550,8 +550,8 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
   flex-shrink:0;
 }
 .rp-tab{
-  flex:1;padding:.5rem;text-align:center;cursor:pointer;
-  font-size:.65rem;letter-spacing:.07em;color:var(--dim2);
+  flex:1;padding:.4rem .2rem;text-align:center;cursor:pointer;
+  font-size:.58rem;letter-spacing:.04em;color:var(--dim2);
   border-bottom:2px solid transparent;transition:all .15s;
 }
 .rp-tab:hover{color:var(--text);background:rgba(255,255,255,.02)}
@@ -858,7 +858,7 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
 
 /* ── COUNTRY INTEL CHAT PANEL ── */
 #chat-panel{
-  position:fixed;right:0;top:52px;bottom:0;width:360px;
+  position:fixed;right:0;top:56px;bottom:0;width:360px;
   background:var(--panel);border-left:2px solid var(--border2);
   z-index:600;display:flex;flex-direction:column;
   transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
@@ -868,7 +868,7 @@ body.cinema #ww3-hdr{ opacity:0;pointer-events:none; }
 
 /* ── Phase 11: Entity Dossier Panel ───────────────────────────────────────── */
 #entity-panel{
-  position:fixed;left:0;top:52px;bottom:0;width:340px;
+  position:fixed;left:0;top:56px;bottom:0;width:340px;
   background:var(--panel);border-right:2px solid var(--border2);
   z-index:610;display:flex;flex-direction:column;
   transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
@@ -1186,7 +1186,7 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
 
 /* ── SETTINGS PANEL ── */
 #settings-panel{
-  position:fixed;top:52px;right:0;width:300px;bottom:44px;
+  position:fixed;top:56px;right:0;width:300px;bottom:44px;
   z-index:800;background:rgba(5,5,10,.98);border-left:1px solid var(--border);
   display:flex;flex-direction:column;
   transform:translateX(100%);transition:transform .25s ease;
@@ -2581,8 +2581,8 @@ body.vbar-open #rpanel{bottom:calc(44px + 215px)}
     <div id="rpanel">
       <div class="rp-tabs">
         <div class="rp-tab active" id="tab-feed" onclick="switchTab('feed')">SIGINT</div>
-        <div class="rp-tab" id="tab-news" onclick="switchTab('news')">WAR NEWS</div>
-        <div class="rp-tab" id="tab-comm" onclick="switchTab('comm')">COMMUNITY</div>
+        <div class="rp-tab" id="tab-news" onclick="switchTab('news')">NEWS</div>
+        <div class="rp-tab" id="tab-comm" onclick="switchTab('comm')">COMM</div>
         <div class="rp-tab" id="tab-alerts" onclick="switchTab('alerts')" style="color:var(--red)">⚡ ALERTS <span id="alert-tab-count" style="background:var(--red);color:#fff;font-size:.38rem;padding:.05rem .25rem;border-radius:2px;margin-left:.15rem">0</span></div>
         <div class="rp-tab" id="tab-sitrep" onclick="switchTab('sitrep')" style="color:var(--amber)">🤖 SITREP</div>
       </div>
