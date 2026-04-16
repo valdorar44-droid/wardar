@@ -16,6 +16,9 @@ attempt to continue tracking via a cascading signal fallback chain:
   4. GPSJam      — if ghost position overlaps active GPS jamming cell, flag it
                    (EW aircraft cause their own jamming — useful cross-signal)
   5. Squawk      — military squawk code pattern analysis (mission type hints)
+  6. Sonic boom  — USGS FDSN sonic boom / explosion events within 400km (seismic)
+  7. Contrail    — open-meteo 200hPa Appleman criterion (contrail favorability)
+  8. KiwiSDR     — nearest public HF monitoring station (ground-wave / skip range)
 
 Ghost positions are broadcast as type "ghost_positions" over WebSocket.
 They are NEVER stored in the DB — they are ephemeral computed positions.
@@ -468,6 +471,36 @@ async def run_ghost_tick() -> list[dict]:
             if gpsjam_hit:
                 signal_sources.append(f"GPSJam⚡({gpsjam_hit})")
 
+            # ── Step 4: Sonic boom / seismic cross-reference ──────────────────
+            sonic_hit = ""
+            try:
+                from core.sonic_intel import check_sonic_near_ghost
+                sonic_hit = check_sonic_near_ghost(conn, ghost_lat, ghost_lon)
+                if sonic_hit:
+                    signal_sources.append(f"Seismic✓({sonic_hit[:30]})")
+            except Exception:
+                pass
+
+            # ── Step 5: Contrail favorability (Appleman criterion) ────────────
+            contrail_status = ""
+            try:
+                from ingestors.contrail_wx import get_contrail_status
+                contrail_status = await get_contrail_status(ghost_lat, ghost_lon, ghost_alt)
+                if contrail_status:
+                    signal_sources.append(f"Wx✓({contrail_status[:20]})")
+            except Exception:
+                pass
+
+            # ── Step 6: KiwiSDR HF receiver proximity ─────────────────────────
+            kiwisdr_hit = ""
+            try:
+                from ingestors.kiwisdr import find_nearby
+                kiwisdr_hit = await find_nearby(ghost_lat, ghost_lon)
+                if kiwisdr_hit:
+                    signal_sources.append(f"HF✓({kiwisdr_hit[:25]})")
+            except Exception:
+                pass
+
             # ── Confidence ────────────────────────────────────────────────────
             if acars_found:
                 confidence = 0.97 if fix_source == "HFDL" else 0.92
@@ -504,6 +537,9 @@ async def run_ghost_tick() -> list[dict]:
                 "squawk_intel":     squawk_intel,
                 "acars_label":      acars_label,
                 "acars_freq":       acars_freq,
+                "sonic_hit":        sonic_hit,
+                "contrail_status":  contrail_status,
+                "kiwisdr_hit":      kiwisdr_hit,
                 "last_known_lat":   last_lat,
                 "last_known_lon":   last_lon,
                 "last_known_hdg":   last_hdg,
@@ -520,6 +556,9 @@ async def run_ghost_tick() -> list[dict]:
                     "gpsjam_hit":     gpsjam_hit,
                     "squawk_intel":   squawk_intel,
                     "acars_freq":     acars_freq,
+                    "sonic_hit":      sonic_hit,
+                    "contrail_status": contrail_status,
+                    "kiwisdr_hit":    kiwisdr_hit,
                 }),
             }
             ghosts.append(ghost)

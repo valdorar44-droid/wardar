@@ -252,7 +252,12 @@ def _norm_message(msg: dict) -> Optional[dict]:
             heading_deg = None
 
         callsign = flight or tail or icao_hex or "ACARS"
-        wardar_source = "hfdl" if source_type == "hfdl" else "acars"
+        if source_type == "hfdl":
+            wardar_source = "hfdl"
+        elif source_type == "aero":
+            wardar_source = "aero"
+        else:
+            wardar_source = "acars"
 
         return {
             "source":        wardar_source,
@@ -316,13 +321,19 @@ async def lookup_aircraft(hex_code: str, callsign: str = "") -> Optional[dict]:
         if p:
             # Stamp with source signal type for display in popup
             src_type = (msg.get("source") or "vhf").lower()
+            if src_type == "hfdl":
+                acars_src_label = "HFDL"
+            elif src_type == "aero":
+                acars_src_label = "AERO"
+            else:
+                acars_src_label = "ACARS"
             result = {
                 "lat":          p["lat"],
                 "lon":          p["lon"],
                 "altitude_ft":  p["altitude_ft"],
                 "speed_kts":    p["speed_kts"],
                 "heading_deg":  p["heading_deg"],
-                "acars_source": "HFDL" if src_type == "hfdl" else "ACARS",
+                "acars_source": acars_src_label,
                 "freq":         msg.get("freq", ""),
                 "label":        (msg.get("label") or "").upper(),
             }
@@ -398,8 +409,31 @@ async def fetch() -> list[dict]:
     except Exception as exc:
         log_warn(f"acars_hfdl: VHF ACARS poll error: {exc}")
 
+    # ── Inmarsat AERO (L-band satellite — military transports over oceans) ────
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT, headers=_HEADERS) as cl:
+            r = await cl.get(f"{_BASE_URL}/messages",
+                             params={"source": "aero", "limit": 200})
+        if r.status_code == 200:
+            body  = r.json()
+            msgs  = body.get("messages") or (body if isinstance(body, list) else [])
+            for msg in msgs:
+                icao = (msg.get("icao") or "").strip()
+                cs   = (msg.get("flight") or msg.get("callsign") or "").strip()
+                if not _is_military(icao, cs):
+                    continue
+                p = _norm_message(msg)
+                if p and p["callsign"] not in seen_callsigns:
+                    seen_callsigns.add(p["callsign"])
+                    results.append(p)
+    except Exception as exc:
+        log_warn(f"acars_hfdl: AERO poll error: {exc}")
+
     _global_cache = (now_mono, results)
 
     if results:
-        log(f"acars_hfdl: {len(results)} mil positions ({sum(1 for r in results if r['source']=='hfdl')} HFDL, {sum(1 for r in results if r['source']=='acars')} ACARS)")
+        hfdl_ct = sum(1 for r in results if r['source'] == 'hfdl')
+        aero_ct = sum(1 for r in results if r['source'] == 'aero')
+        acars_ct = len(results) - hfdl_ct - aero_ct
+        log(f"acars_hfdl: {len(results)} mil positions ({hfdl_ct} HFDL, {aero_ct} AERO, {acars_ct} ACARS)")
     return results

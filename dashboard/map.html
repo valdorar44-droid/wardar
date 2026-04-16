@@ -5524,6 +5524,25 @@ function buildGhostPopup(g){
         ⚡ GPS JAMMING ACTIVE ${esc(g.gpsjam_hit)} — possible EW aircraft</div>`
     : '';
 
+  // Sonic boom / seismic alert
+  const sonicAlert = g.sonic_hit
+    ? `<div style="background:#0a0a1a;border:1px solid #818cf8;color:#818cf8;
+        font-size:.52rem;padding:2px 6px;margin:.3rem 0;letter-spacing:.06em">
+        🌊 SEISMIC ${esc(g.sonic_hit)}</div>`
+    : '';
+
+  // Contrail favorability
+  const contrailRow = g.contrail_status
+    ? `<div class="popup-row"><span class="popup-label">CONTRAIL</span>
+       <span class="popup-val" style="color:#7dd3fc;font-size:.5rem">${esc(g.contrail_status)}</span></div>`
+    : '';
+
+  // KiwiSDR HF proximity
+  const kiwiRow = g.kiwisdr_hit
+    ? `<div class="popup-row"><span class="popup-label">HF MONITOR</span>
+       <span class="popup-val" style="color:#a3e635;font-size:.5rem">${esc(g.kiwisdr_hit)}</span></div>`
+    : '';
+
   // Squawk intel
   const sqIntel = g.squawk_intel
     ? `<div class="popup-row"><span class="popup-label">SQUAWK</span>
@@ -5555,12 +5574,15 @@ function buildGhostPopup(g){
     </div>
 
     ${jamAlert}
+    ${sonicAlert}
 
     <div class="popup-row"><span class="popup-label">CALLSIGN</span>
       <span class="popup-val" style="color:#00ff77">${esc(g.callsign||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">BEHAVIOR</span>
       <span class="popup-val" style="color:#facc15">${esc(beh)}${g.is_orbit?' 🔄':''}</span></div>
     ${sqIntel}
+    ${contrailRow}
+    ${kiwiRow}
     <div class="popup-row"><span class="popup-label">ALT</span>
       <span class="popup-val">${alt}${at?` <span style="color:#a78bfa">${at}</span>`:''}</span></div>
     <div class="popup-row"><span class="popup-label">SPEED</span>
@@ -6144,7 +6166,7 @@ function sourceToLayerKey(source, category){
   const _combatCat = {aircraft_down:1,missile_strike:1,airstrike:1,drone_attack:1,naval:1,equipment_loss:1};
   if(_combatCat[category]) return category;
   if(s==='ghost_mil') return 'adsb';  // ghost shares adsb layer key for visibility toggle
-  if(s==='acars'||s==='hfdl') return 'adsb';  // ACARS/HFDL military positions on same layer
+  if(s==='acars'||s==='hfdl'||s==='aero') return 'adsb';  // ACARS/HFDL/AERO military positions on same layer
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
   if(s==='shodan')         return 'shodan';
@@ -6215,7 +6237,7 @@ function spawnPulse(lat, lon, color){
 // ── Position updater ──────────────────────────────────────────────────────────
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
-  acars:'#f59e0b',hfdl:'#f59e0b',  // ACARS/HFDL — same layer as ADS-B (military aircraft)
+  acars:'#f59e0b',hfdl:'#f59e0b',aero:'#f59e0b',  // ACARS/HFDL/AERO — military aircraft layer
   aircraft_down:'#ef4444', missile_strike:'#ef4444', airstrike:'#f97316',
   drone_attack:'#f59e0b', naval:'#06b6d4', equipment_loss:'#fb923c',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',

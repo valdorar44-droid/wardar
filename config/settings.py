@@ -151,9 +151,20 @@ GHOST_TRACKER_INTERVAL_SEC = _i("GHOST_TRACKER_INTERVAL_SEC", 60)    # every 60s
 GHOST_DARK_MIN             = _i("GHOST_DARK_MIN",             5)     # minutes gap → "dark"
 GHOST_MAX_MIN              = _i("GHOST_MAX_MIN",              240)   # give up after 4 h
 
-# ── ACARS / HFDL (airframes.io — VHF range + HF global) ──
+# ── ACARS / HFDL / AERO (airframes.io — VHF + HF global + Inmarsat L-band) ──
 ENABLE_ACARS_HFDL          = _b("ENABLE_ACARS_HFDL",          True)
 ACARS_HFDL_INTERVAL_SEC    = _i("ACARS_HFDL_INTERVAL_SEC",    300)   # every 5 min
+
+# ── Ghost Signal #5: Sonic boom / seismic cross-reference (USGS FDSN) ────────
+SONIC_REFRESH_INTERVAL_SEC = _i("SONIC_REFRESH_INTERVAL_SEC", 900)   # every 15 min
+SONIC_RADIUS_KM            = _i("SONIC_RADIUS_KM",            400)   # detectable within 400km
+
+# ── Ghost Signal #6: Contrail favorability (open-meteo 200hPa Appleman) ──────
+CONTRAIL_MIN_ALT_FT        = _i("CONTRAIL_MIN_ALT_FT",        25000) # only check FL250+
+
+# ── Ghost Signal #8: KiwiSDR HF receiver proximity ───────────────────────────
+KIWISDR_GW_KM              = _i("KIWISDR_GW_KM",              500)   # ground-wave range
+KIWISDR_SKIP_KM            = _i("KIWISDR_SKIP_KM",            2000)  # HF first-hop range
 
 # ── Phase 4 Dark Signal Detectors ─────────────────────
 VESSEL_SPOOF_INTERVAL_SEC     = _i("VESSEL_SPOOF_INTERVAL_SEC",     600)   # every 10 min

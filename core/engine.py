@@ -790,6 +790,19 @@ async def _tick_ghost_tracker():
     except Exception as exc:
         log_err(f"tick_ghost_tracker: {exc}")
 
+
+async def _tick_sonic_refresh():
+    """Refresh USGS sonic boom / explosion cache (signal #5 for ghost tracker)."""
+    if not getattr(C, "ENABLE_GHOST_TRACKER", True):
+        return
+    try:
+        from core.sonic_intel import refresh as sonic_refresh
+        n = await sonic_refresh()
+        if n:
+            log(f"sonic_intel: {n} sonic/explosion events cached")
+    except Exception as exc:
+        log_err(f"tick_sonic_refresh: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -866,8 +879,9 @@ async def start():
         asyncio.create_task(_run_every(_tick_acled_iran,           C.ACLED_INTERVAL_SEC,           "acled_iran")),
         asyncio.create_task(_run_every(_tick_reliefweb_api,        C.RELIEFWEB_API_INTERVAL_SEC,   "reliefweb_api")),
         asyncio.create_task(_run_every(_tick_gfw_vessels,          C.GFW_INTERVAL_SEC,             "gfw_vessels")),
-        asyncio.create_task(_run_every(_tick_acars_hfdl,           getattr(C, "ACARS_HFDL_INTERVAL_SEC", 300),  "acars_hfdl")),
-        asyncio.create_task(_run_every(_tick_ghost_tracker,        getattr(C, "GHOST_TRACKER_INTERVAL_SEC", 60), "ghost_tracker")),
+        asyncio.create_task(_run_every(_tick_acars_hfdl,           getattr(C, "ACARS_HFDL_INTERVAL_SEC", 300),        "acars_hfdl")),
+        asyncio.create_task(_run_every(_tick_ghost_tracker,        getattr(C, "GHOST_TRACKER_INTERVAL_SEC", 60),      "ghost_tracker")),
+        asyncio.create_task(_run_every(_tick_sonic_refresh,        getattr(C, "SONIC_REFRESH_INTERVAL_SEC", 900),     "sonic_refresh")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks
