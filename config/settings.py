@@ -151,6 +151,10 @@ GHOST_TRACKER_INTERVAL_SEC = _i("GHOST_TRACKER_INTERVAL_SEC", 60)    # every 60s
 GHOST_DARK_MIN             = _i("GHOST_DARK_MIN",             5)     # minutes gap → "dark"
 GHOST_MAX_MIN              = _i("GHOST_MAX_MIN",              240)   # give up after 4 h
 
+# ── ACARS / HFDL (airframes.io — VHF range + HF global) ──
+ENABLE_ACARS_HFDL          = _b("ENABLE_ACARS_HFDL",          True)
+ACARS_HFDL_INTERVAL_SEC    = _i("ACARS_HFDL_INTERVAL_SEC",    300)   # every 5 min
+
 # ── Phase 4 Dark Signal Detectors ─────────────────────
 VESSEL_SPOOF_INTERVAL_SEC     = _i("VESSEL_SPOOF_INTERVAL_SEC",     600)   # every 10 min
 TRANSPONDER_LOSS_INTERVAL_SEC = _i("TRANSPONDER_LOSS_INTERVAL_SEC", 600)   # every 10 min

@@ -5499,7 +5499,6 @@ function buildGhostPopup(g){
     ? `${Math.floor((g.dark_min||0)/60)}h ${(g.dark_min||0)%60|0}m`
     : `${g.dark_min||0}m`;
   const conf = Math.round((g.confidence||0)*100);
-  const sigs = (g.signal_sources||[]).join(' · ');
   const tr   = g.turn_rate != null ? `${g.turn_rate>0?'+':''}${g.turn_rate.toFixed(1)}°/min` : '—';
   const alt  = g.altitude_ft != null ? Math.round(g.altitude_ft/100)+'FL' : '—';
   const spd  = g.speed_kts   != null ? Math.round(g.speed_kts)+'kts' : '—';
@@ -5508,37 +5507,80 @@ function buildGhostPopup(g){
   const at   = g.alt_trend != null && Math.abs(g.alt_trend) > 50
     ? (g.alt_trend > 0 ? `↑ +${Math.round(g.alt_trend)}fpm` : `↓ ${Math.round(g.alt_trend)}fpm`)
     : '';
-  const osky = g.opensky_found ? `<span style="color:#22c55e">✓ OpenSky recovered</span>` : '';
 
-  return `<div class="popup-inner" style="min-width:220px">
-    <div style="color:#00ff77;font-size:.7rem;letter-spacing:.12em;margin-bottom:.3rem;
+  // Fix source badge
+  const fixSrc = g.fix_source || 'DR';
+  const fixCol  = g.acars_found ? '#00ff77' : g.opensky_found ? '#22c55e' : '#555';
+  const fixIcon = g.acars_found
+    ? (fixSrc === 'HFDL' ? '📡 HFDL' : '📻 ACARS')
+    : g.opensky_found ? '🛰 OpenSky' : '🔮 Dead Reckoning';
+  const fixFreq = g.acars_freq ? ` ${esc(g.acars_freq)} MHz` : '';
+  const fixLabel= g.acars_label ? ` L${esc(g.acars_label)}` : '';
+
+  // GPSJam correlation alert
+  const jamAlert = g.gpsjam_hit
+    ? `<div style="background:#1a0a00;border:1px solid #f97316;color:#f97316;
+        font-size:.52rem;padding:2px 6px;margin:.3rem 0;letter-spacing:.06em">
+        ⚡ GPS JAMMING ACTIVE ${esc(g.gpsjam_hit)} — possible EW aircraft</div>`
+    : '';
+
+  // Squawk intel
+  const sqIntel = g.squawk_intel
+    ? `<div class="popup-row"><span class="popup-label">SQUAWK</span>
+       <span class="popup-val" style="color:#facc15">${esc(g.squawk_intel)}</span></div>`
+    : '';
+
+  // Signal chain (each entry on its own line, colour-coded)
+  const sigLines = (g.signal_sources || []).map(s => {
+    const ok  = s.includes('✓');
+    const col = ok ? '#22c55e' : s.includes('-') ? '#555' : '#ef444499';
+    return `<div style="color:${col}">${esc(s)}</div>`;
+  }).join('');
+
+  const predData = JSON.stringify({
+    callsign:g.callsign, lat:g.lat, lon:g.lon,
+    heading_deg:g.heading_deg, speed_kts:g.speed_kts,
+    altitude_ft:g.altitude_ft, military_flag:1,
+    source:'ghost_mil', type:'military'
+  });
+
+  return `<div class="popup-inner" style="min-width:230px">
+    <div style="color:#00ff77;font-size:.7rem;letter-spacing:.12em;margin-bottom:.25rem;
       text-shadow:0 0 8px #00ff77">⚡ GHOST TRACK — DARK ${esc(darkLabel)}</div>
-    ${osky?`<div style="font-size:.55rem;margin-bottom:.3rem">${osky}</div>`:''}
+
+    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem">
+      <span style="background:#001a0a;border:1px solid ${fixCol};color:${fixCol};
+        font-size:.5rem;padding:1px 6px;letter-spacing:.08em">${fixIcon}${fixFreq}${fixLabel}</span>
+      <span style="color:${conf>70?'#22c55e':conf>40?'#facc15':'#ef4444'};font-size:.55rem;font-weight:700">${conf}% conf</span>
+    </div>
+
+    ${jamAlert}
+
     <div class="popup-row"><span class="popup-label">CALLSIGN</span>
       <span class="popup-val" style="color:#00ff77">${esc(g.callsign||'—')}</span></div>
     <div class="popup-row"><span class="popup-label">BEHAVIOR</span>
       <span class="popup-val" style="color:#facc15">${esc(beh)}${g.is_orbit?' 🔄':''}</span></div>
+    ${sqIntel}
     <div class="popup-row"><span class="popup-label">ALT</span>
-      <span class="popup-val">${alt}${at?' '+at:''}</span></div>
+      <span class="popup-val">${alt}${at?` <span style="color:#a78bfa">${at}</span>`:''}</span></div>
     <div class="popup-row"><span class="popup-label">SPEED</span>
       <span class="popup-val">${spd}</span></div>
     <div class="popup-row"><span class="popup-label">HEADING</span>
       <span class="popup-val">${hdg}</span></div>
     <div class="popup-row"><span class="popup-label">TURN RATE</span>
       <span class="popup-val" style="color:${Math.abs(g.turn_rate||0)>1?'#f97316':'#b8bcc8'}">${tr}</span></div>
-    <div class="popup-row"><span class="popup-label">CONFIDENCE</span>
-      <span class="popup-val" style="color:${conf>70?'#22c55e':conf>40?'#facc15':'#ef4444'}">${conf}%</span></div>
-    <div style="margin:.4rem 0 .2rem;border-top:1px solid #1e2a1e;padding-top:.3rem">
-      <div style="color:#555;font-size:.52rem;letter-spacing:.08em;margin-bottom:.2rem">SIGNALS CHECKED</div>
-      <div style="font-size:.55rem;color:#00ff7799;letter-spacing:.04em">${esc(sigs)}</div>
+
+    <div style="margin:.35rem 0 .2rem;border-top:1px solid #1e2a1e;padding-top:.3rem">
+      <div style="color:#444;font-size:.5rem;letter-spacing:.08em;margin-bottom:.2rem">SIGNAL CHAIN</div>
+      <div style="font-size:.52rem;font-family:monospace;line-height:1.6">${sigLines}</div>
     </div>
+
     <div style="display:flex;gap:.3rem;margin-top:.4rem">
       <button class="mmd-btn" style="flex:1;border-color:#00ff77;color:#00ff77"
-        onclick="predictPath({...${JSON.stringify({callsign:g.callsign,lat:g.lat,lon:g.lon,heading_deg:g.heading_deg,speed_kts:g.speed_kts,altitude_ft:g.altitude_ft,military_flag:1,source:'ghost_mil',type:'military'})}})">
-        🎯 PREDICT PATH</button>
+        onclick="predictPath(${predData})">🎯 PREDICT PATH</button>
     </div>
-    <div style="color:#333;font-size:.48rem;margin-top:.3rem">
-      Last known: ${g.last_known_lat!=null?g.last_known_lat.toFixed(3)+'°N':'?'}, ${g.last_known_lon!=null?g.last_known_lon.toFixed(3)+'°E':'?'}
+    <div style="color:#333;font-size:.46rem;margin-top:.3rem">
+      Last fix: ${g.last_known_lat!=null?g.last_known_lat.toFixed(3)+'°N':'?'} ${g.last_known_lon!=null?g.last_known_lon.toFixed(3)+'°E':'?'}
     </div>
   </div>`;
 }
@@ -6102,6 +6144,7 @@ function sourceToLayerKey(source, category){
   const _combatCat = {aircraft_down:1,missile_strike:1,airstrike:1,drone_attack:1,naval:1,equipment_loss:1};
   if(_combatCat[category]) return category;
   if(s==='ghost_mil') return 'adsb';  // ghost shares adsb layer key for visibility toggle
+  if(s==='acars'||s==='hfdl') return 'adsb';  // ACARS/HFDL military positions on same layer
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
   if(s==='shodan')         return 'shodan';
@@ -6172,6 +6215,7 @@ function spawnPulse(lat, lon, color){
 // ── Position updater ──────────────────────────────────────────────────────────
 const LAYER_COLORS = {
   adsb:'#f59e0b',ais:'#06b6d4',tle:'#a855f7',acled:'#ef4444',
+  acars:'#f59e0b',hfdl:'#f59e0b',  // ACARS/HFDL — same layer as ADS-B (military aircraft)
   aircraft_down:'#ef4444', missile_strike:'#ef4444', airstrike:'#f97316',
   drone_attack:'#f59e0b', naval:'#06b6d4', equipment_loss:'#fb923c',
   notam:'#eab308',osint:'#3b82f6',fire:'#f97316',seismic:'#84cc16',

@@ -2,24 +2,23 @@
 Wardar — Ghost Tracker
 ======================
 When military aircraft go dark (ADS-B / MLAT gap > GHOST_DARK_MIN minutes),
-attempt to continue tracking via:
+attempt to continue tracking via a cascading signal fallback chain:
 
-  1. OpenSky Network — independent receiver network, free anonymous access
-  2. Dead-reckoning — last known heading + speed + computed turn-rate from
-     position_history, iterated per-minute so banking/turning aircraft are
-     extrapolated along their arc, not a straight line
+  Signal Fallback Chain (in priority order):
+  1. ACARS/HFDL  — airframes.io community receivers
+                   VHF range ~200-300nm; HFDL = global via HF ionospheric skip
+                   Best for oceanic routes where ADS-B coverage is absent
+  2. OpenSky     — independent ADS-B receiver network (different ground stations)
+  3. Dead-reckoning — last heading + speed + turn-rate from position_history,
+                      iterated per-minute so turning/orbiting aircraft follow arc
+
+  Correlated intelligence (enriches ghost, doesn't replace position):
+  4. GPSJam      — if ghost position overlaps active GPS jamming cell, flag it
+                   (EW aircraft cause their own jamming — useful cross-signal)
+  5. Squawk      — military squawk code pattern analysis (mission type hints)
 
 Ghost positions are broadcast as type "ghost_positions" over WebSocket.
 They are NEVER stored in the DB — they are ephemeral computed positions.
-
-Algorithm:
-  • Scan positions table for military aircraft with no update in >GHOST_DARK_MIN min
-  • Pull last 20 history rows → compute avg turn_rate (deg/min) and speed
-  • Detect orbit pattern (turn_rate > threshold over 180°+ of heading change)
-  • For orbit: project the aircraft around the orbit circle
-  • For transit: project straight/arcing path
-  • Try OpenSky by ICAO24 hex — if found, use that as ground truth and reset DR
-  • Emit ghost dict per dark aircraft
 """
 from __future__ import annotations
 
@@ -104,6 +103,124 @@ def _detect_orbit(history: list[dict]) -> bool:
             dh -= 360
         total += dh
     return abs(total) >= _ORBIT_MIN_SPAN
+
+
+# ── Squawk code mission intelligence ─────────────────────────────────────────
+# Military squawk allocations vary by country but common patterns are documented
+# in ICAO Doc 7030 regional supplements and national AIP ENR sections.
+
+_SQUAWK_MISSIONS: dict[str, str] = {
+    # Emergency / special
+    "7700": "EMERGENCY",
+    "7600": "RADIO FAIL",
+    "7500": "HIJACK",
+    # US military training ranges (ATCAA)
+    "7001": "MIL TRAINING",
+    "7002": "MIL TRAINING",
+    # US Navy special missions
+    "6400": "USN SPECIAL",
+    "6401": "USN SPECIAL",
+    # UK military (ENR 1.6)
+    "7001": "RAF TRAINING",
+    "6100": "UK MIL",
+    # NATO AWACS / ISR distinctive
+    "6676": "NATO ISR",
+    "5765": "NATO AWACS",
+    # Tanker common codes (US)
+    "3400": "TANKER OPS",
+    "3401": "TANKER OPS",
+    # NORAD / Air Defense
+    "0100": "AIR DEFENSE",
+    "0200": "AIR DEFENSE",
+    # Test / evaluation flights
+    "0076": "TEST/EVAL",
+    "0077": "TEST/EVAL",
+}
+
+# Squawk ranges that are always military-allocated
+_MIL_SQUAWK_RANGES = [
+    (0o6000, 0o6077),   # US mil specific
+    (0o7001, 0o7007),   # mil training globally
+]
+
+
+def _squawk_mission(extra_json: str) -> str:
+    """
+    Analyse the squawk code stored in extra JSON.
+    Returns a mission-type hint string or "" if nothing notable.
+    """
+    try:
+        extra  = json.loads(extra_json or "{}")
+        squawk = str(extra.get("squawk") or "").strip()
+        if not squawk or squawk in ("0000", ""):
+            return ""
+
+        # Direct match
+        if squawk in _SQUAWK_MISSIONS:
+            return _SQUAWK_MISSIONS[squawk]
+
+        # Range check (convert from octal string representation)
+        try:
+            sq_int = int(squawk, 8)   # squawk codes are octal
+            for lo, hi in _MIL_SQUAWK_RANGES:
+                if lo <= sq_int <= hi:
+                    return "MIL ALLOCATED"
+        except Exception:
+            pass
+
+        # Pattern: 1XXX often assigned to military by regional ATC
+        if squawk.startswith("1") and len(squawk) == 4:
+            return "MIL RANGE"
+
+    except Exception:
+        pass
+    return ""
+
+
+# ── GPSJam correlation ────────────────────────────────────────────────────────
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a  = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+    return 2 * R * math.asin(math.sqrt(min(1.0, a)))
+
+
+def _check_gpsjam_overlap(conn, ghost_lat: float, ghost_lon: float) -> str:
+    """
+    Check if the ghost aircraft position is near an active GPS jamming cell.
+    Returns a description string (e.g. "150km SE") or "" if no overlap.
+    Uses events table: source='gpsjam', raw_ts_utc within last 6 hours.
+    """
+    try:
+        rows = conn.execute("""
+            SELECT lat, lon, title FROM events
+            WHERE source = 'gpsjam'
+              AND raw_ts_utc > datetime('now', '-6 hours')
+              AND lat IS NOT NULL AND lon IS NOT NULL
+            ORDER BY raw_ts_utc DESC
+            LIMIT 100
+        """).fetchall()
+
+        best_km   = 9999.0
+        best_desc = ""
+        for row in rows:
+            km = _haversine_km(ghost_lat, ghost_lon, float(row["lat"]), float(row["lon"]))
+            if km < 300 and km < best_km:   # within 300km
+                best_km   = km
+                # Cardinal direction from jam cell to ghost
+                dlat = ghost_lat - float(row["lat"])
+                dlon = ghost_lon - float(row["lon"])
+                bearing = math.degrees(math.atan2(dlon, dlat)) % 360
+                dirs = ["N","NE","E","SE","S","SW","W","NW","N"]
+                card = dirs[round(bearing / 45) % 8]
+                best_desc = f"{int(km)}km {card}"
+
+        return best_desc
+    except Exception:
+        return ""
 
 
 def _project_ghost(last_lat: float, last_lon: float, last_hdg: float,
@@ -282,22 +399,56 @@ async def run_ghost_tick() -> list[dict]:
             if alt_ft is not None and alt_trend != 0:
                 ghost_alt = max(0, float(alt_ft) + alt_trend * elapsed_min)
 
-            # Try alternative signal sources
-            signal_sources  = [f"{orig_src}✗"]
-            opensky_found   = False
-            hex_code        = ""
+            # ── Parse squawk for mission type hints ──────────────────────────
+            squawk_intel = _squawk_mission(r.get("extra") or "{}")
+
+            # ── Signal fallback chain ─────────────────────────────────────────
+            signal_sources = [f"{orig_src}✗"]
+            acars_found    = False
+            opensky_found  = False
+            fix_source     = "DR"      # dead reckoning by default
+            acars_label    = ""
+            acars_freq     = ""
+
+            hex_code = ""
             try:
                 extra    = json.loads(r["extra"] or "{}")
                 hex_code = extra.get("hex", "")
             except Exception:
                 pass
 
-            if hex_code:
+            # ── Step 1: ACARS / HFDL (highest accuracy — real radio fix) ─────
+            if hex_code or callsign:
+                try:
+                    from ingestors.acars_hfdl import lookup_aircraft
+                    acars = await lookup_aircraft(hex_code, callsign)
+                    if acars:
+                        acars_found  = True
+                        fix_source   = acars.get("acars_source", "ACARS")
+                        acars_label  = acars.get("label", "")
+                        acars_freq   = acars.get("freq", "")
+                        signal_sources.append(f"{fix_source}✓ ({acars_freq})")
+                        ghost_lat = acars["lat"]
+                        ghost_lon = acars["lon"]
+                        if acars.get("heading_deg") is not None:
+                            ghost_hdg = acars["heading_deg"]
+                        if acars.get("speed_kts") is not None:
+                            avg_spd = acars["speed_kts"]
+                        if acars.get("altitude_ft") is not None:
+                            ghost_alt = acars["altitude_ft"]
+                        elapsed_min = 1.0   # ~60s old ACARS fix typical
+                    else:
+                        signal_sources.append(f"ACARS/HFDL✗")
+                except Exception:
+                    signal_sources.append("ACARS/HFDL-")
+
+            # ── Step 2: OpenSky (only if ACARS missed) ────────────────────────
+            if not acars_found and hex_code:
                 osky = await _try_opensky(hex_code)
                 if osky:
                     opensky_found = True
+                    fix_source    = "OpenSky"
                     signal_sources.append("OpenSky✓")
-                    # Use OpenSky as ground truth — reset to its position
                     ghost_lat = osky["lat"]
                     ghost_lon = osky["lon"]
                     if osky.get("heading_deg") is not None:
@@ -306,20 +457,25 @@ async def run_ghost_tick() -> list[dict]:
                         avg_spd = osky["speed_kts"]
                     if osky.get("altitude_ft") is not None:
                         ghost_alt = osky["altitude_ft"]
-                    # Small dead-reckon from OpenSky fix time to now (minimal)
-                    elapsed_min = 0.5   # assume ~30s old OpenSky fix
+                    elapsed_min = 0.5
                 else:
                     signal_sources.append("OpenSky✗")
-            else:
-                signal_sources.append("OpenSky-")   # no hex, can't query
+            elif not acars_found:
+                signal_sources.append("OpenSky-")
 
-            # Confidence: decays with time; boosted if OpenSky confirmed
-            if opensky_found:
+            # ── Step 3: GPSJam correlation ────────────────────────────────────
+            gpsjam_hit = _check_gpsjam_overlap(conn, ghost_lat, ghost_lon)
+            if gpsjam_hit:
+                signal_sources.append(f"GPSJam⚡({gpsjam_hit})")
+
+            # ── Confidence ────────────────────────────────────────────────────
+            if acars_found:
+                confidence = 0.97 if fix_source == "HFDL" else 0.92
+            elif opensky_found:
                 confidence = 0.95
             else:
                 confidence = max(0.05, 1.0 - (elapsed_min / GHOST_MAX_MIN))
 
-            # Behavior tag
             behavior = "ORBIT" if is_orbit else ("TURNING" if abs(turn_rate) > 0.5 else "TRANSIT")
             dark_min = round(elapsed_min)
 
@@ -341,7 +497,13 @@ async def run_ghost_tick() -> list[dict]:
                 "behavior":         behavior,
                 "confidence":       round(confidence, 3),
                 "signal_sources":   signal_sources,
+                "fix_source":       fix_source,
+                "acars_found":      acars_found,
                 "opensky_found":    opensky_found,
+                "gpsjam_hit":       gpsjam_hit,
+                "squawk_intel":     squawk_intel,
+                "acars_label":      acars_label,
+                "acars_freq":       acars_freq,
                 "last_known_lat":   last_lat,
                 "last_known_lon":   last_lon,
                 "last_known_hdg":   last_hdg,
@@ -353,7 +515,11 @@ async def run_ghost_tick() -> list[dict]:
                     "behavior":       behavior,
                     "confidence_pct": round(confidence * 100),
                     "signal_sources": signal_sources,
+                    "fix_source":     fix_source,
                     "alt_trend_fpm":  round(alt_trend, 1),
+                    "gpsjam_hit":     gpsjam_hit,
+                    "squawk_intel":   squawk_intel,
+                    "acars_freq":     acars_freq,
                 }),
             }
             ghosts.append(ghost)
@@ -362,6 +528,9 @@ async def run_ghost_tick() -> list[dict]:
             log_warn(f"ghost_tracker: {r.get('callsign','?')}: {exc}")
             continue
 
+    acars_ct   = sum(1 for g in ghosts if g["acars_found"])
+    opensky_ct = sum(1 for g in ghosts if g["opensky_found"] and not g["acars_found"])
+    dr_ct      = len(ghosts) - acars_ct - opensky_ct
     if ghosts:
-        log(f"ghost_tracker: {len(ghosts)} dark mil aircraft — {sum(1 for g in ghosts if g['opensky_found'])} recovered via OpenSky")
+        log(f"ghost_tracker: {len(ghosts)} dark mil — {acars_ct} ACARS/HFDL, {opensky_ct} OpenSky, {dr_ct} DR-only")
     return ghosts

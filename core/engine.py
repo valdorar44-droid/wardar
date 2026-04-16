@@ -761,8 +761,25 @@ async def _tick_webhook_flush():
         log_err(f"tick_webhook_flush: {exc}")
 
 
+async def _tick_acars_hfdl():
+    """Poll airframes.io for ACARS/HFDL position reports from military aircraft."""
+    if not getattr(C, "ENABLE_ACARS_HFDL", True):
+        return
+    try:
+        from ingestors import acars_hfdl
+        positions = await acars_hfdl.fetch()
+        n = _save_positions(positions)
+        if positions:
+            hfdl_ct  = sum(1 for p in positions if p["source"] == "hfdl")
+            acars_ct = len(positions) - hfdl_ct
+            log(f"acars_hfdl: saved {n} ({hfdl_ct} HFDL, {acars_ct} ACARS)")
+            await _broadcast({"type": "positions", "sources": ["hfdl", "acars"], "data": positions})
+    except Exception as exc:
+        log_err(f"tick_acars_hfdl: {exc}")
+
+
 async def _tick_ghost_tracker():
-    """Dead-reckon dark military aircraft; try OpenSky as alternative signal."""
+    """Dead-reckon dark military aircraft; cascade through ACARS/HFDL → OpenSky → DR."""
     if not getattr(C, "ENABLE_GHOST_TRACKER", True):
         return
     try:
@@ -849,6 +866,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_acled_iran,           C.ACLED_INTERVAL_SEC,           "acled_iran")),
         asyncio.create_task(_run_every(_tick_reliefweb_api,        C.RELIEFWEB_API_INTERVAL_SEC,   "reliefweb_api")),
         asyncio.create_task(_run_every(_tick_gfw_vessels,          C.GFW_INTERVAL_SEC,             "gfw_vessels")),
+        asyncio.create_task(_run_every(_tick_acars_hfdl,           getattr(C, "ACARS_HFDL_INTERVAL_SEC", 300),  "acars_hfdl")),
         asyncio.create_task(_run_every(_tick_ghost_tracker,        getattr(C, "GHOST_TRACKER_INTERVAL_SEC", 60), "ghost_tracker")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
