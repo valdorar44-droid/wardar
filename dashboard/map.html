@@ -107,6 +107,9 @@ body::after{
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes alertPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}
+@keyframes ghostPulse{0%,100%{opacity:.75;filter:drop-shadow(0 0 4px #00ff77)}50%{opacity:.3;filter:drop-shadow(0 0 10px #00ff77cc)}}
+.ghost-aircraft-svg{animation:ghostPulse 2.2s ease-in-out infinite}
+.ghost-dark-badge{animation:ghostPulse 2.2s ease-in-out infinite;animation-delay:-.6s}
 
 /* ══════════════════════════════════════════════════════════════
    MAIN LAYOUT
@@ -3824,6 +3827,15 @@ function _globeIconSvg(type, hexColor) {
       `<line x1="0" y1="-6" x2="0" y2="-14" stroke="${H}" stroke-width="1"/>` +
       `<circle cx="0" cy="-15" r="2" fill="${H}" opacity="0.75"/>` +
       `</svg>`,
+    // Ghost military aircraft — translucent outlined delta, dashed stroke
+    ghost_mil:
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48">` +
+      `<polygon points="0,-20 -14,12 0,6 14,12" fill="#00ff7722" stroke="#00ff77" stroke-width="1.8" stroke-dasharray="5,3" opacity="0.9"/>` +
+      `<polygon points="-3,6 -10,18 -3,11" fill="#00ff7733" stroke="#00ff77" stroke-width="1" stroke-dasharray="3,2" opacity="0.75"/>` +
+      `<polygon points="3,6 10,18 3,11"  fill="#00ff7733" stroke="#00ff77" stroke-width="1" stroke-dasharray="3,2" opacity="0.75"/>` +
+      `<rect x="-1.5" y="-22" width="3" height="5" fill="#00ff7766" opacity="0.6"/>` +
+      `<circle cx="0" cy="0" r="2.5" fill="none" stroke="#00ff77" stroke-width="1" opacity="0.8"/>` +
+      `</svg>`,
   };
   const svg = svgs[type] || svgs.aircraft;
   // Encode entire SVG as data URI — encodeURIComponent handles # in hex colors correctly
@@ -3834,6 +3846,7 @@ function _globeIconSvg(type, hexColor) {
 function _getGlobeIconType(d) {
   const src = d.source || '';
   const mil  = parseInt(d.military_flag || 0);
+  if (src === 'ghost_mil') return 'ghost_mil';
   if (src === 'tle') return 'satellite';
   if (src === 'ais')  return mil ? 'ship_mil' : 'ship';
   if (src === 'adsb' || src === 'opensky' || src === 'adsb_emergency') {
@@ -3848,6 +3861,15 @@ function _getGlobeIconType(d) {
 }
 const _trails = {};
 let _predictArcs = [];  // AI predicted path arcs — cleared per-prediction
+
+// ── Ghost Tracker state ───────────────────────────────────────────────────────
+const _ghostStore   = {};   // callsign → ghost data dict (from server tick)
+const _lastSeenMs   = {};   // callsign → Date.now() of last real ADS-B hit
+const _ghostMkrs2D  = {};   // callsign → Leaflet marker (ghost layer)
+const _ghostPaths2D = {};   // callsign → Leaflet polyline (predicted track ahead)
+const _ghostLastMk  = {};   // callsign → {lat,lon} at time marker was placed (for client DR)
+const _ghostLastMs  = {};   // callsign → Date.now() when marker was placed
+let   _ghostLayer2D = null; // L.layerGroup — separate from cluster groups
 
 // ── Map mode (2d / 3d) ────────────────────────────────────────────────────────
 let _mapMode = '2d';
@@ -4164,6 +4186,49 @@ function _rebuildGlobe(){
     });
   }
 
+  // ── Ghost aircraft (3D globe) ──
+  for(const [cs, g] of Object.entries(_ghostStore)){
+    if(g.lat==null||g.lon==null) continue;
+    const altM = Math.max((g.altitude_ft||35000)/3.28084, 6000);
+    const hdg  = g.heading_deg || 0;
+    // Ghost billboard (outlined translucent delta)
+    if(_cesiumBills){
+      _cesiumBills.add({
+        position: Cesium.Cartesian3.fromDegrees(g.lon, g.lat, altM),
+        image:     _globeIconSvg('ghost_mil', '#00ff77'),
+        rotation:  -Cesium.Math.toRadians(hdg),
+        scale:     0.8,
+        verticalOrigin:   Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        scaleByDistance:       new Cesium.NearFarScalar(300, 2.2, 25000, 0.0),
+        translucencyByDistance: new Cesium.NearFarScalar(5000, 1.0, 20000, 0.0),
+      });
+    }
+    // Ghost point dot at global view
+    _cesiumPts.add({
+      position: Cesium.Cartesian3.fromDegrees(g.lon, g.lat, altM),
+      color:       Cesium.Color.fromCssColorString('#00ff77').withAlpha(0.5),
+      pixelSize:   8,
+      outlineColor: Cesium.Color.fromCssColorString('#00ff77').withAlpha(0.25),
+      outlineWidth: 2,
+    });
+    // Ghost heading vector line (dashed green, 600km)
+    if(g.speed_kts > 5){
+      const h = hdg*Math.PI/180, dist=600/6371;
+      const la1=g.lat*Math.PI/180, lo1=g.lon*Math.PI/180;
+      const la2=Math.asin(Math.sin(la1)*Math.cos(dist)+Math.cos(la1)*Math.sin(dist)*Math.cos(h));
+      const lo2=lo1+Math.atan2(Math.sin(h)*Math.sin(dist)*Math.cos(la1),Math.cos(dist)-Math.sin(la1)*Math.sin(la2));
+      _cesiumLines.add({
+        positions:[
+          Cesium.Cartesian3.fromDegrees(g.lon,g.lat,altM),
+          Cesium.Cartesian3.fromDegrees(lo2*180/Math.PI,la2*180/Math.PI,altM),
+        ],
+        width:1.5,
+        material:Cesium.Material.fromType('Color',{color:Cesium.Color.fromCssColorString('#00ff77').withAlpha(0.45)}),
+      });
+    }
+  }
+
   // ── ISW conflict polygons ──
   for(const poly of iswPolygons){
     if(!poly.geometry||!poly.geometry.coordinates) continue;
@@ -4362,6 +4427,19 @@ function _svgAircraft(col, hdg, isMil, sz){
     style="transform:${r};display:block;overflow:visible">
     <path d="M0,-${h*.86} L${h*.78},${h*.38} L${h*.12},${h*.1} L${h*.12},${h*.76} L0,${h*.86} L-${h*.12},${h*.76} L-${h*.12},${h*.1} L-${h*.78},${h*.38} Z"
       fill="${col}" opacity=".9" filter="drop-shadow(0 0 2px ${col}77)"/>
+  </svg>`;
+}
+
+// Ghost military aircraft — translucent green outlined delta wing, pulsing
+function _svgGhostAircraft(hdg, sz){
+  const h = sz/2, r = `rotate(${hdg!=null?hdg:0}deg)`;
+  return `<svg width="${sz}" height="${sz}" viewBox="-${h} -${h} ${sz} ${sz}"
+    class="ghost-aircraft-svg"
+    style="transform:${r};display:block;overflow:visible">
+    <path d="M0,-${h*.88} L${h*.84},${h*.48} L${h*.18},${h*.1} L${h*.18},${h*.74} L-${h*.18},${h*.74} L-${h*.18},${h*.1} L-${h*.84},${h*.48} Z"
+      fill="#00ff7718" stroke="#00ff77" stroke-width="1.3" stroke-dasharray="4,2.5"
+      opacity=".9" filter="drop-shadow(0 0 5px #00ff7799)"/>
+    <circle r="${h*.13}" fill="#00ff77" opacity=".55"/>
   </svg>`;
 }
 
@@ -5164,6 +5242,12 @@ function initMap2D(){
     });
     if(visible[lk]) _cluster2d[lk].addTo(_map2d);
   }
+
+  // Ghost layer — separate from clusters, always on top
+  _ghostLayer2D = L.layerGroup().addTo(_map2d);
+
+  // Re-build ghost icons on zoom (same as regular markers)
+  _map2d.on('zoomend', _refreshGhostIcons2D);
 }
 
 function addMarker2D(key, d){
@@ -5335,6 +5419,221 @@ function togglePanelCollapse(){
 
 // ── AI Asset Prediction ───────────────────────────────────────────────────────
 const THREAT_COLORS = {LOW:'#22c55e',MODERATE:'#f59e0b',HIGH:'#f97316',CRITICAL:'#ef4444'};
+
+// ── Ghost Tracker — client-side rendering ────────────────────────────────────
+
+// Single-step dead reckoning (used by ghost advancement loop)
+function _drStep(lat0, lon0, hdgDeg, speedKts, minutes){
+  if(!speedKts || speedKts < 1 || minutes <= 0) return [lat0, lon0];
+  const R = 6371, d = (speedKts*1.852*(minutes/60))/R;
+  const brg = hdgDeg*Math.PI/180, la1=lat0*Math.PI/180, lo1=lon0*Math.PI/180;
+  const la2 = Math.asin(Math.sin(la1)*Math.cos(d)+Math.cos(la1)*Math.sin(d)*Math.cos(brg));
+  const lo2 = lo1+Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(la1),Math.cos(d)-Math.sin(la1)*Math.sin(la2));
+  return [la2*180/Math.PI, ((lo2*180/Math.PI)+540)%360-180];
+}
+
+/** Called when a ghost_positions WS message arrives. Store + render. */
+function _updateGhostStore(g){
+  const cs = g.callsign || g._k || '';
+  if(!cs) return;
+  // Don't render ghost if we have a fresh real signal (<10 min ago)
+  const seenMs = _lastSeenMs[cs];
+  if(seenMs && (Date.now()-seenMs) < 10*60*1000) return;
+  g._receivedAt = Date.now();
+  _ghostStore[cs] = g;
+  _ghostLastMk[cs] = {lat:g.lat, lon:g.lon, hdg:g.heading_deg};
+  _ghostLastMs[cs] = Date.now();
+  if(_mapMode==='2d') _renderGhost2D(g);
+  else _scheduleRebuild();
+}
+
+/** Build the ghost marker icon for 2D Leaflet. */
+function _buildGhostIcon(g, zoom){
+  const hdg = g.heading_deg != null ? g.heading_deg : 0;
+  const sz  = zoom >= 11 ? 30 : zoom >= 8 ? 24 : 18;
+  const darkMin = g.dark_min || 0;
+  const darkLabel = darkMin >= 60
+    ? `${Math.floor(darkMin/60)}h${darkMin%60|0}m`
+    : `${darkMin}m`;
+  const confPct = Math.round((g.confidence||0)*100);
+  const beh = g.behavior || '';
+
+  if(zoom < 5){
+    return L.divIcon({
+      html:`<div style="width:8px;height:8px;border-radius:50%;border:1.5px dashed #00ff77;background:#00ff7722;box-shadow:0 0 6px #00ff77aa"></div>`,
+      className:'',iconSize:[8,8],iconAnchor:[4,4]
+    });
+  }
+  if(zoom < 8){
+    const sz2=16;
+    return L.divIcon({
+      html:`<div style="width:${sz2}px;height:${sz2}px;font-size:${sz2}px;line-height:1;filter:drop-shadow(0 0 4px #00ff77)" class="ghost-aircraft-svg">👻</div>`,
+      className:'',iconSize:[sz2,sz2],iconAnchor:[sz2/2,sz2/2]
+    });
+  }
+
+  const svgHtml = _svgGhostAircraft(hdg, sz);
+  const badge = `<div class="ghost-dark-badge" style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+    background:#00080488;border:1px dashed #00ff77;color:#00ff77;
+    font-family:monospace;font-size:5.5px;padding:1px 5px;white-space:nowrap;
+    letter-spacing:.1em;pointer-events:none;text-shadow:0 0 4px #00ff77">DARK ${esc(darkLabel)}</div>`;
+  const tag = zoom >= 12 && (g.altitude_ft!=null||g.speed_kts!=null)
+    ? `<div style="position:absolute;bottom:calc(100% + 14px);left:50%;transform:translateX(-50%);
+        font-size:5px;font-family:monospace;color:#00ff7788;white-space:nowrap;pointer-events:none">
+        ${g.altitude_ft!=null?Math.round(g.altitude_ft/100)+'FL':''}${g.speed_kts!=null?' '+Math.round(g.speed_kts)+'kt':''}
+        ${beh?` · ${beh}`:''}</div>`
+    : '';
+  const cs = (g.callsign||'').substring(0,10);
+  const lbl = zoom >= 10 ? `<div style="position:absolute;top:calc(100%+2px);left:50%;transform:translateX(-50%);
+    font-size:6px;font-family:monospace;color:#00ff7799;white-space:nowrap;pointer-events:none">${esc(cs)}</div>` : '';
+
+  return L.divIcon({
+    html:`<div style="position:relative;width:${sz}px;height:${sz}px">${svgHtml}${badge}${tag}${lbl}</div>`,
+    className:'ghost-marker',iconSize:[sz+50,sz+30],iconAnchor:[sz/2,sz/2]
+  });
+}
+
+/** Build popup HTML for a ghost position. */
+function buildGhostPopup(g){
+  const darkLabel = (g.dark_min||0) >= 60
+    ? `${Math.floor((g.dark_min||0)/60)}h ${(g.dark_min||0)%60|0}m`
+    : `${g.dark_min||0}m`;
+  const conf = Math.round((g.confidence||0)*100);
+  const sigs = (g.signal_sources||[]).join(' · ');
+  const tr   = g.turn_rate != null ? `${g.turn_rate>0?'+':''}${g.turn_rate.toFixed(1)}°/min` : '—';
+  const alt  = g.altitude_ft != null ? Math.round(g.altitude_ft/100)+'FL' : '—';
+  const spd  = g.speed_kts   != null ? Math.round(g.speed_kts)+'kts' : '—';
+  const hdg  = g.heading_deg != null ? Math.round(g.heading_deg)+'°'  : '—';
+  const beh  = g.behavior || '—';
+  const at   = g.alt_trend != null && Math.abs(g.alt_trend) > 50
+    ? (g.alt_trend > 0 ? `↑ +${Math.round(g.alt_trend)}fpm` : `↓ ${Math.round(g.alt_trend)}fpm`)
+    : '';
+  const osky = g.opensky_found ? `<span style="color:#22c55e">✓ OpenSky recovered</span>` : '';
+
+  return `<div class="popup-inner" style="min-width:220px">
+    <div style="color:#00ff77;font-size:.7rem;letter-spacing:.12em;margin-bottom:.3rem;
+      text-shadow:0 0 8px #00ff77">⚡ GHOST TRACK — DARK ${esc(darkLabel)}</div>
+    ${osky?`<div style="font-size:.55rem;margin-bottom:.3rem">${osky}</div>`:''}
+    <div class="popup-row"><span class="popup-label">CALLSIGN</span>
+      <span class="popup-val" style="color:#00ff77">${esc(g.callsign||'—')}</span></div>
+    <div class="popup-row"><span class="popup-label">BEHAVIOR</span>
+      <span class="popup-val" style="color:#facc15">${esc(beh)}${g.is_orbit?' 🔄':''}</span></div>
+    <div class="popup-row"><span class="popup-label">ALT</span>
+      <span class="popup-val">${alt}${at?' '+at:''}</span></div>
+    <div class="popup-row"><span class="popup-label">SPEED</span>
+      <span class="popup-val">${spd}</span></div>
+    <div class="popup-row"><span class="popup-label">HEADING</span>
+      <span class="popup-val">${hdg}</span></div>
+    <div class="popup-row"><span class="popup-label">TURN RATE</span>
+      <span class="popup-val" style="color:${Math.abs(g.turn_rate||0)>1?'#f97316':'#b8bcc8'}">${tr}</span></div>
+    <div class="popup-row"><span class="popup-label">CONFIDENCE</span>
+      <span class="popup-val" style="color:${conf>70?'#22c55e':conf>40?'#facc15':'#ef4444'}">${conf}%</span></div>
+    <div style="margin:.4rem 0 .2rem;border-top:1px solid #1e2a1e;padding-top:.3rem">
+      <div style="color:#555;font-size:.52rem;letter-spacing:.08em;margin-bottom:.2rem">SIGNALS CHECKED</div>
+      <div style="font-size:.55rem;color:#00ff7799;letter-spacing:.04em">${esc(sigs)}</div>
+    </div>
+    <div style="display:flex;gap:.3rem;margin-top:.4rem">
+      <button class="mmd-btn" style="flex:1;border-color:#00ff77;color:#00ff77"
+        onclick="predictPath({...${JSON.stringify({callsign:g.callsign,lat:g.lat,lon:g.lon,heading_deg:g.heading_deg,speed_kts:g.speed_kts,altitude_ft:g.altitude_ft,military_flag:1,source:'ghost_mil',type:'military'})}})">
+        🎯 PREDICT PATH</button>
+    </div>
+    <div style="color:#333;font-size:.48rem;margin-top:.3rem">
+      Last known: ${g.last_known_lat!=null?g.last_known_lat.toFixed(3)+'°N':'?'}, ${g.last_known_lon!=null?g.last_known_lon.toFixed(3)+'°E':'?'}
+    </div>
+  </div>`;
+}
+
+/** Add or update a ghost marker on the 2D Leaflet map. */
+function _renderGhost2D(g){
+  if(!_map2d || !_ghostLayer2D) return;
+  const cs  = g.callsign || '';
+  const zoom = _map2d.getZoom();
+  const icon = _buildGhostIcon(g, zoom);
+
+  // Predicted path ahead — dashed green polyline (next ~2h)
+  _updateGhostPath2D(g);
+
+  if(_ghostMkrs2D[cs]){
+    _ghostMkrs2D[cs].setLatLng([g.lat, g.lon]);
+    _ghostMkrs2D[cs].setIcon(icon);
+    _ghostMkrs2D[cs]._gdata = g;
+  } else {
+    const m = L.marker([g.lat, g.lon], {icon, zIndexOffset:2000});
+    m._gdata = g;
+    m.bindPopup('', {className:'wardar-popup', maxWidth:300, autoPanPadding:[20,60]});
+    m.on('click', ()=>{
+      _lastPopupData = m._gdata;
+      const html = buildGhostPopup(m._gdata);
+      m.setPopupContent(`<div style="background:#020a04;color:#b8bcc8;font-family:monospace;font-size:11px;border:1px solid #00ff7755">${html}</div>`);
+    });
+    _ghostLayer2D.addLayer(m);
+    _ghostMkrs2D[cs] = m;
+  }
+}
+
+/** Draw/update the dashed predicted path forward from ghost position. */
+function _updateGhostPath2D(g){
+  if(!_map2d) return;
+  const cs = g.callsign || '';
+  if(_ghostPaths2D[cs]) _map2d.removeLayer(_ghostPaths2D[cs]);
+
+  const hdg = g.heading_deg || 0;
+  const spd = g.speed_kts || 0;
+  const tr  = g.turn_rate  || 0;
+  if(spd < 5) return;
+
+  // Project 8 waypoints × 15 min = 2h ahead, applying turn rate
+  const pts = [[g.lat, g.lon]];
+  let glat = g.lat, glon = g.lon, ghdg = hdg;
+  const STEPS = 8, STEP_MIN = 15;
+  for(let i=0; i<STEPS; i++){
+    ghdg = (ghdg + tr*STEP_MIN) % 360;
+    const [nlat, nlon] = _drStep(glat, glon, ghdg, spd, STEP_MIN);
+    pts.push([nlat, nlon]);
+    glat = nlat; glon = nlon;
+  }
+
+  // Fading dashed green polyline
+  const lines = [];
+  for(let i=0; i<pts.length-1; i++){
+    const alpha = Math.max(0.08, 0.6 - i*0.07);
+    lines.push(L.polyline([pts[i],pts[i+1]],{
+      color:'#00ff77', weight:1.5, opacity:alpha,
+      dashArray:'6,5', interactive:false,
+    }));
+  }
+  // Endpoint circle
+  const ep = L.circleMarker(pts[pts.length-1],{
+    radius:4, color:'#00ff77', fillColor:'#00ff77',
+    fillOpacity:0.2, weight:1, interactive:false,
+  }).bindTooltip(`GHOST ETA ~2h`,{className:'measure-tip',direction:'top'});
+  const grp = L.layerGroup([...lines, ep]).addTo(_map2d);
+  _ghostPaths2D[cs] = grp;
+}
+
+/** Remove ghost marker and path from 2D map. */
+function _clearGhost2D(cs){
+  if(_ghostMkrs2D[cs]){
+    if(_ghostLayer2D) _ghostLayer2D.removeLayer(_ghostMkrs2D[cs]);
+    delete _ghostMkrs2D[cs];
+  }
+  if(_ghostPaths2D[cs]){
+    _map2d && _map2d.removeLayer(_ghostPaths2D[cs]);
+    delete _ghostPaths2D[cs];
+  }
+  delete _ghostLastMk[cs];
+  delete _ghostLastMs[cs];
+}
+
+/** Rebuild ghost markers on zoom change. */
+function _refreshGhostIcons2D(){
+  if(!_map2d) return;
+  const zoom = _map2d.getZoom();
+  for(const [cs, m] of Object.entries(_ghostMkrs2D)){
+    const g = m._gdata;
+    if(g) m.setIcon(_buildGhostIcon(g, zoom));
+  }
+}
 
 // Great-circle dead-reckoning path — accurate, instant, no API needed
 function _gcDeadReckoning(lat0, lon0, headingDeg, speedKts, nPoints=8, intervalMin=15){
@@ -5802,6 +6101,7 @@ function sourceToLayerKey(source, category){
   const s=(source||'').toLowerCase();
   const _combatCat = {aircraft_down:1,missile_strike:1,airstrike:1,drone_attack:1,naval:1,equipment_loss:1};
   if(_combatCat[category]) return category;
+  if(s==='ghost_mil') return 'adsb';  // ghost shares adsb layer key for visibility toggle
   if(s==='adsb_emergency') return 'adsb_emergency';
   if(s==='polymarket')     return 'polymarket';
   if(s==='shodan')         return 'shodan';
@@ -5884,10 +6184,20 @@ const LAYER_COLORS = {
 
 function updatePosition(p, isNew){
   if(p.lat==null||p.lon==null) return;
+  if((p.source||'')==='ghost_mil') return; // handled separately by _updateGhostStore
   const key=markerKey(p);
   positionStore[key]=p;
-  if(p.source==='adsb'||p.source==='opensky'||p.source==='ais'){
+  if(p.source==='adsb'||p.source==='opensky'||p.source==='ais'||p.source==='airplaneslive'){
     const cs=p.callsign||key;
+    // Track last-seen for ghost detection
+    if(parseInt(p.military_flag||0)){
+      _lastSeenMs[cs] = Date.now();
+      // Real signal returned — remove any ghost we were tracking
+      if(_ghostStore[cs]){
+        delete _ghostStore[cs];
+        _clearGhost2D(cs);
+      }
+    }
     if(!_trails[cs]) _trails[cs]=[];
     const last=_trails[cs][_trails[cs].length-1];
     if(!last||last.lat!==p.lat||last.lon!==p.lon){
@@ -7742,6 +8052,8 @@ function connectWS(){
         _checkWatchlistMatch(msg.data || []);
       } else if(msg.type==='events'){
         if(TL.isLive)(msg.data||[]).forEach(e=>updateEvent(e,true));
+      } else if(msg.type==='ghost_positions'){
+        if(TL.isLive)(msg.data||[]).forEach(g=>_updateGhostStore(g));
       } else if(msg.type==='intel_brief'){
         // New brief generated server-side — update SITREP pane if open
         if(msg.data && msg.data.text){
@@ -7777,6 +8089,38 @@ function scheduleReconnect(){
 
 setInterval(()=>{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 30000);
 setInterval(refreshCounts, 1000);
+
+// ── Ghost position advancement (client-side DR between server ticks) ──────────
+// Every 10 seconds: advance each ghost forward using its speed/heading/turn-rate
+// so the marker moves smoothly rather than jumping every 60s server tick.
+setInterval(()=>{
+  const now = Date.now();
+  let anyUpdated = false;
+  for(const [cs, g] of Object.entries(_ghostStore)){
+    if(!g.speed_kts || g.speed_kts < 5 || !g.lat) continue;
+    const base    = _ghostLastMk[cs];
+    const baseMs  = _ghostLastMs[cs];
+    if(!base || !baseMs) continue;
+    const ageMin  = (now - baseMs) / 60000;
+    if(ageMin < 0.15) continue;  // less than 9 seconds — skip
+    // Apply turn rate to get current heading
+    const curHdg  = (base.hdg + (g.turn_rate||0) * ageMin) % 360;
+    const [nlat, nlon] = _drStep(base.lat, base.lon, curHdg, g.speed_kts, ageMin);
+    // Update ghost data lat/lon/heading
+    g.lat         = nlat;
+    g.lon         = nlon;
+    g.heading_deg = curHdg;
+    // Move 2D marker
+    const mk = _ghostMkrs2D[cs];
+    if(mk && _map2d && _mapMode==='2d'){
+      mk.setLatLng([nlat, nlon]);
+      mk._gdata = g;
+      anyUpdated = true;
+    }
+  }
+  // In 3D, trigger a globe rebuild if any ghosts moved
+  if(anyUpdated && _mapMode==='3d') _scheduleRebuild();
+}, 10000);
 
 // ── TIMELINE / PLAYBACK ───────────────────────────────────────────────────────
 const TL={

@@ -760,6 +760,19 @@ async def _tick_webhook_flush():
     except Exception as exc:
         log_err(f"tick_webhook_flush: {exc}")
 
+
+async def _tick_ghost_tracker():
+    """Dead-reckon dark military aircraft; try OpenSky as alternative signal."""
+    if not getattr(C, "ENABLE_GHOST_TRACKER", True):
+        return
+    try:
+        from core import ghost_tracker
+        ghosts = await ghost_tracker.run_ghost_tick()
+        if ghosts:
+            await _broadcast({"type": "ghost_positions", "data": ghosts})
+    except Exception as exc:
+        log_err(f"tick_ghost_tracker: {exc}")
+
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 async def _run_every(coro_fn: Callable, interval_sec: int, name: str):
@@ -836,6 +849,7 @@ async def start():
         asyncio.create_task(_run_every(_tick_acled_iran,           C.ACLED_INTERVAL_SEC,           "acled_iran")),
         asyncio.create_task(_run_every(_tick_reliefweb_api,        C.RELIEFWEB_API_INTERVAL_SEC,   "reliefweb_api")),
         asyncio.create_task(_run_every(_tick_gfw_vessels,          C.GFW_INTERVAL_SEC,             "gfw_vessels")),
+        asyncio.create_task(_run_every(_tick_ghost_tracker,        getattr(C, "GHOST_TRACKER_INTERVAL_SEC", 60), "ghost_tracker")),
     ]
     log(f"engine: {len(tasks)} ingestor tasks scheduled")
     return tasks

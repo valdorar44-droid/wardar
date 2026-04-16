@@ -145,6 +145,12 @@ NUCLEAR_ALERT_KM           = _i("NUCLEAR_ALERT_KM",           10)    # km radius
 PIPELINE_ALERT_KM          = _i("PIPELINE_ALERT_KM",          5)     # km radius
 CONVERGENCE_SCORE_THRESHOLD= _i("CONVERGENCE_SCORE_THRESHOLD", 4)    # min score
 
+# ── Ghost Tracker (dead-reckoning for dark military aircraft) ──
+ENABLE_GHOST_TRACKER       = _b("ENABLE_GHOST_TRACKER",       True)
+GHOST_TRACKER_INTERVAL_SEC = _i("GHOST_TRACKER_INTERVAL_SEC", 60)    # every 60s
+GHOST_DARK_MIN             = _i("GHOST_DARK_MIN",             5)     # minutes gap → "dark"
+GHOST_MAX_MIN              = _i("GHOST_MAX_MIN",              240)   # give up after 4 h
+
 # ── Phase 4 Dark Signal Detectors ─────────────────────
 VESSEL_SPOOF_INTERVAL_SEC     = _i("VESSEL_SPOOF_INTERVAL_SEC",     600)   # every 10 min
 TRANSPONDER_LOSS_INTERVAL_SEC = _i("TRANSPONDER_LOSS_INTERVAL_SEC", 600)   # every 10 min
